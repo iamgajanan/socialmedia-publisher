@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { consumeRateLimit, requestFingerprint } from "@/lib/security/rate-limit";
 import { cookies } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -20,6 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   const { platform } = await params;
   if (!isPlatform(platform)) return NextResponse.redirect(new URL("/connect-accounts?error=unsupported", request.url));
 
+  const supabase = await createClient(); const { data: claims } = await supabase.auth.getClaims(); const userId = claims?.claims?.sub; if (!userId) return NextResponse.redirect(new URL("/auth/login", request.url)); if (!(await consumeRateLimit(`oauth-start:user:${String(userId)}`,10,600)) || !(await consumeRateLimit(`oauth-start:ip:${await requestFingerprint()}`,20,600))) return NextResponse.redirect(new URL(`/connect-accounts?error=rate_limit&platform=${platform}`,request.url));
   const config = getProviderConfig(platform);
   if (!config) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
 

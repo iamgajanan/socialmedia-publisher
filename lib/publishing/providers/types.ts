@@ -3,7 +3,7 @@ import "server-only";
 export type PublisherAccount = {
   id: string; platform: string; external_account_id: string; account_name: string;
   username: string | null; metadata: Record<string, unknown>;
-  access_token_ciphertext: string | null; refresh_token_ciphertext: string | null; token_expires_at: string | null;
+  token_expires_at: string | null;
 };
 export type MediaAsset = { path: string; url: string; mimeType: string; size: number };
 export type PublishInput = { account: PublisherAccount; content: string; media: MediaAsset[]; idempotencyKey: string };

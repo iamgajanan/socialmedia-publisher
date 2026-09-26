@@ -81,11 +81,14 @@ export async function GET(request: Request) {
     profile_id: String(userId), platform, account_name: String(values.name || values.username || platform), external_account_id: externalId,
     username: values.username ? String(values.username) : null, avatar_url: values.avatar ? String(values.avatar) : null, status: "connected",
     provider_account_url: values.url ? String(values.url) : null, scopes: tokens.scope ? tokens.scope.split(/[ ,]+/).filter(Boolean) : config.scopes,
-    access_token_ciphertext: encryptToken(tokens.access_token), refresh_token_ciphertext: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
     token_expires_at: typeof tokens.expires_in === "number" ? new Date(Date.now() + tokens.expires_in * 1000).toISOString() : null,
     refresh_token_expires_at: typeof tokens.refresh_expires_in === "number" ? new Date(Date.now() + tokens.refresh_expires_in * 1000).toISOString() : null,
   }, { onConflict: "profile_id,platform,external_account_id" });
 
   if (error) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+  const { data: savedAccount, error: accountLookupError } = await admin.from("socialmedia_social_accounts").select("id").eq("profile_id", String(userId)).eq("platform", platform).eq("external_account_id", externalId).single();
+  if (accountLookupError || !savedAccount) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+  const { error: secretError } = await admin.from("socialmedia_account_secrets").upsert({ social_account_id: savedAccount.id, access_token_ciphertext: encryptToken(tokens.access_token), refresh_token_ciphertext: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null }, { onConflict: "social_account_id" });
+  if (secretError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
   return NextResponse.redirect(new URL("/connect-accounts?connected=1", request.url));
 }
