@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
+import { enqueueNotification } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 const postIdSchema = z.object({ postId: z.string().uuid() });
@@ -98,6 +99,7 @@ export async function queuePublishNow(_previous: PostActionState, formData: Form
   const { error: postError } = await supabase.from("socialmedia_posts").update({ status: "scheduled", scheduled_at: scheduledAt }).eq("id", post.id).eq("profile_id", userId).in("status", ["draft", "scheduled"]);
   if (postError) return { ok: false, message: "The post could not be queued." };
   const { error } = await supabase.from("socialmedia_post_platforms").update({ status: "scheduled", scheduled_at: scheduledAt }).eq("post_id", post.id).in("status", ["pending", "scheduled"]);
+  if (!error) await enqueueNotification({ profileId: userId, eventType: "post_scheduled", dedupeKey: `post_scheduled:${post.id}:${scheduledAt}`, postId: post.id, payload: { scheduledAt } });
   if (error) return { ok: false, message: "The post time changed, but destinations could not be queued." };
   revalidatePath("/post-history");
   revalidatePath("/schedule");

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { decryptToken, encryptToken } from "@/lib/social/token-crypto";
 import { getProviderConfig } from "@/lib/social/oauth";
+import { enqueueNotification } from "@/lib/notifications";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -17,6 +18,8 @@ async function requireUser() {
 export async function disconnectAccount(accountId: string) {
   const { userId } = await requireUser();
   const admin = createAdminClient();
+  const { data: account } = await admin.from("socialmedia_social_accounts").select("id,platform,account_name,created_at").eq("id", accountId).eq("profile_id", userId).maybeSingle();
+  if (account) await enqueueNotification({ profileId: userId, eventType: "account_disconnected", dedupeKey: `account_disconnected:${account.id}:${account.created_at}`, socialAccountId: account.id, payload: { platform: account.platform, account: account.account_name } });
   const { error } = await admin.from("socialmedia_social_accounts").delete().eq("id", accountId).eq("profile_id", userId);
   if (error) redirect("/connect-accounts?error=disconnect");
   redirect("/connect-accounts?disconnected=1");

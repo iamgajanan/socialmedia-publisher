@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone";
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
+import { enqueueNotification } from "@/lib/notifications";
 
 const draftSchema = z.object({
   postId: z.string().uuid().optional(),
@@ -99,6 +100,8 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
   );
   if (linksError) return { ok: false, message: "The draft was saved, but its destinations could not be saved." };
+
+  if (parsed.data.mode === "schedule" && scheduledAt) await enqueueNotification({ profileId: String(userId), eventType: "post_scheduled", dedupeKey: `post_scheduled:${postId}:${scheduledAt}`, postId, payload: { scheduledAt, timezone } });
 
   revalidatePath("/create-post");
   revalidatePath("/dashboard");
