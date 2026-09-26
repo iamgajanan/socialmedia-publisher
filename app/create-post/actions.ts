@@ -56,7 +56,6 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (!hasImage && !hasVideo) return { ok: false, message: "The selected media type is not supported." };
   }
 
-  const accounts = selectedAccountRows.data;
 
   let postId = parsed.data.postId;
   if (postId) {
