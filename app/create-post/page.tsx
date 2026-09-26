@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
+export const instant = false;
+
 export default async function CreatePostPage() {
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
