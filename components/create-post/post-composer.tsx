@@ -7,6 +7,7 @@ import { saveDraft, type SaveDraftState } from "@/app/create-post/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MediaUploader, type UploadedMedia } from "@/components/create-post/media-uploader";
 import { cn } from "@/lib/utils";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
@@ -24,6 +25,7 @@ const initialState: SaveDraftState = { ok: false, message: "" };
 export function PostComposer({ accounts }: { accounts: Account[] }) {
   const [content, setContent] = useState("");
   const [selected, setSelected] = useState<string[]>(accounts.map((account) => account.id));
+  const [media, setMedia] = useState<UploadedMedia[]>([]);
   const [state, formAction, pending] = useActionState(saveDraft, initialState);
   const [previewPlatform, setPreviewPlatform] = useState<string | null>(accounts[0]?.platform ?? null);
 
@@ -45,6 +47,7 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
 
   return <form action={formAction} className="space-y-6">
     {selected.map((id) => <input key={id} type="hidden" name="accountIds" value={id} />)}
+    {media.map((item) => <input key={item.path} type="hidden" name="mediaPaths" value={item.path} />)}
     <input type="hidden" name="content" value={content} />
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
@@ -62,8 +65,9 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
             {selectedMeta && <span className={cn(overLimit && "font-medium text-destructive")}>{content.length.toLocaleString()} / {selectedMeta.limit.toLocaleString()} for {selectedMeta.name}</span>}
           </div>
 
+          <MediaUploader uploaded={media} onUploaded={setMedia} />
+
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled><ImagePlus />Add media <span className="text-xs text-muted-foreground">Phase 7</span></Button>
             <Button type="button" variant="outline" disabled><Sparkles />AI assist</Button>
           </div>
 
