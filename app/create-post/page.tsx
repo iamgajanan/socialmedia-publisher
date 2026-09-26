@@ -16,12 +16,21 @@ export default async function CreatePostPage() {
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
   const userId = String(claims.claims.sub);
 
-  const { data: accounts } = await supabase
-    .from("socialmedia_social_accounts")
-    .select("id, platform, account_name, username, avatar_url")
-    .eq("profile_id", userId)
-    .eq("status", "connected")
-    .order("created_at", { ascending: false });
+  const [{ data: accounts }, { data: profile }] = await Promise.all([
+    supabase
+      .from("socialmedia_social_accounts")
+      .select("id, platform, account_name, username, avatar_url")
+      .eq("profile_id", userId)
+      .eq("status", "connected")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("socialmedia_profiles")
+      .select("timezone")
+      .eq("id", userId)
+      .maybeSingle(),
+  ]);
+
+  const timezone = profile?.timezone || "Asia/Kolkata";
 
   return (
     <div className="space-y-8">
@@ -31,11 +40,11 @@ export default async function CreatePostPage() {
             <Badge variant="secondary">
               <Sparkles className="mr-1.5 size-3.5" />Composer
             </Badge>
-            <span className="text-xs text-muted-foreground">Phase 6</span>
+            <span className="text-xs text-muted-foreground">Phase 8</span>
           </div>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Create a post</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Compose once, select your destinations, validate platform limits, preview, and save a reusable draft.
+            Compose once, choose your destinations, and save a draft or prepare a scheduled post.
           </p>
         </div>
         <Button asChild variant="outline">
@@ -43,7 +52,7 @@ export default async function CreatePostPage() {
         </Button>
       </section>
       {(accounts?.length ?? 0) > 0 ? (
-        <PostComposer accounts={accounts ?? []} />
+        <PostComposer accounts={accounts ?? []} timezone={timezone} />
       ) : (
         <Card className="border-dashed shadow-sm">
           <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">

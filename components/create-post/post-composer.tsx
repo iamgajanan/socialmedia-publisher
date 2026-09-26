@@ -22,22 +22,21 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
 
 const initialState: SaveDraftState = { ok: false, message: "" };
 
-export function PostComposer({ accounts }: { accounts: Account[] }) {
+export function PostComposer({ accounts, timezone = "Asia/Kolkata" }: { accounts: Account[]; timezone?: string }) {
   const [content, setContent] = useState("");
   const [selected, setSelected] = useState<string[]>(accounts.map((account) => account.id));
   const [media, setMedia] = useState<UploadedMedia[]>([]);
+  const [mode, setMode] = useState<"draft" | "schedule">("draft");
+  const [scheduledAtLocal, setScheduledAtLocal] = useState("");
   const [state, formAction, pending] = useActionState(saveDraft, initialState);
   const [previewPlatform, setPreviewPlatform] = useState<string | null>(accounts[0]?.platform ?? null);
 
   const selectedAccounts = accounts.filter((account) => selected.includes(account.id));
-  const selectedPlatforms = useMemo(
-    () => [...new Set(selectedAccounts.map((account) => account.platform))],
-    [selectedAccounts],
-  );
+  const selectedPlatforms = useMemo(() => [...new Set(selectedAccounts.map((account) => account.platform))], [selectedAccounts]);
   const previewAccount = selectedAccounts.find((account) => account.platform === previewPlatform) ?? selectedAccounts[0];
   const selectedMeta = previewPlatform ? meta[previewPlatform] : null;
   const overLimit = selectedMeta ? content.length > selectedMeta.limit : false;
-  const canSave = content.trim().length > 0 && selected.length > 0 && !overLimit;
+  const canSave = content.trim().length > 0 && selected.length > 0 && !overLimit && (mode === "draft" || Boolean(scheduledAtLocal));
 
   const limits = useMemo(
     () => selectedPlatforms.map((platform) => ({ platform, ...meta[platform], over: content.length > meta[platform].limit })),
@@ -52,12 +51,15 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
     {selected.map((id) => <input key={id} type="hidden" name="accountIds" value={id} />)}
     {media.map((item) => <input key={item.path} type="hidden" name="mediaPaths" value={item.path} />)}
     <input type="hidden" name="content" value={content} />
+    <input type="hidden" name="mode" value={mode} />
+    <input type="hidden" name="scheduledAtLocal" value={scheduledAtLocal} />
+    <input type="hidden" name="timezone" value={timezone} />
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
       <Card className="overflow-hidden shadow-sm">
         <CardHeader className="border-b bg-muted/20">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><CardTitle>Post content</CardTitle><CardDescription>Write once, select destinations, and validate before saving.</CardDescription></div>
+            <div><CardTitle>Post content</CardTitle><CardDescription>Write once, select destinations, and prepare a draft or scheduled post.</CardDescription></div>
             <Badge variant={selected.length ? "secondary" : "outline"}>{selected.length} account{selected.length === 1 ? "" : "s"} selected</Badge>
           </div>
         </CardHeader>
@@ -69,6 +71,31 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
           </div>
 
           <MediaUploader uploaded={media} onUploaded={setMedia} />
+
+          <div className="mt-5 rounded-2xl border bg-muted/20 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Publishing mode</p>
+                <p className="text-xs leading-5 text-muted-foreground">Choose whether to keep this post as a draft or schedule it for later.</p>
+              </div>
+              <div className="grid grid-cols-2 rounded-xl border bg-background p-1 text-xs">
+                <button type="button" onClick={() => setMode("draft")} className={cn("rounded-lg px-3 py-2 font-medium transition", mode === "draft" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Save draft</button>
+                <button type="button" onClick={() => setMode("schedule")} className={cn("rounded-lg px-3 py-2 font-medium transition", mode === "schedule" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Schedule</button>
+              </div>
+            </div>
+            {mode === "schedule" && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <label className="space-y-2">
+                  <span className="text-xs font-medium">Date and time</span>
+                  <input type="datetime-local" value={scheduledAtLocal} onChange={(event) => setScheduledAtLocal(event.target.value)} min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)} required aria-label="Scheduled date and time" className="h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                </label>
+                <div className="rounded-xl border bg-background px-3 py-2 text-xs">
+                  <p className="font-medium">Workspace timezone</p>
+                  <p className="mt-1 text-muted-foreground">{timezone}</p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled><Sparkles />AI assist</Button>
@@ -94,7 +121,7 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled><ChevronDown />More actions</Button>
-            <Button type="submit" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Saving…" : "Save draft"}</Button>
+            <Button type="submit" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? (mode === "schedule" ? "Scheduling…" : "Saving…") : (mode === "schedule" ? "Schedule post" : "Save draft")}</Button>
           </div>
         </CardContent>
       </Card>
