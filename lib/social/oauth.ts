@@ -8,11 +8,17 @@ export type ProviderConfig = {
   scopes: string[]; redirectUri: string; usePkce?: boolean; clientSecretInBasicAuth?: boolean; tokenClientKey?: string;
 };
 
-function env(name: string) { return process.env[name]?.trim() || ""; }\n\nfunction siteUrl() {\n  const configured = env("SITE_URL");\n  if (configured) return new URL(configured).toString().replace(/\\/$/, "");\n  if (process.env.NODE_ENV === "production") throw new Error("SITE_URL must be configured in production.");\n  return "http://localhost:3000";\n}
+function env(name: string) { return process.env[name]?.trim() || ""; }
+
+function siteUrl() {
+  const configured = env("SITE_URL");
+  if (configured) return new URL(configured).toString().replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") throw new Error("SITE_URL must be configured in production.");
+  return "http://localhost:3000";
+}
 
 export function getProviderConfig(platform: SocialPlatform): ProviderConfig | null {
-  const siteUrl = env("SITE_URL") || "http://localhost:3000";
-  const redirectUri = new URL("/api/social/oauth/callback", siteUrl).toString();
+  const redirectUri = new URL("/api/social/oauth/callback", siteUrl()).toString();
   switch (platform) {
     case "youtube":
       if (!env("GOOGLE_CLIENT_ID") || !env("GOOGLE_CLIENT_SECRET")) return null;
