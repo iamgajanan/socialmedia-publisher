@@ -1,6 +1,6 @@
 import "server-only";
 import { providerFetch } from "./http";
-import { PublisherError, type PublishInput, type Publisher } from "./types";
+import { PublisherError, type Publisher } from "./types";
 
 function graphVersion() {
   const value = process.env.META_GRAPH_VERSION?.trim();
