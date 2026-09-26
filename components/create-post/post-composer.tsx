@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Check, ChevronDown, Facebook, ImagePlus, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
+import { Check, ChevronDown, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
 
 import { saveDraft, type SaveDraftState } from "@/app/create-post/actions";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,10 @@ export function PostComposer({ accounts }: { accounts: Account[] }) {
   const [previewPlatform, setPreviewPlatform] = useState<string | null>(accounts[0]?.platform ?? null);
 
   const selectedAccounts = accounts.filter((account) => selected.includes(account.id));
-  const selectedPlatforms = [...new Set(selectedAccounts.map((account) => account.platform))];
+  const selectedPlatforms = useMemo(
+    () => [...new Set(selectedAccounts.map((account) => account.platform))],
+    [selectedAccounts],
+  );
   const previewAccount = selectedAccounts.find((account) => account.platform === previewPlatform) ?? selectedAccounts[0];
   const selectedMeta = previewPlatform ? meta[previewPlatform] : null;
   const overLimit = selectedMeta ? content.length > selectedMeta.limit : false;
