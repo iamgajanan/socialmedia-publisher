@@ -8,7 +8,7 @@ export type ProviderConfig = {
   scopes: string[]; redirectUri: string; usePkce?: boolean; clientSecretInBasicAuth?: boolean; tokenClientKey?: string;
 };
 
-function env(name: string) { return process.env[name]?.trim() || ""; }
+function env(name: string) { return process.env[name]?.trim() || ""; }\n\nfunction siteUrl() {\n  const configured = env("SITE_URL");\n  if (configured) return new URL(configured).toString().replace(/\\/$/, "");\n  if (process.env.NODE_ENV === "production") throw new Error("SITE_URL must be configured in production.");\n  return "http://localhost:3000";\n}
 
 export function getProviderConfig(platform: SocialPlatform): ProviderConfig | null {
   const siteUrl = env("SITE_URL") || "http://localhost:3000";
@@ -38,5 +38,5 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
   }
 }
 
-export function getRedirectUri() { return new URL("/api/social/oauth/callback", process.env.SITE_URL || "http://localhost:3000").toString(); }
+export function getRedirectUri() { return new URL("/api/social/oauth/callback", siteUrl()).toString(); }
 export function getPkceVerifierCookieName() { return "social_oauth_pkce"; }

@@ -13,3 +13,9 @@ test("protected dashboard redirects unauthenticated users", async () => {
   const dashboard = await fetch(`${base}/dashboard`, { redirect: "manual" });
   assert.ok([302, 307, 308].includes(dashboard.status), `unexpected status ${dashboard.status}`);
 });
+
+const health = await fetch(`${base}/api/health`, { redirect: "manual" });
+test("health endpoint is available", async () => {
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { ok: true, service: "socialmedia-publisher" });
+});
