@@ -7,10 +7,11 @@ import { resolveMedia } from "./media";
 import { getUsableAccessToken } from "./refresh";
 import { getPublisher } from "./providers";
 import { PublisherError } from "./providers/types";
+import { enqueueNotification } from "@/lib/notifications";
 import type { PublisherAccount } from "./providers/types";
 
 const BATCH_SIZE = 10;
-type WorkerRow = { id: string; post_id: string; social_account_id: string; status: string; platform_post_id: string | null; retry_count: number; max_retries: number; account: PublisherAccount; content: string; mediaPaths: string[] };
+type WorkerRow = { profileId: string; id: string; post_id: string; social_account_id: string; status: string; platform_post_id: string | null; retry_count: number; max_retries: number; account: PublisherAccount; content: string; mediaPaths: string[] };
 
 async function requeueDueRetries(supabase: ReturnType<typeof createAdminClient>, now: string) {
   const { data } = await supabase.from("socialmedia_post_platforms").select("id,post_id").eq("status","failed").not("next_retry_at","is",null).lte("next_retry_at",now).limit(BATCH_SIZE * 5);
@@ -26,7 +27,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
   const supabase = createAdminClient();
   const now = new Date().toISOString();
   await requeueDueRetries(supabase, now);
-  const { data: duePosts, error } = await supabase.from("socialmedia_posts").select("id,content,media_urls,scheduled_at").eq("status","scheduled").not("scheduled_at","is",null).lte("scheduled_at",now).order("scheduled_at",{ascending:true}).limit(BATCH_SIZE);
+  const { data: duePosts, error } = await supabase.from("socialmedia_posts").select("id,profile_id,content,media_urls,scheduled_at").eq("status","scheduled").not("scheduled_at","is",null).lte("scheduled_at",now).order("scheduled_at",{ascending:true}).limit(BATCH_SIZE);
   if (error) throw new Error(`Unable to load scheduled posts: ${error.message}`);
   let claimed=0, deferred=0, published=0, failed=0;
 
@@ -49,7 +50,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
         await supabase.from("socialmedia_post_platforms").update({status:"failed",error_message:"Connected social account was not found.",last_attempt_at:now}).eq("id",link.id).eq("status","scheduled");
         failed += 1; continue;
       }
-      rows.push({ id:link.id, post_id:link.post_id, social_account_id:link.social_account_id, status:link.status, platform_post_id:link.platform_post_id, retry_count:link.retry_count ?? 0, max_retries:link.max_retries ?? 3, account:account as PublisherAccount, content:String(post.content ?? ""), mediaPaths:Array.isArray(post.media_urls) ? post.media_urls.filter((v:unknown):v is string => typeof v==="string") : [] });
+      rows.push({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), id:link.id, post_id:link.post_id, social_account_id:link.social_account_id, status:link.status, platform_post_id:link.platform_post_id, retry_count:link.retry_count ?? 0, max_retries:link.max_retries ?? 3, account:account as PublisherAccount, content:String(post.content ?? ""), mediaPaths:Array.isArray(post.media_urls) ? post.media_urls.filter((v:unknown):v is string => typeof v==="string") : [] });
     }
 
     for (const row of rows.filter((item) => item.status === "scheduled")) {
@@ -77,7 +78,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
           status:"failed", error_message:providerError.message.slice(0,1000), retry_count:row.retry_count+1,
           next_retry_at:next.canRetry && providerError.retryable ? next.nextRetryAt : null, last_attempt_at:now
         }).eq("id",row.id).eq("status","publishing");
-        if (providerError.code === "http_401" || providerError.code === "http_403") await supabase.from("socialmedia_social_accounts").update({status:"error"}).eq("id",row.social_account_id);
+        if (providerError.code === "http_401" || providerError.code === "http_403") await supabase.from("socialmedia_social_accounts").update({status:"error"}).eq("id",row.social_account_id);\n          await enqueueNotification({ profileId: row.profileId, eventType: "token_expired", dedupeKey: `token_expired:${row.social_account_id}`, socialAccountId: row.social_account_id, payload: { platform: row.account.platform, account: row.account.account_name } });
         failed += 1;
       }
     }
@@ -85,7 +86,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
     const { data: finalLinks } = await supabase.from("socialmedia_post_platforms").select("status").eq("post_id",post.id);
     const statuses = (finalLinks ?? []).map((link) => link.status);
     if (statuses.length && statuses.every((status) => status === "published")) {
-      await supabase.from("socialmedia_posts").update({status:"published",published_at:now,scheduled_at:null}).eq("id",post.id).eq("status","publishing");
+      await supabase.from("socialmedia_posts").update({status:"published",published_at:now,scheduled_at:null}).eq("id",post.id).eq("status","publishing");\n      await enqueueNotification({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), eventType: "post_published", dedupeKey: `post_published:${post.id}`, postId: post.id, payload: { postId: post.id } });
     } else if (statuses.some((status) => status === "failed")) {
       await supabase.from("socialmedia_posts").update({status:"failed"}).eq("id",post.id).eq("status","publishing");
     } else {
