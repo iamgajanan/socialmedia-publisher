@@ -31,6 +31,8 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   const userId = claims?.claims?.sub;
   if (claimsError || !userId) redirect("/auth/login");
   const userPathPrefix = `${String(userId)}/`;
+  const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
+  if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, message: "One or more selected accounts are no longer connected." };
 
   if (parsed.data.mediaPaths.some((path) => !path.startsWith(userPathPrefix) || path.includes(".."))) {
     return { ok: false, message: "One or more media files are not owned by your account." };
@@ -41,22 +43,19 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
       .from("social-media-assets")
       .list(String(userId), { limit: 1000, sortBy: { column: "created_at", order: "desc" } });
     if (mediaError) return { ok: false, message: "The media could not be verified." };
-    const ownedNames = new Set((ownedFiles ?? []).map((file) => `${userPathPrefix}${file.name}`));
-    if (parsed.data.mediaPaths.some((path) => !ownedNames.has(path))) {
-      return { ok: false, message: "One or more selected media files could not be verified." };
-    }
+    const ownedFilesByPath = new Map((ownedFiles ?? []).map((file) => [`${userPathPrefix}${file.name}`, file]));
+    if (parsed.data.mediaPaths.some((path) => !ownedFilesByPath.has(path))) return { ok: false, message: "One or more selected media files could not be verified." };
+    const selectedMedia = parsed.data.mediaPaths.map((path) => ownedFilesByPath.get(path)).filter(Boolean);
+    const invalidMedia = selectedMedia.find((file) => !file?.metadata?.mimetype || (file.metadata.size ?? 0) > 100 * 1024 * 1024);
+    if (invalidMedia) return { ok: false, message: "One or more media files exceed the supported type or 100 MB size limit." };
+    const mediaTypes = selectedMedia.map((file) => String(file?.metadata?.mimetype ?? ""));
+    const hasImage = mediaTypes.some((type) => type.startsWith("image/"));
+    const hasVideo = mediaTypes.some((type) => type.startsWith("video/"));
+    const selectedPlatforms = selectedAccountRows.data.map((account) => account.platform);
+    if ((selectedPlatforms.includes("youtube") || selectedPlatforms.includes("tiktok")) && hasImage) return { ok: false, message: "YouTube and TikTok destinations require video media in this composer." };
+    if (!hasImage && !hasVideo) return { ok: false, message: "The selected media type is not supported." };
   }
 
-  const { data: accounts, error: accountError } = await supabase
-    .from("socialmedia_social_accounts")
-    .select("id")
-    .eq("profile_id", String(userId))
-    .eq("status", "connected")
-    .in("id", parsed.data.accountIds);
-
-  if (accountError || !accounts || accounts.length !== parsed.data.accountIds.length) {
-    return { ok: false, message: "One or more selected accounts are no longer connected." };
-  }
 
   let postId = parsed.data.postId;
   if (postId) {
