@@ -16,6 +16,7 @@ jobs:
       SUPABASE_URL: https://example.supabase.co
       SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
       SUPABASE_SERVICE_ROLE_KEY: sb_secret_ci_placeholder
+      SOCIAL_OAUTH_ENCRYPTION_KEY: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,5 +33,37 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
       - name: Build
         run: npm run build
+
+      - name: Start production server
+        run: |
+          npm run start -- -p 3000 > /tmp/socialmedia-publisher.log 2>&1 &
+          echo $! > /tmp/socialmedia-publisher.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/auth/login > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/socialmedia-publisher.log
+          exit 1
+
+      - name: E2E smoke tests
+        run: npm run test:e2e
+
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/socialmedia-publisher.pid ]; then
+            kill "$(cat /tmp/socialmedia-publisher.pid)" || true
+          fi

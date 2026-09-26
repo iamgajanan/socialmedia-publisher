@@ -4,7 +4,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts",
+    "test:integration": "node --test tests/integration/*.mjs",
+    "test:e2e": "node --test tests/e2e/*.mjs",
+    "test": "npm run test:unit && npm run test:integration"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.1",
