@@ -5,12 +5,16 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone";
 
 const draftSchema = z.object({
   postId: z.string().uuid().optional(),
   content: z.string().max(5000),
   accountIds: z.array(z.string().uuid()).min(1, "Select at least one connected account."),
   mediaPaths: z.array(z.string().min(1)).max(20).default([]),
+  mode: z.enum(["draft", "schedule"]).default("draft"),
+  scheduledAtLocal: z.string().optional(),
+  timezone: z.string().default("Asia/Kolkata"),
 });
 
 export type SaveDraftState = { ok: boolean; message: string; postId?: string };
@@ -23,6 +27,9 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     content: String(formData.get("content") ?? ""),
     accountIds: rawAccountIds,
     mediaPaths: rawMediaPaths,
+    mode: formData.get("mode") === "schedule" ? "schedule" : "draft",
+    scheduledAtLocal: typeof formData.get("scheduledAtLocal") === "string" ? String(formData.get("scheduledAtLocal")) : undefined,
+    timezone: typeof formData.get("timezone") === "string" ? String(formData.get("timezone")) : "Asia/Kolkata",
   });
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Please review the post." };
 
@@ -30,6 +37,17 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
   if (claimsError || !userId) redirect("/auth/login");
+  const timezone = normalizeTimeZone(parsed.data.timezone);
+  let scheduledAt: string | null = null;
+
+  if (parsed.data.mode === "schedule") {
+    if (!parsed.data.scheduledAtLocal) return { ok: false, message: "Choose a date and time for the scheduled post." };
+    const scheduledDate = zonedDateTimeToUtc(parsed.data.scheduledAtLocal, timezone);
+    if (!scheduledDate) return { ok: false, message: "The selected date and time is invalid for the workspace timezone." };
+    if (scheduledDate.getTime() <= Date.now()) return { ok: false, message: "Scheduled posts must be set for a future time." };
+    scheduledAt = scheduledDate.toISOString();
+  }
+
   const userPathPrefix = `${String(userId)}/`;
   const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
   if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, message: "One or more selected accounts are no longer connected." };
@@ -60,7 +78,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   let postId = parsed.data.postId;
   if (postId) {
     const { error } = await supabase.from("socialmedia_posts")
-      .update({ content: parsed.data.content, status: "draft", scheduled_at: null, media_urls: parsed.data.mediaPaths })
+      .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .eq("id", postId)
       .eq("profile_id", String(userId));
     if (error) return { ok: false, message: "The draft could not be updated." };
@@ -68,7 +86,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (deleteError) return { ok: false, message: "The draft changed, but its destinations could not be updated." };
   } else {
     const { data: post, error } = await supabase.from("socialmedia_posts")
-      .insert({ profile_id: String(userId), content: parsed.data.content, status: "draft", media_urls: parsed.data.mediaPaths })
+      .insert({ profile_id: String(userId), content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .select("id")
       .single();
     if (error || !post) return { ok: false, message: "The draft could not be saved." };
@@ -76,11 +94,11 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   }
 
   const { error: linksError } = await supabase.from("socialmedia_post_platforms").insert(
-    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: "pending" })),
+    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt })),
   );
   if (linksError) return { ok: false, message: "The draft was saved, but its destinations could not be saved." };
 
   revalidatePath("/create-post");
   revalidatePath("/dashboard");
-  return { ok: true, message: "Draft saved.", postId };
+  return { ok: true, message: parsed.data.mode === "schedule" ? `Post scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(scheduledAt!))} (${timezone}).` : "Draft saved.", postId };
 }
