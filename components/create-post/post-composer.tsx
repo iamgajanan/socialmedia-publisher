@@ -56,8 +56,8 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
     <input type="hidden" name="scheduledAtLocal" value={scheduledAtLocal} />
     <input type="hidden" name="timezone" value={timezone} />
 
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <Card className="overflow-hidden shadow-sm">
+    <div className="grid min-w-0 gap-5 lg:gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <Card className="min-w-0 overflow-hidden shadow-sm">
         <CardHeader className="border-b bg-muted/20">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><CardTitle>Post content</CardTitle><CardDescription>Write once, select destinations, and prepare a draft or scheduled post.</CardDescription></div>
@@ -65,7 +65,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
           </div>
         </CardHeader>
         <CardContent className="p-5 sm:p-6">
-          <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="What do you want to share?" aria-label="Post content" className="min-h-[280px] w-full resize-y rounded-2xl border bg-background p-4 text-sm leading-6 outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+          <textarea spellCheck value={content} onChange={(event) => setContent(event.target.value)} placeholder="What do you want to share?" aria-label="Post content" className="min-h-[280px] w-full resize-y rounded-2xl border bg-background p-4 text-sm leading-6 outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{content.length.toLocaleString()} characters</span>
             {selectedMeta && <span className={cn(overLimit && "font-medium text-destructive")}>{content.length.toLocaleString()} / {selectedMeta.limit.toLocaleString()} for {selectedMeta.name}</span>}

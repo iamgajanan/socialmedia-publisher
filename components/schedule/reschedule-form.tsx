@@ -24,7 +24,7 @@ export function RescheduleForm({ postId, scheduledAt, timezone }: { postId: stri
   const initial = `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`;
 
   return (
-    <form action={formAction} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+    <form action={formAction} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <input type="hidden" name="postId" value={postId} />
       <label className="space-y-2">
         <span className="text-xs font-medium">New date and time</span>

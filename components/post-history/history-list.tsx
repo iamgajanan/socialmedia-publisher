@@ -32,7 +32,7 @@ function ActionForm({ action, postId, children }: { action:(state:PostActionStat
 export function HistoryList({ posts }: { posts: HistoryPost[] }) {
   return <div className="space-y-4">
     {posts.map((post)=>(
-      <Card key={post.id} className="overflow-hidden shadow-sm">
+      <Card key={post.id} className="min-w-0 overflow-hidden shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col gap-4 p-5 sm:p-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

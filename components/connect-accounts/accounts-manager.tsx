@@ -19,7 +19,7 @@ export function AccountsManager({ accounts }: { accounts: AccountRow[] }) {
   return <div className="space-y-4">{accounts.map((account) => {
     const meta = labels[account.platform] ?? { name: account.platform, mark: "•" };
     const expiring = account.token_expires_at && new Date(account.token_expires_at).getTime() < Date.now() + 7 * 86400000;
-    return <div key={account.id} className="group flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm transition hover:border-foreground/15 sm:flex-row sm:items-center">
+    return <div key={account.id} className="group flex min-w-0 flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm transition hover:border-foreground/15 sm:p-5 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-4"><div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-muted text-sm font-bold">{meta.mark}</div><div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{account.account_name}</p><Badge variant={account.status === "connected" ? "secondary" : "destructive"}>{account.status === "connected" ? "Connected" : "Needs attention"}</Badge>{expiring && <Badge variant="outline">Token expiring</Badge>}</div>
         <p className="mt-1 text-sm text-muted-foreground">{meta.name}{account.username ? ` · @${account.username}` : ""}</p>
