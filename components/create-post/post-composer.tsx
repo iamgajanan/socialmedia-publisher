@@ -23,12 +23,12 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
 
 const initialState: SaveDraftState = { ok: false, message: "" };
 
-export function PostComposer({ accounts, timezone = "Asia/Kolkata" }: { accounts: Account[]; timezone?: string }) {
-  const [content, setContent] = useState("");
-  const [selected, setSelected] = useState<string[]>(accounts.map((account) => account.id));
-  const [media, setMedia] = useState<UploadedMedia[]>([]);
-  const [mode, setMode] = useState<"draft" | "schedule">("draft");
-  const [scheduledAtLocal, setScheduledAtLocal] = useState("");
+export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost }: { accounts: Account[]; timezone?: string; initialPost?: { id: string; content: string; accountIds: string[]; mediaPaths: string[]; mode: "draft" | "schedule"; scheduledAt: string | null } }) {
+  const [content, setContent] = useState(initialPost?.content ?? "");
+  const [selected, setSelected] = useState<string[]>(initialPost?.accountIds ?? accounts.map((account) => account.id));
+  const [media, setMedia] = useState<UploadedMedia[]>(initialPost?.mediaPaths.map((path) => ({ path, name: path.split("/").pop() ?? path, size: 0, type: "" })) ?? []);
+  const [mode, setMode] = useState<"draft" | "schedule">(initialPost?.mode ?? "draft");
+  const [scheduledAtLocal, setScheduledAtLocal] = useState(() => { if (!initialPost?.scheduledAt) return ""; const parts = new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(initialPost.scheduledAt)); const map=Object.fromEntries(parts.filter((part)=>part.type!=="literal").map((part)=>[part.type,part.value])); return map.year ? `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}` : ""; });
   const [state, formAction, pending] = useActionState(saveDraft, initialState);
   const [previewPlatform, setPreviewPlatform] = useState<string | null>(accounts[0]?.platform ?? null);
 
@@ -51,7 +51,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata" }: { accounts
   return <form action={formAction} className="space-y-6">
     {selected.map((id) => <input key={id} type="hidden" name="accountIds" value={id} />)}
     {media.map((item) => <input key={item.path} type="hidden" name="mediaPaths" value={item.path} />)}
-    <input type="hidden" name="content" value={content} />
+    {initialPost?.id && <input type="hidden" name="postId" value={initialPost.id} />}<input type="hidden" name="content" value={content} />
     <input type="hidden" name="mode" value={mode} />
     <input type="hidden" name="scheduledAtLocal" value={scheduledAtLocal} />
     <input type="hidden" name="timezone" value={timezone} />
