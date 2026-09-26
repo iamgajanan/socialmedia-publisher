@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, Copy, Edit3, FileText, RotateCcw, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
-import { duplicatePost, deletePost, queuePublishNow, retryPost } from "@/app/post-history/actions";
 import { RescheduleForm } from "@/components/schedule/reschedule-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

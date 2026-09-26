@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, CircleAlert, Copy, Edit3, Eye, FileEdit, MoreHorizontal, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Copy, Edit3, Eye, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useActionState } from "react";
 
 import { deletePost, duplicatePost, queuePublishNow, retryPost, type PostActionState } from "@/app/post-history/actions";
