@@ -6,14 +6,30 @@ import { encryptToken } from "@/lib/social/token-crypto";
 import { getPkceVerifierCookieName, getProviderConfig, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social/oauth";
 
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
+type JsonRecord = Record<string, unknown>;
 type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; refresh_expires_in?: number; scope?: string; open_id?: string };
+function record(value: unknown): JsonRecord { return value && typeof value === "object" ? value as JsonRecord : {}; }
+function stringValue(value: unknown) { return typeof value === "string" ? value : undefined; }
 
-function profileValues(platform: SocialPlatform, payload: any) {
-  if (platform === "youtube") { const item = payload?.items?.[0]; return { id: item?.id, name: item?.snippet?.title, username: item?.snippet?.customUrl, avatar: item?.snippet?.thumbnails?.default?.url, url: item?.id ? `https://youtube.com/channel/${item.id}` : null }; }
-  if (platform === "x") { const item = payload?.data; return { id: item?.id, name: item?.name, username: item?.username, avatar: item?.profile_image_url, url: item?.username ? `https://x.com/${item.username}` : null }; }
-  if (platform === "tiktok") { const item = payload?.data?.user ?? payload?.data; return { id: item?.open_id, name: item?.display_name, username: item?.username, avatar: item?.avatar_url, url: item?.profile_deep_link }; }
-  if (platform === "linkedin") return { id: payload?.sub, name: payload?.name, username: payload?.email, avatar: payload?.picture, url: null };
-  return { id: payload?.id, name: payload?.name, username: payload?.username, avatar: payload?.picture?.data?.url ?? payload?.picture, url: null };
+function profileValues(platform: SocialPlatform, payload: unknown) {
+  const root = record(payload);
+  if (platform === "youtube") {
+    const items = Array.isArray(root.items) ? root.items : [];
+    const item = record(items[0]); const snippet = record(item.snippet); const thumbnails = record(snippet.thumbnails); const thumbnail = record(thumbnails.default);
+    const id = stringValue(item.id);
+    return { id, name: stringValue(snippet.title), username: stringValue(snippet.customUrl), avatar: stringValue(thumbnail.url), url: id ? `https://youtube.com/channel/${id}` : undefined };
+  }
+  if (platform === "x") {
+    const item = record(root.data); const username = stringValue(item.username);
+    return { id: stringValue(item.id), name: stringValue(item.name), username, avatar: stringValue(item.profile_image_url), url: username ? `https://x.com/${username}` : undefined };
+  }
+  if (platform === "tiktok") {
+    const item = record(root.data && typeof root.data === "object" ? record(root.data).user ?? root.data : root.data);
+    return { id: stringValue(item.open_id), name: stringValue(item.display_name), username: stringValue(item.username), avatar: stringValue(item.avatar_url), url: stringValue(item.profile_deep_link) };
+  }
+  if (platform === "linkedin") return { id: stringValue(root.sub), name: stringValue(root.name), username: stringValue(root.email), avatar: stringValue(root.picture), url: undefined };
+  const picture = record(root.picture); const pictureData = record(picture.data);
+  return { id: stringValue(root.id), name: stringValue(root.name), username: stringValue(root.username), avatar: stringValue(pictureData.url) ?? stringValue(root.picture), url: undefined };
 }
 
 export async function GET(request: Request) {
@@ -52,7 +68,7 @@ export async function GET(request: Request) {
   const tokens = (await tokenResponse.json()) as TokenResponse;
   if (!tokens.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
 
-  let profilePayload: any = {};
+  let profilePayload: unknown = {};
   const profileResponse = await fetch(config.profileUrl, { headers: { Authorization: `Bearer ${tokens.access_token}` }, cache: "no-store" });
   if (profileResponse.ok) profilePayload = await profileResponse.json();
 
