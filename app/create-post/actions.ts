@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone";
+import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
 
 const draftSchema = z.object({
   postId: z.string().uuid().optional(),
@@ -95,7 +96,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   }
 
   const { error: linksError } = await supabase.from("socialmedia_post_platforms").insert(
-    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt })),
+    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
   );
   if (linksError) return { ok: false, message: "The draft was saved, but its destinations could not be saved." };
 
