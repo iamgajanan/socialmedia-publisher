@@ -39,12 +39,17 @@ export const facebookPublisher: Publisher = {
     }
     const media = input.media[0];
     const endpoint = media.mimeType.startsWith("image/") ? `https://graph.facebook.com/${version}/${page.id}/photos` : `https://graph.facebook.com/${version}/${page.id}/videos`;
-    const params = media.mimeType.startsWith("image/")
-      ? { url: media.url, caption: input.content, access_token: pageToken }
-      : { file_url: media.url, description: input.content, access_token: pageToken };
+    const params = new URLSearchParams({ access_token: pageToken });
+    if (media.mimeType.startsWith("image/")) {
+      params.set("url", media.url);
+      params.set("caption", input.content);
+    } else {
+      params.set("file_url", media.url);
+      params.set("description", input.content);
+    }
     const response = await providerFetch(endpoint, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params),
+      body: params,
     });
     const data = await response.json() as { id?: string; post_id?: string };
     const id = data.post_id ?? data.id;
