@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MediaUploader, type UploadedMedia } from "@/components/create-post/media-uploader";
 import { cn } from "@/lib/utils";
+import { formatTimeZoneName } from "@/lib/scheduling/timezone";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
 const meta: Record<string, { name: string; icon: typeof Facebook; limit: number }> = {
@@ -92,6 +93,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata" }: { accounts
                 <div className="rounded-xl border bg-background px-3 py-2 text-xs">
                   <p className="font-medium">Workspace timezone</p>
                   <p className="mt-1 text-muted-foreground">{timezone}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground/80">{formatTimeZoneName(timezone)}</p>
                 </div>
               </div>
             )}
