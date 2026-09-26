@@ -1,20 +1,30 @@
 import Link from "next/link";
-import { ImagePlus, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link2, Sparkles } from "lucide-react";
+import { redirect } from "next/navigation";
 
-export default function CreatePostPage() {
-  return (
-    <div className="space-y-8">
-      <div><p className="text-sm font-medium text-muted-foreground">Content</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Create post</h1><p className="mt-2 text-sm text-muted-foreground">Prepare a post now; connected-channel publishing will be wired in later.</p></div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl border bg-card p-6">
-          <label htmlFor="post-content" className="text-sm font-medium">Post content</label>
-          <textarea id="post-content" placeholder="What do you want to share?" className="mt-3 min-h-48 w-full resize-y rounded-xl border bg-background p-4 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button variant="outline" disabled><ImagePlus /> Add media</Button><Button variant="outline" disabled><Sparkles /> AI assist</Button></div>
-          <div className="mt-6 flex justify-end gap-3"><Button variant="outline" disabled>Save draft</Button><Button disabled>Publish</Button></div>
-        </div>
-        <div className="rounded-2xl border bg-card p-6"><h2 className="font-semibold">Preview</h2><div className="mt-5 rounded-xl border bg-muted/20 p-5"><p className="text-sm text-muted-foreground">Your channel preview will appear here after an account is connected.</p></div><Button asChild variant="link" className="mt-4 px-0"><Link href="/connect-accounts">Connect an account</Link></Button></div>
-      </div>
-    </div>
-  );
+import { PostComposer } from "@/components/create-post/post-composer";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+export default async function CreatePostPage() {
+  const supabase = await createClient();
+  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
+  if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
+  const userId = String(claims.claims.sub);
+
+  const { data: accounts } = await supabase.from("socialmedia_social_accounts")
+    .select("id, platform, account_name, username, avatar_url")
+    .eq("profile_id", userId).eq("status", "connected").order("created_at", { ascending: false });
+
+  return <div className="space-y-8">
+    <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div><div className="flex items-center gap-2"><Badge variant="secondary"><Sparkles className="mr-1.5 size-3.5" />Composer</Badge><span className="text-xs text-muted-foreground">Phase 6</span></div><h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Create a post</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Compose once, select your destinations, validate platform limits, preview, and save a reusable draft.</p></div>
+      <Button asChild variant="outline"><Link href="/connect-accounts"><Link2 />Manage accounts</Link></Button>
+    </section>
+    {(accounts?.length ?? 0) > 0 ? <PostComposer accounts={accounts ?? []} /> : <Card className="border-dashed shadow-sm"><CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center"><div className="flex size-14 items-center justify-center rounded-2xl bg-muted"><Link2 className="size-6" /></div><h2 className="mt-5 text-xl font-semibold">Connect an account first</h2><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Your composer needs at least one connected destination. Connect a Facebook, Instagram, LinkedIn, X, YouTube, or TikTok account to start.</p><Button asChild className="mt-6"><Link href="/connect-accounts">Connect social account</Link></Button></CardContent></Card>}
+  </div>;
 }
