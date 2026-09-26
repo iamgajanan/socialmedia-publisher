@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 type SettingsState = { error: string | null; success: string | null };
 
@@ -91,7 +92,8 @@ export async function updateEmail(
 
   if (!parsed.success) return { error: "Enter a valid email address.", success: null };
 
-  const { supabase } = await requireUser();
+  const { supabase, userId } = await requireUser();
+  if (!(await consumeRateLimit(`email-update:user:${userId}`, 5, 3600))) return { error: "Too many email-change attempts. Please try again later.", success: null };
   const { error } = await supabase.auth.updateUser({ email: parsed.data });
 
   return error
@@ -106,10 +108,11 @@ export async function updateAccountPassword(
   const password = String(formData.get("password") ?? "");
   const repeatPassword = String(formData.get("repeatPassword") ?? "");
 
-  if (password.length < 6) return { error: "Password must be at least 6 characters.", success: null };
+  if (password.length < 8) return { error: "Password must be at least 8 characters.", success: null };
   if (password !== repeatPassword) return { error: "Passwords do not match.", success: null };
 
-  const { supabase } = await requireUser();
+  const { supabase, userId } = await requireUser();
+  if (!(await consumeRateLimit(`password-update:user:${userId}`, 5, 3600))) return { error: "Too many password-change attempts. Please try again later.", success: null };
   const { error } = await supabase.auth.updateUser({ password });
 
   return error

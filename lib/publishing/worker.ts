@@ -45,7 +45,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
 
     const rows: WorkerRow[] = [];
     for (const link of links) {
-      const { data: account } = await supabase.from("socialmedia_social_accounts").select("id,platform,external_account_id,account_name,username,metadata,access_token_ciphertext,refresh_token_ciphertext,token_expires_at").eq("id",link.social_account_id).maybeSingle();
+      const { data: account } = await supabase.from("socialmedia_social_accounts").select("id,platform,external_account_id,account_name,username,metadata,token_expires_at").eq("id",link.social_account_id).maybeSingle();
       if (!account) {
         await supabase.from("socialmedia_post_platforms").update({status:"failed",error_message:"Connected social account was not found.",last_attempt_at:now}).eq("id",link.id).eq("status","scheduled");
         failed += 1; continue;

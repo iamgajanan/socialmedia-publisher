@@ -78,6 +78,7 @@ export type NotificationWorkerResult = { scanned: number; sent: number; failed: 
 export async function runNotificationWorker(): Promise<NotificationWorkerResult> {
   const admin = createAdminClient();
   const now = new Date();
+  await admin.from("socialmedia_rate_limits").delete().lt("updated_at", new Date(now.getTime()-86400000).toISOString());
   const nowIso = now.toISOString();
   const stale = new Date(now.getTime() - STALE_SENDING_MINUTES * 60_000).toISOString();
 
