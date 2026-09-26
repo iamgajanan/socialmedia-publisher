@@ -115,3 +115,7 @@ create policy socialmedia_post_platforms_update_own on public.socialmedia_post_p
 create policy socialmedia_post_platforms_delete_own on public.socialmedia_post_platforms for delete to authenticated using (
   exists (select 1 from public.socialmedia_posts p where p.id = post_id and p.profile_id = auth.uid())
 );
+
+
+-- The profile trigger invokes this function internally; it must not be callable as an API/RPC by clients.
+revoke execute on function public.socialmedia_create_profile() from public, anon, authenticated;
