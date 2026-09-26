@@ -1,18 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-process.env.SOCIAL_OAUTH_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
-const { encryptToken, decryptToken } = await import("../../lib/social/token-crypto.ts");
+import { encryptTokenWithKey, decryptTokenWithKey } from "../../lib/social/token-crypto-core.ts";
+const key = Buffer.alloc(32, 7);
 
 test("encrypts and decrypts OAuth tokens", () => {
   const plaintext = "provider-secret-token";
-  const encrypted = encryptToken(plaintext);
+  const encrypted = encryptTokenWithKey(plaintext, key);
   assert.notEqual(encrypted, plaintext);
-  assert.equal(decryptToken(encrypted), plaintext);
+  assert.equal(decryptTokenWithKey(encrypted, key), plaintext);
 });
 
 test("tampering with ciphertext fails authentication", () => {
-  const encrypted = encryptToken("secret");
+  const encrypted = encryptTokenWithKey("secret", key);
   const payload = Buffer.from(encrypted, "base64");
   payload[payload.length - 1] ^= 1;
-  assert.throws(() => decryptToken(payload.toString("base64")));
+  assert.throws(() => decryptTokenWithKey(payload.toString("base64"), key));
 });
