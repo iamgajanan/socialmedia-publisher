@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getProviderConfig } from "@/lib/social/oauth";
 import { AccountsManager, type AccountRow } from "@/components/connect-accounts/accounts-manager";
 
+export const instant = false;
+
 const providers = [
   ["facebook", "Facebook", "Pages and business publishing destinations."],
   ["instagram", "Instagram", "Professional accounts and visual publishing."],
