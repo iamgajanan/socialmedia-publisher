@@ -10,9 +10,15 @@ export type ProviderConfig = {
 
 function env(name: string) { return process.env[name]?.trim() || ""; }
 
+function siteUrl() {
+  const configured = env("SITE_URL");
+  if (configured) return new URL(configured).toString().replace(/\/$/, "");
+  if (process.env.NODE_ENV === "production") throw new Error("SITE_URL must be configured in production.");
+  return "http://localhost:3000";
+}
+
 export function getProviderConfig(platform: SocialPlatform): ProviderConfig | null {
-  const siteUrl = env("SITE_URL") || "http://localhost:3000";
-  const redirectUri = new URL("/api/social/oauth/callback", siteUrl).toString();
+  const redirectUri = new URL("/api/social/oauth/callback", siteUrl()).toString();
   switch (platform) {
     case "youtube":
       if (!env("GOOGLE_CLIENT_ID") || !env("GOOGLE_CLIENT_SECRET")) return null;
@@ -38,5 +44,5 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
   }
 }
 
-export function getRedirectUri() { return new URL("/api/social/oauth/callback", process.env.SITE_URL || "http://localhost:3000").toString(); }
+export function getRedirectUri() { return new URL("/api/social/oauth/callback", siteUrl()).toString(); }
 export function getPkceVerifierCookieName() { return "social_oauth_pkce"; }

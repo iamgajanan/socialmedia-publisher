@@ -8,7 +8,7 @@ import { z } from "zod";
 
 type AuthState = { error: string | null };
 
-async function getOrigin() { const configured=process.env.SITE_URL?.trim(); if(configured) return new URL(configured).origin; if(process.env.NODE_ENV==="development"){const h=await headers(); const host=h.get("x-forwarded-host")??h.get("host"); const protocol=h.get("x-forwarded-proto")??"http"; if(host)return `${protocol}://${host}`;} return "http://localhost:3000"; }
+async function getOrigin() { const configured=process.env.SITE_URL?.trim(); if(configured) return new URL(configured).origin; if(process.env.NODE_ENV==="development"){const h=await headers(); const host=h.get("x-forwarded-host")??h.get("host"); const protocol=h.get("x-forwarded-proto")??"http"; if(host)return `${protocol}://${host}`;} throw new Error("SITE_URL must be configured in production."); }
 
 export async function login(_previousState: AuthState, formData: FormData): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -70,7 +70,7 @@ export async function requestPasswordReset(_previousState: AuthState, formData: 
 export async function updatePassword(_previousState: AuthState, formData: FormData): Promise<AuthState> {
   if (!(await consumeRateLimit(`password-update:ip:${await requestFingerprint()}`, 5, 600))) return { error: "Too many password-update attempts. Please try again later." };
   const password = String(formData.get("password") ?? "");
-  if (password.length < 8) return { error: "Password must be at least 6 characters." };
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
