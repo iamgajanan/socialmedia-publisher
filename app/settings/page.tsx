@@ -1,12 +1,111 @@
-import { Bell, Building2, UserRound } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation";
+import { Mail, Palette, ShieldCheck, UserRound, Workflow } from "lucide-react";
 
-export default function SettingsPage() {
+import { AccountSecurityForm, DeleteAccountForm, PasswordForm, ProfileForm, WorkspaceForm } from "@/components/settings/settings-form";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/server";
+import { updateAccountPassword, deleteAccount, updateEmail, updateProfile, updateWorkspace } from "./actions";
+
+export const instant = false;
+
+export default async function SettingsPage() {
+  const supabase = await createClient();
+  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
+  if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
+
+  const userId = String(claims.claims.sub);
+  const email = typeof claims.claims.email === "string" ? claims.claims.email : "";
+  const { data: profile, error } = await supabase
+    .from("socialmedia_profiles")
+    .select("display_name, workspace_name, timezone, default_posting_preferences")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  const preferences =
+    profile?.default_posting_preferences &&
+    typeof profile.default_posting_preferences === "object" &&
+    !Array.isArray(profile.default_posting_preferences)
+      ? profile.default_posting_preferences as { autoSaveDrafts?: boolean; defaultStatus?: "draft" | "scheduled" }
+      : {};
+
   return (
     <div className="space-y-8">
-      <div><p className="text-sm font-medium text-muted-foreground">Workspace</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Settings</h1><p className="mt-2 text-sm text-muted-foreground">Manage your account and publishing preferences.</p></div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {[{icon:UserRound,title:"Profile",text:"Your name and account details."},{icon:Building2,title:"Workspace",text:"Business and workspace configuration."},{icon:Bell,title:"Notifications",text:"Choose how product updates reach you."}].map(({icon:Icon,title,text}) => <div key={title} className="rounded-2xl border bg-card p-6"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted"><Icon className="h-5 w-5" /></div><h2 className="mt-5 font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p><Button variant="outline" className="mt-5" disabled>Configure</Button></div>)}
+      <div className="max-w-3xl">
+        <Badge variant="secondary" className="rounded-full px-3 py-1"><Palette className="mr-1.5 size-3.5" />Workspace settings</Badge>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Make OmniSocial yours.</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Manage your profile, workspace defaults, and account security from one place.</p>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><UserRound className="size-5" />Profile</CardTitle>
+              <CardDescription>How your identity is shown inside the workspace.</CardDescription>
+            </CardHeader>
+            <CardContent><ProfileForm action={updateProfile} displayName={profile?.display_name ?? ""} /></CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Workflow className="size-5" />Workspace & scheduling</CardTitle>
+              <CardDescription>Set the name, timezone, and defaults used by future publishing flows.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WorkspaceForm
+                action={updateWorkspace}
+                workspaceName={profile?.workspace_name ?? "My workspace"}
+                timezone={profile?.timezone ?? "Asia/Kolkata"}
+                autoSaveDrafts={preferences.autoSaveDrafts ?? true}
+                defaultStatus={preferences.defaultStatus ?? "draft"}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Mail className="size-5" />Email</CardTitle>
+              <CardDescription>Keep your sign-in email up to date.</CardDescription>
+            </CardHeader>
+            <CardContent><AccountSecurityForm action={updateEmail} currentEmail={email} /></CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><ShieldCheck className="size-5" />Password</CardTitle>
+              <CardDescription>Change the password used to access your account.</CardDescription>
+            </CardHeader>
+            <CardContent><PasswordForm action={updateAccountPassword} /></CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger zone</CardTitle>
+              <CardDescription>Permanent account deletion and data removal.</CardDescription>
+            </CardHeader>
+            <CardContent><DeleteAccountForm action={deleteAccount} /></CardContent>
+          </Card>
+        </div>
+
+        <aside className="h-fit space-y-4 xl:sticky xl:top-24">
+          <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10"><Palette className="size-5 text-primary" /></div>
+              <h2 className="mt-4 font-semibold">A workspace that fits you</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Your timezone and posting defaults will become the foundation for the scheduler and composer in later phases.</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Current timezone</p>
+              <p className="mt-2 text-lg font-semibold">{profile?.timezone ?? "Asia/Kolkata"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">All future scheduling UI will respect this preference.</p>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </div>
   );
