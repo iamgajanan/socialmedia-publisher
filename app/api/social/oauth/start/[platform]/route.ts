@@ -30,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
 
   const url = new URL(config.authorizationUrl);
   url.searchParams.set("client_id", config.clientId);
-  url.searchParams.set("redirect_uri", getRedirectUri());
+  url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
   url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" ? "," : " "));
