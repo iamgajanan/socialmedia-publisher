@@ -1,16 +1,41 @@
-import { DashboardHeader } from "@/components/dashboard-header";
-import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { redirect } from "next/navigation";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { createClient } from "@/lib/supabase/server";
+
+export const instant = false;
+
+export default async function DashboardLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (error || !data?.claims?.sub) {
+    redirect("/auth/login");
+  }
+
+  const userId = String(data.claims.sub);
+  const { data: profile } = await supabase
+    .from("socialmedia_profiles")
+    .select("display_name, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const email =
+    typeof data.claims.email === "string" ? data.claims.email : "Account";
+
   return (
-    <div className="min-h-screen bg-muted/20">
-      <div className="flex min-h-screen">
-        <DashboardSidebar />
-        <div className="min-w-0 flex-1">
-          <DashboardHeader />
-          <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">{children}</main>
-        </div>
-      </div>
-    </div>
+    <DashboardShell
+      user={{
+        email,
+        name: profile?.display_name ?? email.split("@")[0] ?? "Creator",
+        avatarUrl: profile?.avatar_url ?? null,
+      }}
+    >
+      {children}
+    </DashboardShell>
   );
 }
