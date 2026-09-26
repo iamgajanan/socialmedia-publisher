@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 
 const BUCKET = "social-media-assets";
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 16000;
+const MAX_VIDEO_DURATION_SECONDS = 600;
 const ACCEPTED_TYPES = [
   "image/jpeg",
   "image/png",
@@ -60,8 +62,19 @@ export function MediaUploader({
         if (!ACCEPTED_TYPES.includes(file.type)) {
           throw new Error(`Unsupported file type: ${file.type || "unknown"}.`);
         }
-        if (file.size > MAX_FILE_SIZE) {
-          throw new Error(`${file.name} is larger than the 100 MB upload limit.`);
+        if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than the 100 MB upload limit.`);
+        if (uploaded.length + results.length >= 20) throw new Error("A draft can contain at most 20 media files.");
+        if (file.type.startsWith("image/")) {
+          const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+            const image = new Image(); image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight }); image.onerror = () => reject(new Error(`${file.name} could not be read as an image.`)); image.src = URL.createObjectURL(file);
+          });
+          if (dimensions.width > MAX_IMAGE_DIMENSION || dimensions.height > MAX_IMAGE_DIMENSION) throw new Error(`${file.name} exceeds the 16000×16000 pixel validation limit.`);
+        }
+        if (file.type.startsWith("video/")) {
+          const duration = await new Promise<number>((resolve, reject) => {
+            const video = document.createElement("video"); video.preload = "metadata"; video.onloadedmetadata = () => resolve(video.duration); video.onerror = () => reject(new Error(`${file.name} could not be read as a video.`)); video.src = URL.createObjectURL(file);
+          });
+          if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) throw new Error(`${file.name} must be a valid video up to 10 minutes.`);
         }
 
         const path = `${userData.user.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
