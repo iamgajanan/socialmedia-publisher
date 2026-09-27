@@ -49,6 +49,10 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
+  function confirmPublish(event: React.MouseEvent<HTMLButtonElement>) {
+    if (!window.confirm("Publish this post now? It will be queued for publishing and sent to the selected destinations.")) event.preventDefault();
+  }
+
   return <form action={formAction} className="space-y-6">
     {selected.map((id) => <input key={id} type="hidden" name="accountIds" value={id} />)}
     {media.map((item) => <input key={item.path} type="hidden" name="mediaPaths" value={item.path} />)}
@@ -124,7 +128,9 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled><ChevronDown />More actions</Button>
-            <Button type="submit" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? (mode === "schedule" ? "Scheduling…" : "Saving…") : (mode === "schedule" ? "Schedule post" : "Save draft")}</Button>
+            <Button type="submit" name="intent" value="draft" variant="outline" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Saving…" : "Save draft"}</Button>
+            {mode === "schedule" && <Button type="submit" name="intent" value="schedule" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Scheduling…" : "Schedule post"}</Button>}
+            <Button type="submit" name="intent" value="publish" onClick={confirmPublish} disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />}{pending ? "Publishing…" : "Publish now"}</Button>
           </div>
         </CardContent>
       </Card>
