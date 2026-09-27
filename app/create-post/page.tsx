@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { Link2, Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { PostComposer } from "@/components/create-post/post-composer";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 

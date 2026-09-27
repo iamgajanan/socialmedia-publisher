@@ -310,8 +310,7 @@ export default async function DashboardPage() {
               },
             ].map((action) => {
               const Icon = action.icon;
-              return (
-                {action.href === "/connect-accounts" ? (
+              return action.href === "/connect-accounts" ? (
                   <a
                     key={action.href}
                     href={action.href}
@@ -343,8 +342,7 @@ export default async function DashboardPage() {
                     </div>
                     <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
                   </Link>
-                )}
-              );
+                );
             })}
           </CardContent>
         </Card>
