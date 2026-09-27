@@ -95,13 +95,13 @@ export function MediaUploader({
         }
 
         const { path, signedUrl } = await createMediaUploadUrl(file.name);
+        const uploadBody = new FormData();
+        uploadBody.append("cacheControl", "3600");
+        uploadBody.append("", file, file.name);
+
         const uploadResponse = await fetch(signedUrl, {
           method: "PUT",
-          headers: {
-            "cache-control": "max-age=3600",
-            "content-type": file.type,
-          },
-          body: file,
+          body: uploadBody,
         });
 
         if (!uploadResponse.ok) {
