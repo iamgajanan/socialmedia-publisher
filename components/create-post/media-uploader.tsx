@@ -3,11 +3,10 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, FileImage, Film, Loader2, Upload, XCircle } from "lucide-react";
 
+import { createMediaUploadUrl } from "@/app/create-post/media-actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 
-const BUCKET = "social-media-assets";
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 16000;
 const MAX_VIDEO_DURATION_SECONDS = 600;
@@ -53,10 +52,6 @@ export function MediaUploader({
     setMessage(null);
 
     try {
-      const supabase = createClient();
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData.user) throw new Error("Your session has expired. Please sign in again.");
-
       const results: UploadedMedia[] = [];
       for (const file of Array.from(files)) {
         if (!ACCEPTED_TYPES.includes(file.type)) {
@@ -64,26 +59,66 @@ export function MediaUploader({
         }
         if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than the 100 MB upload limit.`);
         if (uploaded.length + results.length >= 20) throw new Error("A draft can contain at most 20 media files.");
+
         if (file.type.startsWith("image/")) {
           const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-            const image = new Image(); image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight }); image.onerror = () => reject(new Error(`${file.name} could not be read as an image.`)); image.src = URL.createObjectURL(file);
+            const image = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            image.onload = () => {
+              URL.revokeObjectURL(objectUrl);
+              resolve({ width: image.naturalWidth, height: image.naturalHeight });
+            };
+            image.onerror = () => {
+              URL.revokeObjectURL(objectUrl);
+              reject(new Error(`${file.name} could not be read as an image.`));
+            };
+            image.src = objectUrl;
           });
-          if (dimensions.width > MAX_IMAGE_DIMENSION || dimensions.height > MAX_IMAGE_DIMENSION) throw new Error(`${file.name} exceeds the 16000×16000 pixel validation limit.`);
-        }
-        if (file.type.startsWith("video/")) {
-          const duration = await new Promise<number>((resolve, reject) => {
-            const video = document.createElement("video"); video.preload = "metadata"; video.onloadedmetadata = () => resolve(video.duration); video.onerror = () => reject(new Error(`${file.name} could not be read as a video.`)); video.src = URL.createObjectURL(file);
-          });
-          if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) throw new Error(`${file.name} must be a valid video up to 10 minutes.`);
+          if (dimensions.width > MAX_IMAGE_DIMENSION || dimensions.height > MAX_IMAGE_DIMENSION) {
+            throw new Error(`${file.name} exceeds the 16000×16000 pixel validation limit.`);
+          }
         }
 
-        const path = `${userData.user.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
-        const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-          cacheControl: "3600",
-          contentType: file.type,
-          upsert: false,
+        if (file.type.startsWith("video/")) {
+          const duration = await new Promise<number>((resolve, reject) => {
+            const video = document.createElement("video");
+            const objectUrl = URL.createObjectURL(file);
+            video.preload = "metadata";
+            video.onloadedmetadata = () => {
+              URL.revokeObjectURL(objectUrl);
+              resolve(video.duration);
+            };
+            video.onerror = () => {
+              URL.revokeObjectURL(objectUrl);
+              reject(new Error(`${file.name} could not be read as a video.`));
+            };
+            video.src = objectUrl;
+          });
+          if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) {
+            throw new Error(`${file.name} must be a valid video up to 10 minutes.`);
+          }
+        }
+
+        const { path, signedUrl } = await createMediaUploadUrl(file.name);
+        const uploadResponse = await fetch(signedUrl, {
+          method: "PUT",
+          headers: {
+            "cache-control": "max-age=3600",
+            "content-type": file.type,
+          },
+          body: file,
         });
-        if (error) throw new Error(`Could not upload ${file.name}: ${error.message}`);
+
+        if (!uploadResponse.ok) {
+          let detail = "";
+          try {
+            const body = await uploadResponse.json() as { message?: string };
+            detail = body.message ? `: ${body.message}` : "";
+          } catch {
+            // Keep the generic error when the storage response is not JSON.
+          }
+          throw new Error(`Could not upload ${file.name}${detail}`);
+        }
 
         results.push({ path, name: file.name, type: file.type, size: file.size });
       }
