@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Link2, LockKeyhole, Plus, ShieldCheck } from "lucide-react";
+import { ArrowRight, Link2, LockKeyhole, Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,13 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
     .select("id, platform, account_name, username, avatar_url, status, token_expires_at, provider_account_url")
     .eq("profile_id", userId).order("created_at", { ascending: false });
   const accounts = (data ?? []) as AccountRow[];
+  const accountsByPlatform = new Map<string, AccountRow[]>();
+  for (const account of accounts) {
+    const existing = accountsByPlatform.get(account.platform) ?? [];
+    existing.push(account);
+    accountsByPlatform.set(account.platform, existing);
+  }
+  const connectedCount = accounts.filter((account) => account.status === "connected").length;
 
   return <div className="space-y-8">
     <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-background via-background to-muted/70 p-6 shadow-sm sm:p-8">
@@ -59,7 +66,10 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
           <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Connect your social accounts</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Bring your publishing destinations into one workspace. OAuth credentials and provider tokens stay on the server and are never sent to the browser.</p>
         </div>
-        <div className="flex items-center gap-2 rounded-2xl border bg-background/80 px-4 py-3 text-sm shadow-sm"><ShieldCheck className="size-4 text-primary" /> Secure server-side OAuth</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline"><Link href="/dashboard">Dashboard</Link></Button>
+          <Button asChild><Link href="/create-post"><ArrowRight />Create post</Link></Button>
+        </div>
       </div>
     </section>
 
@@ -70,11 +80,18 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {providers.map(([id, name, description]) => {
         const configured = Boolean(getProviderConfig(id));
+        const platformAccounts = accountsByPlatform.get(id) ?? [];
+        const account = platformAccounts[0];
+        const isConnected = account?.status === "connected";
         const mark = name === "Instagram" ? "◎" : name === "Threads" ? "@" : name === "LinkedIn" ? "in" : name === "YouTube" ? "▶" : name === "TikTok" ? "♪" : name === "X" ? "𝕏" : "f";
-        return <Card key={id} className="overflow-hidden shadow-sm"><CardHeader className="pb-4">
-          <div className="flex items-start justify-between gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-sm font-bold">{mark}</div><Badge variant={configured ? "secondary" : "outline"}>{configured ? "Ready" : "Setup required"}</Badge></div>
+        return <Card key={id} className={"overflow-hidden shadow-sm transition " + (isConnected ? "border-primary/30 bg-primary/[0.02]" : "")}><CardHeader className="pb-4">
+          <div className="flex items-start justify-between gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-sm font-bold">{mark}</div><Badge variant={isConnected ? "secondary" : "outline"}>{isConnected ? "Connected" : configured ? "Ready" : "Setup required"}</Badge></div>
           <CardTitle className="mt-2">{name}</CardTitle><CardDescription>{description}</CardDescription>
-        </CardHeader><CardContent>{configured ? <Button asChild className="w-full"><Link href={`/api/social/oauth/start/${id}`}><Plus />Connect {name}</Link></Button> : <Button className="w-full" variant="outline" disabled><LockKeyhole />Configure OAuth first</Button>}</CardContent></Card>;
+        </CardHeader><CardContent>{account ? <div className="space-y-4 rounded-2xl border bg-background/70 p-4">
+          <div className="flex min-w-0 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-bold">{mark}</div><div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{account.username ? "@" + account.username : name + " account"}</p></div></div>
+          <div className="flex flex-wrap items-center gap-2"><Badge variant={isConnected ? "secondary" : "destructive"}>{isConnected ? "Connected" : "Needs attention"}</Badge>{platformAccounts.length > 1 && <Badge variant="outline">+{platformAccounts.length - 1} more</Badge>}</div>
+          <div className="flex flex-wrap gap-2"><Button asChild className="flex-1" size="sm"><Link href="/create-post"><ArrowRight />Create post</Link></Button>{account.provider_account_url && <Button asChild size="sm" variant="outline"><Link href={account.provider_account_url} target="_blank" rel="noreferrer">View</Link></Button>}</div>
+        </div> : configured ? <Button asChild className="w-full"><Link href={"/api/social/oauth/start/" + id}><Plus />Connect {name}</Link></Button> : <Button className="w-full" variant="outline" disabled><LockKeyhole />Configure OAuth first</Button>}</CardContent></Card>;
       })}
     </section>
 
@@ -82,7 +99,8 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
       {[["1","Authorize","Approve only the provider permissions this workspace needs."],["2","Protect","Tokens are encrypted with AES-256-GCM before storage."],["3","Publish","Later phases use the same account records for scheduling and publishing."]].map(([number,title,description]) => <div key={number} className="flex gap-3"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{number}</div><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p></div></div>)}
     </CardContent></Card>
 
-    {accounts.length > 0 && <section className="space-y-4"><div><p className="text-sm font-medium text-muted-foreground">Your connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Connected accounts</h2></div><AccountsManager accounts={accounts} /></section>}
+    {connectedCount > 0 && <Card className="border-primary/15 bg-primary/[0.03] shadow-sm"><CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Publishing is ready</p><p className="mt-1 text-sm text-muted-foreground">{connectedCount} connected {connectedCount === 1 ? "destination is" : "destinations are"} available in the composer.</p></div><Button asChild><Link href="/create-post">Create a post <ArrowRight /></Link></Button></CardContent></Card>}
+    {accounts.length > 0 && <section className="space-y-4"><div><p className="text-sm font-medium text-muted-foreground">Account management</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Manage connected accounts</h2></div><AccountsManager accounts={accounts} /></section>}
     <p className="text-xs leading-5 text-muted-foreground">Provider applications must be configured with the exact callback URL before authorization can succeed. Provider scopes and app-review requirements vary; the UI intentionally does not claim a provider is live until its server credentials are present.</p>
   </div>;
 }

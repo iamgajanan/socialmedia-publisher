@@ -10,7 +10,7 @@ import { disconnectAccount, refreshAccount } from "@/app/connect-accounts/action
 export type AccountRow = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null; status: "connected" | "disconnected" | "error"; token_expires_at: string | null; provider_account_url: string | null; };
 
 const labels: Record<string, { name: string; mark: string }> = {
-  facebook: { name: "Facebook", mark: "f" }, instagram: { name: "Instagram", mark: "◎" }, linkedin: { name: "LinkedIn", mark: "in" },
+  facebook: { name: "Facebook", mark: "f" }, instagram: { name: "Instagram", mark: "◎" }, threads: { name: "Threads", mark: "@" }, linkedin: { name: "LinkedIn", mark: "in" },
   x: { name: "X", mark: "𝕏" }, youtube: { name: "YouTube", mark: "▶" }, tiktok: { name: "TikTok", mark: "♪" },
 };
 
