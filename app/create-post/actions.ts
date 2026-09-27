@@ -86,6 +86,9 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
 
   let postId = parsed.data.postId;
   if (postId) {
+    const { data: existingPost, error: existingPostError } = await supabase.from("socialmedia_posts").select("id,status").eq("id", postId).eq("profile_id", String(userId)).maybeSingle();
+    if (existingPostError || !existingPost) return { ok: false, message: "Post not found." };
+    if (existingPost.status === "published" || existingPost.status === "publishing") return { ok: false, message: "Published or currently publishing posts cannot be changed." };
     const { error } = await supabase.from("socialmedia_posts")
       .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .eq("id", postId)
