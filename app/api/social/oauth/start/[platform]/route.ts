@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
-  url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" ? "," : " "));
+  url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
 
   if (platform === "youtube") {
     url.searchParams.set("access_type", "offline");
