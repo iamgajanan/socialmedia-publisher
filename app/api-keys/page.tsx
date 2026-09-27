@@ -1,6 +1,8 @@
 import { KeyRound, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+export const instant = false;
+
 export default function ApiKeysPage() {
   return (
     <div className="space-y-8">
