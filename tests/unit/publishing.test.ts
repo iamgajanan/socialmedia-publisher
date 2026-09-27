@@ -26,30 +26,19 @@ test("idempotency keys are stable and destination-specific", () => {
 });
 
 
-test("Threads publisher accepts one image and rejects multiple media assets", async () => {
-  const { threadsPublisher } = await import("../../lib/publishing/providers/threads.ts");
-  const account = {
-    id: "account-1",
-    platform: "threads",
-    external_account_id: "threads-user-1",
-    account_name: "Threads",
-    username: "creator",
-    metadata: {},
-    token_expires_at: null,
-  };
-  threadsPublisher.validate({
-    account,
+
+
+test("Threads validation accepts one image and rejects multiple media assets", async () => {
+  const { validateThreadsPublishInput } = await import("../../lib/publishing/providers/threads-validation.ts");
+  validateThreadsPublishInput({
     content: "hello",
     media: [{ path: "image.png", url: "https://example.com/image.png", mimeType: "image/png", size: 1 }],
-    idempotencyKey: "test",
   });
-  assert.throws(() => threadsPublisher.validate({
-    account,
+  assert.throws(() => validateThreadsPublishInput({
     content: "hello",
     media: [
       { path: "a.png", url: "https://example.com/a.png", mimeType: "image/png", size: 1 },
       { path: "b.png", url: "https://example.com/b.png", mimeType: "image/png", size: 1 },
     ],
-    idempotencyKey: "test",
   }));
 });
