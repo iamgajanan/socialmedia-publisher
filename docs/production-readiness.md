@@ -43,10 +43,10 @@ The workflow runs the complete quality gate before deploying a prebuilt producti
 
 ## Scheduled jobs
 
-`vercel.json` schedules both:
+Vercel does not own the minute-level schedules on the Hobby plan. Use the external n8n scheduler to call:
 
-- `/api/cron/publish` every minute
-- `/api/cron/notifications` every minute
+- `GET /api/cron/publish` every minute
+- `GET /api/cron/notifications` every minute
 
 Both routes require `Authorization: Bearer <CRON_SECRET>`.
 
