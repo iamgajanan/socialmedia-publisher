@@ -3,7 +3,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ArrowUpDown,ExternalLink,FileImage,Film,Loader2,Search,Trash2,Upload,X} from "lucide-react";
 import {Button} from "@/components/ui/button"; import {Card,CardContent} from "@/components/ui/card"; import {Input} from "@/components/ui/input"; import {createMediaPreviewUrl,deleteMediaFile} from "@/app/media/actions";
-const BUCKET="social-media-assets"; type MediaFile={path:string;name:string;size:number;type:string;createdAt:string|null;updatedAt:string|null}; type SortMode="newest"|"oldest"|"name";
+type MediaFile={path:string;name:string;size:number;type:string;createdAt:string|null;updatedAt:string|null}; type SortMode="newest"|"oldest"|"name";
 function size(n:number){if(!n)return"0 B";const u=["B","KB","MB","GB"],i=Math.min(Math.floor(Math.log(n)/Math.log(1024)),3);return (n/1024**i).toFixed(i?1:0)+" "+u[i]}; function date(v:string|null){return v?new Intl.DateTimeFormat(undefined,{dateStyle:"medium"}).format(new Date(v)):"Unknown date"}
 export function MediaLibrary({initialFiles}:{initialFiles:MediaFile[]}){const[files,setFiles]=useState(initialFiles),[query,setQuery]=useState(""),[sort,setSort]=useState<SortMode>("newest"),[selected,setSelected]=useState<MediaFile|null>(null),[url,setUrl]=useState<string|null>(null),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState<string|null>(null);
 const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return[...files].filter(f=>!q||f.name.toLowerCase().includes(q)||f.type.toLowerCase().includes(q)).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):(sort==="newest"?-1:1)*(new Date(a.createdAt??a.updatedAt??0).getTime()-new Date(b.createdAt??b.updatedAt??0).getTime()))},[files,query,sort]);
