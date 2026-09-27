@@ -16,6 +16,7 @@ const draftSchema = z.object({
   accountIds: z.array(z.string().uuid()).min(1, "Select at least one connected account."),
   mediaPaths: z.array(z.string().min(1)).max(20).default([]),
   mode: z.enum(["draft", "schedule"]).default("draft"),
+  intent: z.enum(["draft", "schedule", "publish"]).default("draft"),
   scheduledAtLocal: z.string().optional(),
   timezone: z.string().default("Asia/Kolkata"),
 });
@@ -30,7 +31,8 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     content: String(formData.get("content") ?? ""),
     accountIds: rawAccountIds,
     mediaPaths: rawMediaPaths,
-    mode: formData.get("mode") === "schedule" ? "schedule" : "draft",
+    mode: formData.get("intent") === "schedule" || formData.get("intent") === "publish" ? "schedule" : "draft",
+    intent: formData.get("intent") === "schedule" || formData.get("intent") === "publish" ? String(formData.get("intent")) : "draft",
     scheduledAtLocal: typeof formData.get("scheduledAtLocal") === "string" ? String(formData.get("scheduledAtLocal")) : undefined,
     timezone: typeof formData.get("timezone") === "string" ? String(formData.get("timezone")) : "Asia/Kolkata",
   });
@@ -44,7 +46,9 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   const timezone = normalizeTimeZone(profile?.timezone);
   let scheduledAt: string | null = null;
 
-  if (parsed.data.mode === "schedule") {
+  if (parsed.data.intent === "publish") {
+    scheduledAt = new Date(Date.now() + 60_000).toISOString();
+  } else if (parsed.data.mode === "schedule") {
     if (!parsed.data.scheduledAtLocal) return { ok: false, message: "Choose a date and time for the scheduled post." };
     const scheduledDate = zonedDateTimeToUtc(parsed.data.scheduledAtLocal, timezone);
     if (!scheduledDate) return { ok: false, message: "The selected date and time is invalid for the workspace timezone." };
@@ -107,5 +111,6 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
 
   revalidatePath("/create-post");
   revalidatePath("/dashboard");
+  if (parsed.data.intent === "publish") return { ok: true, message: "Publish queued. The publishing worker will publish it shortly.", postId };
   return { ok: true, message: parsed.data.mode === "schedule" ? `Post scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(scheduledAt!))} (${timezone}).` : "Draft saved.", postId };
 }
