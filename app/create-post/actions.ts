@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone";
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
@@ -60,7 +61,8 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   }
 
   if (parsed.data.mediaPaths.length > 0) {
-    const { data: ownedFiles, error: mediaError } = await supabase.storage
+    const admin = createAdminClient();
+    const { data: ownedFiles, error: mediaError } = await admin.storage
       .from("social-media-assets")
       .list(String(userId), { limit: 1000, sortBy: { column: "created_at", order: "desc" } });
     if (mediaError) return { ok: false, message: "The media could not be verified." };
