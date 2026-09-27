@@ -32,13 +32,13 @@ test("Threads validation accepts one image and rejects multiple media assets", a
   const { validateThreadsPublishInput } = await import("../../lib/publishing/providers/threads-validation.ts");
   validateThreadsPublishInput({
     content: "hello",
-    media: [{ path: "image.png", url: "https://example.com/image.png", mimeType: "image/png", size: 1 }],
+    media: [{ mimeType: "image/png" }],
   });
   assert.throws(() => validateThreadsPublishInput({
     content: "hello",
     media: [
-      { path: "a.png", url: "https://example.com/a.png", mimeType: "image/png", size: 1 },
-      { path: "b.png", url: "https://example.com/b.png", mimeType: "image/png", size: 1 },
+      { mimeType: "image/png" },
+      { mimeType: "image/png" },
     ],
   }));
 });
