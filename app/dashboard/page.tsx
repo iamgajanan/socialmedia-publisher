@@ -314,6 +314,7 @@ export default async function DashboardPage() {
                 <Link
                   key={action.href}
                   href={action.href}
+                  prefetch={action.href === "/connect-accounts" ? false : undefined}
                   className="group flex items-center gap-3 rounded-2xl border p-4 transition hover:border-foreground/20 hover:bg-muted/40"
                 >
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted transition group-hover:bg-background">
