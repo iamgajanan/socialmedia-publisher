@@ -23,6 +23,15 @@ function profileValues(platform: SocialPlatform, payload: unknown) {
     const item = record(root.data); const username = stringValue(item.username);
     return { id: stringValue(item.id), name: stringValue(item.name), username, avatar: stringValue(item.profile_image_url), url: username ? `https://x.com/${username}` : undefined };
   }
+  if (platform === "threads") {
+    return {
+      id: stringValue(root.id),
+      name: stringValue(root.name),
+      username: stringValue(root.username),
+      avatar: stringValue(root.threads_profile_picture_url),
+      url: stringValue(root.username) ? `https://www.threads.com/@${root.username}` : undefined,
+    };
+  }
   if (platform === "tiktok") {
     const item = record(root.data && typeof root.data === "object" ? record(root.data).user ?? root.data : root.data);
     return { id: stringValue(item.open_id), name: stringValue(item.display_name), username: stringValue(item.username), avatar: stringValue(item.avatar_url), url: stringValue(item.profile_deep_link) };
