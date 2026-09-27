@@ -79,8 +79,27 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     const hasImage = mediaTypes.some((type) => type.startsWith("image/"));
     const hasVideo = mediaTypes.some((type) => type.startsWith("video/"));
     const selectedPlatforms = selectedAccountRows.data.map((account) => account.platform);
-    if ((selectedPlatforms.includes("youtube") || selectedPlatforms.includes("tiktok")) && hasImage) return { ok: false, message: "YouTube and TikTok destinations require video media in this composer." };
     if (!hasImage && !hasVideo) return { ok: false, message: "The selected media type is not supported." };
+
+    const mediaCount = selectedMedia.length;
+    if (selectedPlatforms.includes("instagram") && (mediaCount !== 1 || (!hasImage && !hasVideo))) {
+      return { ok: false, message: "Instagram requires exactly one image or video." };
+    }
+    if ((selectedPlatforms.includes("youtube") || selectedPlatforms.includes("tiktok")) && (mediaCount !== 1 || !hasVideo)) {
+      return { ok: false, message: "YouTube and TikTok require exactly one video." };
+    }
+    if (selectedPlatforms.includes("linkedin") && mediaCount > 0) {
+      return { ok: false, message: "LinkedIn media publishing is not enabled for this connected account yet." };
+    }
+    if (selectedPlatforms.includes("x") && mediaCount > 0) {
+      return { ok: false, message: "X media publishing is not enabled for this connected account yet." };
+    }
+    if (selectedPlatforms.includes("threads") && mediaCount > 1) {
+      return { ok: false, message: "Threads currently supports one media asset per post." };
+    }
+    if (selectedPlatforms.includes("facebook") && mediaCount > 1) {
+      return { ok: false, message: "Facebook currently supports one media asset per post." };
+    }
   }
 
 
