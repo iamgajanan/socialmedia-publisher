@@ -38,9 +38,18 @@ function Navigation({ onNavigate, mobile = false }: { onNavigate?: () => void; m
     const Icon = item.icon;
     const active = item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href);
     const future = item.href !== "/dashboard" && item.href !== "/settings";
-    return <Link key={item.href} href={item.href} prefetch={item.href === "/connect-accounts" ? false : undefined} onClick={onNavigate} className={cn("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors", active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-      <Icon className="size-4 shrink-0" /><span>{item.label}</span>{future && <span className={cn("ml-auto text-[10px] font-medium", active ? "text-primary-foreground/70" : "text-muted-foreground/60")}>Soon</span>}
-    </Link>;
+    const className = cn(
+      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+      active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    );
+    const content = <>
+      <Icon className="size-4 shrink-0" /><span>{item.label}</span>
+      {future && <span className={cn("ml-auto text-[10px] font-medium", active ? "text-primary-foreground/70" : "text-muted-foreground/60")}>Soon</span>}
+    </>;
+    if (item.href === "/connect-accounts") {
+      return <a key={item.href} href={item.href} onClick={onNavigate} className={className}>{content}</a>;
+    }
+    return <Link key={item.href} href={item.href} onClick={onNavigate} className={className}>{content}</Link>;
   };
   return <nav className={cn("space-y-1", mobile && "mt-5")}><p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Workspace</p>{navigation.map(render)}<p className="mb-2 mt-7 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Manage</p>{secondaryNavigation.map(render)}</nav>;
 }

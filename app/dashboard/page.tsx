@@ -311,12 +311,12 @@ export default async function DashboardPage() {
             ].map((action) => {
               const Icon = action.icon;
               return (
-                <Link
-                  key={action.href}
-                  href={action.href}
-                  prefetch={action.href === "/connect-accounts" ? false : undefined}
-                  className="group flex items-center gap-3 rounded-2xl border p-4 transition hover:border-foreground/20 hover:bg-muted/40"
-                >
+                {action.href === "/connect-accounts" ? (
+                  <a
+                    key={action.href}
+                    href={action.href}
+                    className="group flex items-center gap-3 rounded-2xl border p-4 transition hover:border-foreground/20 hover:bg-muted/40"
+                  >
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted transition group-hover:bg-background">
                     <Icon className="size-4" />
                   </div>
@@ -327,7 +327,23 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
-                </Link>
+                  </a>
+                ) : (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className="group flex items-center gap-3 rounded-2xl border p-4 transition hover:border-foreground/20 hover:bg-muted/40"
+                  >
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted transition group-hover:bg-background">
+                      <Icon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{action.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{action.description}</p>
+                    </div>
+                    <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-foreground" />
+                  </Link>
+                )}
               );
             })}
           </CardContent>

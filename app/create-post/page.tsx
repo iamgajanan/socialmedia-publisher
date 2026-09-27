@@ -47,9 +47,9 @@ export default async function CreatePostPage() {
             Compose once, choose your destinations, and save a draft or prepare a scheduled post.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/connect-accounts"><Link2 />Manage accounts</Link>
-        </Button>
+        <a href="/connect-accounts" className="inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+          <Link2 />Manage accounts
+        </a>
       </section>
       {(accounts?.length ?? 0) > 0 ? (
         <PostComposer accounts={accounts ?? []} timezone={timezone} />
@@ -61,7 +61,7 @@ export default async function CreatePostPage() {
             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
               Your composer needs at least one connected destination. Connect a Facebook, Instagram, LinkedIn, X, YouTube, or TikTok account to start.
             </p>
-            <Button asChild className="mt-6"><Link href="/connect-accounts">Connect social account</Link></Button>
+            <a href="/connect-accounts" className="mt-6 inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">Connect social account</a>
           </CardContent>
         </Card>
       )}
