@@ -1,9 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const nextConfig = readFileSync("next.config.ts", "utf8");
-const cronConfig = JSON.parse(readFileSync("vercel.json", "utf8"));
 const envExample = readFileSync(".env.example", "utf8");
 
 test("production security headers are configured", () => {
@@ -11,10 +10,14 @@ test("production security headers are configured", () => {
   assert.match(nextConfig, /poweredByHeader:\s*false/);
 });
 
-test("both protected cron jobs are scheduled", () => {
-  const paths = cronConfig.crons.map((cron) => cron.path);
-  assert.deepEqual(paths.sort(), ["/api/cron/notifications", "/api/cron/publish"].sort());
-  assert.equal(cronConfig.crons.every((cron) => cron.schedule === "* * * * *"), true);
+test("scheduled worker routes are configured for external scheduling", () => {
+  assert.equal(existsSync("vercel.json"), false, "Vercel Hobby must not own the minute-level cron schedule");
+  const publishRoute = readFileSync("app/api/cron/publish/route.ts", "utf8");
+  const notificationRoute = readFileSync("app/api/cron/notifications/route.ts", "utf8");
+  assert.match(publishRoute, /CRON_SECRET/);
+  assert.match(notificationRoute, /CRON_SECRET/);
+  assert.match(publishRoute, /Authorization/);
+  assert.match(notificationRoute, /Authorization/);
 });
 
 test("production environment contract documents required secrets", () => {
