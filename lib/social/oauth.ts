@@ -1,6 +1,6 @@
 import "server-only";
 
-export const SOCIAL_PLATFORMS = ["facebook","instagram","linkedin","x","youtube","tiktok"] as const;
+export const SOCIAL_PLATFORMS = ["facebook","instagram","threads","linkedin","x","youtube","tiktok"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 export type ProviderConfig = {
@@ -29,6 +29,17 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
     case "x":
       if (!env("X_CLIENT_ID") || !env("X_CLIENT_SECRET")) return null;
       return { clientId: env("X_CLIENT_ID"), clientSecret: env("X_CLIENT_SECRET"), authorizationUrl: "https://x.com/i/oauth2/authorize", tokenUrl: "https://api.x.com/2/oauth2/token", profileUrl: "https://api.x.com/2/users/me?user.fields=profile_image_url,name,username", scopes: (env("X_OAUTH_SCOPES") || "users.read tweet.read tweet.write offline.access").split(" ").filter(Boolean), redirectUri, usePkce: true, clientSecretInBasicAuth: true };
+    case "threads":
+      if (!env("THREADS_APP_ID") || !env("THREADS_APP_SECRET")) return null;
+      return {
+        clientId: env("THREADS_APP_ID"),
+        clientSecret: env("THREADS_APP_SECRET"),
+        authorizationUrl: "https://threads.net/oauth/authorize",
+        tokenUrl: "https://graph.threads.net/oauth/access_token",
+        profileUrl: "https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url",
+        scopes: (env("THREADS_OAUTH_SCOPES") || "threads_basic,threads_content_publish").split(",").map((v) => v.trim()).filter(Boolean),
+        redirectUri,
+      };
     case "tiktok":
       if (!env("TIKTOK_CLIENT_KEY") || !env("TIKTOK_CLIENT_SECRET")) return null;
       return { clientId: env("TIKTOK_CLIENT_KEY"), clientSecret: env("TIKTOK_CLIENT_SECRET"), authorizationUrl: "https://www.tiktok.com/v2/auth/authorize/", tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/", profileUrl: "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,profile_deep_link", scopes: (env("TIKTOK_OAUTH_SCOPES") || "user.info.basic,video.publish").split(",").map((v) => v.trim()).filter(Boolean), redirectUri, tokenClientKey: "client_key" };
