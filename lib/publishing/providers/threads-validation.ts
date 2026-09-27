@@ -1,4 +1,4 @@
-import { PublisherError, type PublishInput } from "./types";
+import { PublisherError, type PublishInput } from "./types.ts";
 
 export function validateThreadsPublishInput(input: Pick<PublishInput, "content" | "media">) {
   if (!input.content.trim() && input.media.length === 0) {
