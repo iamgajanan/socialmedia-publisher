@@ -29,11 +29,6 @@ export type UploadedMedia = {
   size: number;
 };
 
-function safeFileName(name: string) {
-  const cleaned = name.normalize("NFKC").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  return cleaned.slice(-120) || "media";
-}
-
 export function MediaUploader({
   uploaded,
   onUploaded,
