@@ -87,9 +87,25 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
 
-  // OAuth tokens are stored in the server-only secrets table created by
-  // 202609270012_security_hardening.sql. The social accounts table only
-  // stores non-secret account metadata.
+  // Older accounts can predate the auth trigger that creates this row. Ensure
+  // the profile exists before inserting the social account so the FK cannot
+  // turn a valid OAuth callback into a generic "save" error.
+  const { error: profileError } = await admin
+    .from("socialmedia_profiles")
+    .upsert({ id: String(userId) }, { onConflict: "id" });
+
+  if (profileError) {
+    console.error("social_oauth_profile_save_failed", {
+      platform,
+      userId: String(userId),
+      code: profileError.code,
+      message: profileError.message,
+    });
+    return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+  }
+
+  // OAuth tokens are stored in the server-only secrets table. The social
+  // accounts table only stores non-secret account metadata.
   const { data: savedAccount, error: accountError } = await admin
     .from("socialmedia_social_accounts")
     .upsert({
@@ -109,6 +125,13 @@ export async function GET(request: Request) {
     .single();
 
   if (accountError || !savedAccount?.id) {
+    console.error("social_oauth_account_save_failed", {
+      platform,
+      userId: String(userId),
+      externalAccountId: externalId,
+      code: accountError?.code,
+      message: accountError?.message,
+    });
     return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
   }
 
@@ -121,6 +144,13 @@ export async function GET(request: Request) {
     }, { onConflict: "social_account_id" });
 
   if (secretError) {
+    console.error("social_oauth_secret_save_failed", {
+      platform,
+      userId: String(userId),
+      socialAccountId: String(savedAccount.id),
+      code: secretError.code,
+      message: secretError.message,
+    });
     return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
   }
 
