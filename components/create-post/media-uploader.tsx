@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CheckCircle2, FileImage, Film, Loader2, Upload, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckCircle2, FileImage, Film, Loader2, Upload, X, XCircle } from "lucide-react";
 
 import { createMediaUploadUrl } from "@/app/create-post/media-actions";
 import { Button } from "@/components/ui/button";
@@ -210,15 +210,50 @@ async function handleFiles(files: FileList | null) {
                 <span className="block truncate text-sm font-medium">{item.name}</span>
                 <span className="block text-xs text-muted-foreground">{(item.size / 1024 / 1024).toFixed(1)} MB · {item.type.split("/")[1]?.toUpperCase()}</span>
               </span>
-              <CheckCircle2 className="size-4 shrink-0 text-primary" />
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  onClick={() => moveMedia(uploaded.indexOf(item), -1)}
+                  disabled={uploaded.indexOf(item) === 0 || uploading}
+                  aria-label={`Move ${item.name} up`}
+                >
+                  <ArrowUp />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  onClick={() => moveMedia(uploaded.indexOf(item), 1)}
+                  disabled={uploaded.indexOf(item) === uploaded.length - 1 || uploading}
+                  aria-label={`Move ${item.name} down`}
+                >
+                  <ArrowDown />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeFromPost(item.path)}
+                  disabled={uploading}
+                  aria-label={`Remove ${item.name} from this post`}
+                >
+                  <X />
+                </Button>
+                <CheckCircle2 className="ml-1 size-4 text-primary" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {message && (
-        <div className={cn("mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs", message.includes("uploaded") ? "border-primary/20 bg-primary/5" : "border-destructive/30 bg-destructive/5 text-destructive")}>
-          {message.includes("uploaded") ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <XCircle className="mt-0.5 size-4 shrink-0" />}
+        <div className={cn("mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs", message.includes("uploaded") || message.includes("removed") ? "border-primary/20 bg-primary/5" : "border-destructive/30 bg-destructive/5 text-destructive")}>
+          {message.includes("uploaded") || message.includes("removed") ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <XCircle className="mt-0.5 size-4 shrink-0" />}
           <span>{message}</span>
         </div>
       )}
