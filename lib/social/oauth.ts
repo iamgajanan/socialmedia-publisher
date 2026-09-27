@@ -11,9 +11,22 @@ export type ProviderConfig = {
 function env(name: string) { return process.env[name]?.trim() || ""; }
 
 function siteUrl() {
-  const configured = env("SITE_URL");
-  if (configured) return new URL(configured).toString().replace(/\/$/, "");
-  if (process.env.NODE_ENV === "production") throw new Error("SITE_URL must be configured in production.");
+  const configured =
+    env("SITE_URL") ||
+    env("VERCEL_PROJECT_PRODUCTION_URL") ||
+    env("VERCEL_URL");
+
+  if (configured) {
+    const origin = /^https?:\/\//i.test(configured)
+      ? configured
+      : `https://${configured}`;
+    return new URL(origin).toString().replace(/\/$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("A canonical site URL is required in production.");
+  }
+
   return "http://localhost:3000";
 }
 
