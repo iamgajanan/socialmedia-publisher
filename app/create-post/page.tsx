@@ -57,7 +57,7 @@ export default async function CreatePostPage() {
             <div className="flex size-14 items-center justify-center rounded-2xl bg-muted"><Link2 className="size-6" /></div>
             <h2 className="mt-5 text-xl font-semibold">Connect an account first</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              Your composer needs at least one connected destination. Connect a Facebook, Instagram, LinkedIn, X, YouTube, or TikTok account to start.
+              Your composer needs at least one connected destination. Connect a Facebook, Instagram, Threads, LinkedIn, X, YouTube, or TikTok account to start.
             </p>
             <a href="/connect-accounts" className="mt-6 inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">Connect social account</a>
           </CardContent>

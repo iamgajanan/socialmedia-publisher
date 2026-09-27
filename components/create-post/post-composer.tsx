@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Check, ChevronDown, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
+import { Check, ChevronDown, AtSign, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
 
 import { saveDraft, type SaveDraftState } from "@/app/create-post/actions";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
   linkedin: { name: "LinkedIn", icon: Linkedin, limit: 3000 },
   x: { name: "X", icon: Send, limit: 280 },
   youtube: { name: "YouTube", icon: Youtube, limit: 5000 },
+  threads: { name: "Threads", icon: AtSign, limit: 500 },
   tiktok: { name: "TikTok", icon: Send, limit: 2200 },
 };
 
