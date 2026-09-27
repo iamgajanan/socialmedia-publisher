@@ -86,7 +86,20 @@ export function MediaUploader({
   throw new Error(`Could not upload ${file.name}: ${lastError?.message ?? "unknown storage error"}`);
 }
 
-async function handleFiles(files: FileList | null) {
+function removeFromPost(path: string) {
+    onUploaded(uploaded.filter((item) => item.path !== path));
+    setMessage("Media removed from this post.");
+  }
+
+  function moveMedia(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= uploaded.length) return;
+    const next = [...uploaded];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    onUploaded(next);
+  }
+
+  async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
 
     setUploading(true);
@@ -201,7 +214,7 @@ async function handleFiles(files: FileList | null) {
 
       {uploaded.length > 0 && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {uploaded.map((item) => (
+          {uploaded.map((item, index) => (
             <div key={item.path} className="flex min-w-0 items-center gap-3 rounded-xl border bg-background p-3">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                 {item.type.startsWith("video/") ? <Film className="size-4" /> : <FileImage className="size-4" />}
@@ -216,8 +229,8 @@ async function handleFiles(files: FileList | null) {
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  onClick={() => moveMedia(uploaded.indexOf(item), -1)}
-                  disabled={uploaded.indexOf(item) === 0 || uploading}
+                  onClick={() => moveMedia(index, -1)}
+                  disabled={index === 0 || uploading}
                   aria-label={`Move ${item.name} up`}
                 >
                   <ArrowUp />
@@ -227,8 +240,8 @@ async function handleFiles(files: FileList | null) {
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  onClick={() => moveMedia(uploaded.indexOf(item), 1)}
-                  disabled={uploaded.indexOf(item) === uploaded.length - 1 || uploading}
+                  onClick={() => moveMedia(index, 1)}
+                  disabled={index === uploaded.length - 1 || uploading}
                   aria-label={`Move ${item.name} down`}
                 >
                   <ArrowDown />
