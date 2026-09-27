@@ -1,4 +1,4 @@
-import test from "node:test";
+// CI verification branch: keep the Phase 3 media smoke coverage in the exact tested tree.\nimport test from "node:test";
 import assert from "node:assert/strict";
 
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
