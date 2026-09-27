@@ -13,6 +13,7 @@ export type Publisher = {
   validate(input: PublishInput): void;
   publish(input: PublishInput, accessToken: string): Promise<PublishResult>;
   refreshToken?(account: PublisherAccount, refreshToken: string): Promise<{ accessToken: string; expiresIn?: number } | null>;
+  refreshAccessToken?(account: PublisherAccount, accessToken: string): Promise<{ accessToken: string; expiresIn?: number } | null>;
   getAccount(accessToken: string): Promise<Partial<PublisherAccount>>;
   disconnect?(accessToken: string, account: PublisherAccount): Promise<void>;
 };

@@ -77,8 +77,24 @@ export async function GET(request: Request) {
   const tokens = (await tokenResponse.json()) as TokenResponse;
   if (!tokens.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
 
+  let accessToken = tokens.access_token;
+  let expiresIn = tokens.expires_in;
+
+  if (platform === "threads") {
+    const longLivedUrl = new URL("https://graph.threads.net/access_token");
+    longLivedUrl.searchParams.set("grant_type", "th_exchange_token");
+    longLivedUrl.searchParams.set("client_secret", config.clientSecret);
+    longLivedUrl.searchParams.set("access_token", accessToken);
+    const longLivedResponse = await fetch(longLivedUrl, { method: "GET", cache: "no-store" });
+    if (!longLivedResponse.ok) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+    const longLived = (await longLivedResponse.json()) as TokenResponse;
+    if (!longLived.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+    accessToken = longLived.access_token;
+    expiresIn = longLived.expires_in;
+  }
+
   let profilePayload: unknown = {};
-  const profileResponse = await fetch(config.profileUrl, { headers: { Authorization: `Bearer ${tokens.access_token}` }, cache: "no-store" });
+  const profileResponse = await fetch(config.profileUrl, { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
   if (profileResponse.ok) profilePayload = await profileResponse.json();
 
   const values = profileValues(platform, profilePayload);
@@ -116,6 +132,8 @@ export async function GET(request: Request) {
       username: values.username ? String(values.username) : null,
       avatar_url: values.avatar ? String(values.avatar) : null,
       status: "connected",
+      token_expires_at: typeof expiresIn === "number" ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
+      refresh_token_expires_at: typeof tokens.refresh_expires_in === "number" ? new Date(Date.now() + tokens.refresh_expires_in * 1000).toISOString() : null,
       provider_account_url: values.url ? String(values.url) : null,
       scopes: tokens.scope
         ? tokens.scope.split(/[ ,]+/).filter(Boolean)
@@ -139,7 +157,7 @@ export async function GET(request: Request) {
     .from("socialmedia_account_secrets")
     .upsert({
       social_account_id: savedAccount.id,
-      access_token_ciphertext: encryptToken(tokens.access_token),
+      access_token_ciphertext: encryptToken(accessToken),
       refresh_token_ciphertext: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
     }, { onConflict: "social_account_id" });
 
