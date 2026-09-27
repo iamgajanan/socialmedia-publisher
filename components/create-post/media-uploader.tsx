@@ -38,7 +38,9 @@ export function MediaUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -99,21 +101,32 @@ export function MediaUploader({
         uploadBody.append("cacheControl", "3600");
         uploadBody.append("", file, file.name);
 
-        const uploadResponse = await fetch(signedUrl, {
-          method: "PUT",
-          body: uploadBody,
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhrRef.current = xhr;
+          xhr.open("PUT", signedUrl);
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+          };
+          xhr.onload = () => {
+            xhrRef.current = null;
+            if (xhr.status >= 200 && xhr.status < 300) {
+              setProgress(100);
+              resolve();
+              return;
+            }
+            reject(new Error(`Could not upload ${file.name} (storage returned HTTP ${xhr.status}).`));
+          };
+          xhr.onerror = () => {
+            xhrRef.current = null;
+            reject(new Error(`Could not upload ${file.name} because the storage connection failed.`));
+          };
+          xhr.onabort = () => {
+            xhrRef.current = null;
+            reject(new Error("Upload cancelled."));
+          };
+          xhr.send(uploadBody);
         });
-
-        if (!uploadResponse.ok) {
-          let detail = "";
-          try {
-            const body = await uploadResponse.json() as { message?: string };
-            detail = body.message ? `: ${body.message}` : "";
-          } catch {
-            // Keep the generic error when the storage response is not JSON.
-          }
-          throw new Error(`Could not upload ${file.name}${detail}`);
-        }
 
         results.push({ path, name: file.name, type: file.type, size: file.size });
       }
@@ -123,7 +136,9 @@ export function MediaUploader({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The upload failed.");
     } finally {
+      xhrRef.current = null;
       setUploading(false);
+      setProgress(0);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -144,11 +159,30 @@ export function MediaUploader({
           onChange={(event) => handleFiles(event.target.files)}
           disabled={uploading}
         />
-        <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={uploading}>
-          {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-          {uploading ? "Uploading…" : "Upload media"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {uploading && (
+            <Button type="button" variant="outline" onClick={() => xhrRef.current?.abort()}>
+              Cancel
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={uploading}>
+            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+            {uploading ? `Uploading… ${progress}%` : "Upload media"}
+          </Button>
+        </div>
       </div>
+
+      {uploading && (
+        <div className="mt-4">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Uploading securely to private storage</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
 
       {uploaded.length > 0 && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
