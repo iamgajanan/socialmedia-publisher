@@ -16,8 +16,8 @@ test("scheduled worker routes are configured for external scheduling", () => {
   const notificationRoute = readFileSync("app/api/cron/notifications/route.ts", "utf8");
   assert.match(publishRoute, /CRON_SECRET/);
   assert.match(notificationRoute, /CRON_SECRET/);
-  assert.match(publishRoute, /Authorization/);
-  assert.match(notificationRoute, /Authorization/);
+  assert.match(publishRoute, /authorization/i);
+  assert.match(notificationRoute, /authorization/i);
 });
 
 test("production environment contract documents required secrets", () => {
