@@ -14,6 +14,7 @@ export const instant = false;
 const providers = [
   ["facebook", "Facebook", "Pages and business publishing destinations."],
   ["instagram", "Instagram", "Professional accounts and visual publishing."],
+  ["threads", "Threads", "Threads profiles and text publishing."],
   ["linkedin", "LinkedIn", "Professional profiles and supported pages."],
   ["x", "X", "Posts, replies, and future publishing."],
   ["youtube", "YouTube", "Channels and video publishing."],
@@ -69,7 +70,7 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {providers.map(([id, name, description]) => {
         const configured = Boolean(getProviderConfig(id));
-        const mark = name === "Instagram" ? "◎" : name === "LinkedIn" ? "in" : name === "YouTube" ? "▶" : name === "TikTok" ? "♪" : name === "X" ? "𝕏" : "f";
+        const mark = name === "Instagram" ? "◎" : name === "Threads" ? "@" : name === "LinkedIn" ? "in" : name === "YouTube" ? "▶" : name === "TikTok" ? "♪" : name === "X" ? "𝕏" : "f";
         return <Card key={id} className="overflow-hidden shadow-sm"><CardHeader className="pb-4">
           <div className="flex items-start justify-between gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-sm font-bold">{mark}</div><Badge variant={configured ? "secondary" : "outline"}>{configured ? "Ready" : "Setup required"}</Badge></div>
           <CardTitle className="mt-2">{name}</CardTitle><CardDescription>{description}</CardDescription>
