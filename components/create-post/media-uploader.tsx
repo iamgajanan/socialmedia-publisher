@@ -42,7 +42,51 @@ export function MediaUploader({
   const [message, setMessage] = useState<string | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
-  async function handleFiles(files: FileList | null) {
+  async function uploadWithRetry(signedUrl: string, file: File, onProgress: (value: number) => void, abortRef: React.MutableRefObject<XMLHttpRequest | null>) {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const uploadBody = new FormData();
+      uploadBody.append("cacheControl", "3600");
+      uploadBody.append("", file, file.name);
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        abortRef.current = xhr;
+        xhr.open("PUT", signedUrl);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+        };
+        xhr.onload = () => {
+          abortRef.current = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress(100);
+            resolve();
+          } else {
+            reject(new Error(`Storage returned HTTP ${xhr.status}.`));
+          }
+        };
+        xhr.onerror = () => {
+          abortRef.current = null;
+          reject(new Error("The storage connection failed."));
+        };
+        xhr.onabort = () => {
+          abortRef.current = null;
+          reject(new Error("Upload cancelled."));
+        };
+        xhr.send(uploadBody);
+      });
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("The upload failed.");
+      if (lastError.message === "Upload cancelled." || attempt === 3) break;
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+    }
+  }
+  throw new Error(`Could not upload ${file.name}: ${lastError?.message ?? "unknown storage error"}`);
+}
+
+async function handleFiles(files: FileList | null) {
     if (!files?.length) return;
 
     setUploading(true);
@@ -97,36 +141,7 @@ export function MediaUploader({
         }
 
         const { path, signedUrl } = await createMediaUploadUrl(file.name);
-        const uploadBody = new FormData();
-        uploadBody.append("cacheControl", "3600");
-        uploadBody.append("", file, file.name);
-
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhrRef.current = xhr;
-          xhr.open("PUT", signedUrl);
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
-          };
-          xhr.onload = () => {
-            xhrRef.current = null;
-            if (xhr.status >= 200 && xhr.status < 300) {
-              setProgress(100);
-              resolve();
-              return;
-            }
-            reject(new Error(`Could not upload ${file.name} (storage returned HTTP ${xhr.status}).`));
-          };
-          xhr.onerror = () => {
-            xhrRef.current = null;
-            reject(new Error(`Could not upload ${file.name} because the storage connection failed.`));
-          };
-          xhr.onabort = () => {
-            xhrRef.current = null;
-            reject(new Error("Upload cancelled."));
-          };
-          xhr.send(uploadBody);
-        });
+        await uploadWithRetry(signedUrl, file, setProgress, xhrRef);
 
         results.push({ path, name: file.name, type: file.type, size: file.size });
       }
