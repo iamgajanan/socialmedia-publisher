@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notificationIdempotencyKey } from "./idempotency";
 
 export type NotificationEvent =
   | "post_scheduled"
@@ -33,6 +34,3 @@ export async function enqueueNotification(input: NotificationInput) {
   }
 }
 
-export function notificationIdempotencyKey(dedupeKey: string) {
-  return `socialmedia-notification:v1:${dedupeKey}`.slice(0, 256);
-}
