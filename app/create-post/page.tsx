@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { Link2, Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
-import { connection } from "next/server";
 
 import { PostComposer } from "@/components/create-post/post-composer";
 import { Badge } from "@/components/ui/badge";
@@ -93,5 +92,13 @@ async function CreatePostContent() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function CreatePostPage() {
+  return (
+    <Suspense fallback={<Card className="border-dashed shadow-sm"><CardContent className="px-6 py-16 text-center text-sm text-muted-foreground">Loading connected accounts…</CardContent></Card>}>
+      <CreatePostContent />
+    </Suspense>
   );
 }
