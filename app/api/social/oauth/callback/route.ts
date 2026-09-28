@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptToken } from "@/lib/social/token-crypto";
-import { canCreatePageContent, discoverMetaPages } from "@/lib/social/meta-discovery";
+import { canCreatePageContent, discoverMetaPages, getInstagramBusinessProfile } from "@/lib/social/meta-discovery";
 import { getPkceVerifierCookieName, getProviderConfig, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social/oauth";
 
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
@@ -125,9 +125,29 @@ export async function GET(request: Request) {
     }
 
     for (const page of destinations) {
+      let instagramProfile: Awaited<ReturnType<typeof getInstagramBusinessProfile>> | null = null;
+      if (platform === "instagram" && page.instagramBusinessAccountId) {
+        try {
+          instagramProfile = await getInstagramBusinessProfile(accessToken, graphVersion, page.instagramBusinessAccountId);
+        } catch (error) {
+          console.error("meta_instagram_profile_discovery_failed", {
+            platform,
+            userId: String(userId),
+            pageId: page.id,
+            instagramBusinessAccountId: page.instagramBusinessAccountId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          continue;
+        }
+      }
+
       const externalAccountId = platform === "facebook" ? page.id : String(page.instagramBusinessAccountId);
-      const accountName = platform === "facebook" ? page.name : `Instagram · ${page.name}`;
-      const username = platform === "instagram" ? String(page.instagramBusinessAccountId) : null;
+      const accountName = platform === "facebook"
+        ? page.name
+        : instagramProfile?.username
+          ? `@${instagramProfile.username}`
+          : `Instagram · ${page.name}`;
+      const username = platform === "instagram" ? instagramProfile?.username ?? null : null;
       const metadata = {
         meta_page_id: page.id,
         facebook_page_id: page.id,
@@ -144,11 +164,15 @@ export async function GET(request: Request) {
           account_name: accountName,
           external_account_id: externalAccountId,
           username,
-          avatar_url: null,
+          avatar_url: instagramProfile?.avatarUrl ?? null,
           status: "connected",
           metadata,
           token_expires_at: null,
-          provider_account_url: platform === "facebook" ? `https://www.facebook.com/${page.id}` : null,
+          provider_account_url: platform === "facebook"
+            ? `https://www.facebook.com/${page.id}`
+            : instagramProfile?.username
+              ? `https://www.instagram.com/${instagramProfile.username}`
+              : null,
           scopes: tokens.scope ? tokens.scope.split(/[ ,]+/).filter(Boolean) : config.scopes,
         }, { onConflict: "profile_id,platform,external_account_id" })
         .select("id")
