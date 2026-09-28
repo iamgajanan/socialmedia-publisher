@@ -226,9 +226,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
     }
 
-    const destinations = platform === "facebook"
-      ? pages.filter(canCreatePageContent)
-      : pages.filter((page) => canCreatePageContent(page) && page.instagramBusinessAccountId);
+    const destinations = pages.filter(canCreatePageContent);
 
     if (!destinations.length) {
       return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
@@ -236,35 +234,15 @@ export async function GET(request: Request) {
 
     let savedDestinationCount = 0;
     for (const page of destinations) {
-      let instagramProfile: Awaited<ReturnType<typeof getInstagramBusinessProfile>> | null = null;
-      if (platform === "instagram" && page.instagramBusinessAccountId) {
-        try {
-          instagramProfile = await getInstagramBusinessProfile(accessToken, graphVersion, page.instagramBusinessAccountId);
-        } catch (error) {
-          console.error("meta_instagram_profile_discovery_failed", {
-            platform,
-            userId: String(userId),
-            pageId: page.id,
-            instagramBusinessAccountId: page.instagramBusinessAccountId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          continue;
-        }
-      }
-
-      const externalAccountId = platform === "facebook" ? page.id : String(page.instagramBusinessAccountId);
-      const accountName = platform === "facebook"
-        ? page.name
-        : instagramProfile?.username
-          ? `@${instagramProfile.username}`
-          : `Instagram · ${page.name}`;
-      const username = platform === "instagram" ? instagramProfile?.username ?? null : null;
+      const externalAccountId = page.id;
+      const accountName = page.name;
+      const username = null;
       const metadata = {
         meta_page_id: page.id,
         facebook_page_id: page.id,
         ...(page.instagramBusinessAccountId ? { instagram_business_account_id: page.instagramBusinessAccountId } : {}),
         meta_page_tasks: page.tasks,
-        meta_connection_type: platform,
+        meta_connection_type: "facebook",
       };
 
       const { data: savedAccount, error: accountError } = await admin
@@ -275,15 +253,11 @@ export async function GET(request: Request) {
           account_name: accountName,
           external_account_id: externalAccountId,
           username,
-          avatar_url: instagramProfile?.avatarUrl ?? null,
+          avatar_url: null,
           status: "connected",
           metadata,
           token_expires_at: null,
-          provider_account_url: platform === "facebook"
-            ? `https://www.facebook.com/${page.id}`
-            : instagramProfile?.username
-              ? `https://www.instagram.com/${instagramProfile.username}`
-              : null,
+          provider_account_url: `https://www.facebook.com/${page.id}`,
           scopes: grantedScopes,
         }, { onConflict: "profile_id,platform,external_account_id" })
         .select("id")
