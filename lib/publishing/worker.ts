@@ -7,6 +7,7 @@ import { resolveMedia } from "./media";
 import { getUsableAccessToken } from "./refresh";
 import { getPublisher } from "./providers";
 import { PublisherError } from "./providers/types";
+import { getPublishingPostOutcome } from "./outcome";
 import { enqueueNotification } from "@/lib/notifications";
 import type { PublisherAccount } from "./providers/types";
 
@@ -84,12 +85,13 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       }
     }
 
-    const { data: finalLinks } = await supabase.from("socialmedia_post_platforms").select("status").eq("post_id",post.id);
-    const statuses = (finalLinks ?? []).map((link) => link.status);
-    if (statuses.length && statuses.every((status) => status === "published")) {
+    const { data: finalLinks } = await supabase.from("socialmedia_post_platforms").select("status,next_retry_at").eq("post_id",post.id);
+    const destinationRows = (finalLinks ?? []).map((link) => ({ status: link.status, nextRetryAt: link.next_retry_at }));
+    const outcome = getPublishingPostOutcome(destinationRows);
+    if (outcome === "published") {
       await supabase.from("socialmedia_posts").update({status:"published",published_at:now,scheduled_at:null}).eq("id",post.id).eq("status","publishing");
       await enqueueNotification({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), eventType: "post_published", dedupeKey: `post_published:${post.id}`, postId: post.id, payload: { postId: post.id } });
-    } else if (statuses.some((status) => status === "failed")) {
+    } else if (outcome === "failed") {
       await supabase.from("socialmedia_posts").update({status:"failed"}).eq("id",post.id).eq("status","publishing");
       await enqueueNotification({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), eventType: "post_failed", dedupeKey: `post_failed:${post.id}`, postId: post.id, payload: { postId: post.id } });
     } else {
