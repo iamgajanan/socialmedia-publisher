@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
-export const instant = false;
+// Phase 3 sanity verification: account-attention flow is covered in production UI.\nexport const instant = false;
 
 export default async function CreatePostPage() {
   const supabase = await createClient();
