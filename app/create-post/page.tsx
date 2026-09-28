@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { Link2, Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -7,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
-// Phase 3 sanity verification: account-attention flow is covered in production UI.\nexport const instant = false;
+// Phase 3 sanity verification: account-attention flow is covered in production UI.
+export const instant = false;
 
-async function CreatePostContent() {
+export default async function CreatePostPage() {
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
@@ -95,10 +95,3 @@ async function CreatePostContent() {
   );
 }
 
-export default function CreatePostPage() {
-  return (
-    <Suspense fallback={<Card className="border-dashed shadow-sm"><CardContent className="px-6 py-16 text-center text-sm text-muted-foreground">Loading connected accounts…</CardContent></Card>}>
-      <CreatePostContent />
-    </Suspense>
-  );
-}
