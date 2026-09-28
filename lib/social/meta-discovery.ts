@@ -44,3 +44,26 @@ export async function discoverMetaPages(accessToken: string, graphVersion: strin
 export function canCreatePageContent(page: MetaPageDestination) {
   return page.tasks.includes("CREATE_CONTENT");
 }
+
+
+export type MetaInstagramProfile = {
+  id: string;
+  username: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
+export async function getInstagramBusinessProfile(accessToken: string, graphVersion: string, instagramAccountId: string): Promise<MetaInstagramProfile> {
+  const endpoint = new URL(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(instagramAccountId)}`);
+  endpoint.searchParams.set("fields", "id,username,name,profile_picture_url");
+  endpoint.searchParams.set("access_token", accessToken);
+  const response = await fetch(endpoint, { method: "GET", cache: "no-store" });
+  if (!response.ok) throw new Error(`Instagram profile discovery failed with status ${response.status}.`);
+  const payload = (await response.json()) as { id?: string; username?: string; name?: string; profile_picture_url?: string };
+  return {
+    id: typeof payload.id === "string" ? payload.id : instagramAccountId,
+    username: typeof payload.username === "string" ? payload.username : null,
+    name: typeof payload.name === "string" ? payload.name : null,
+    avatarUrl: typeof payload.profile_picture_url === "string" ? payload.profile_picture_url : null,
+  };
+}
