@@ -65,10 +65,12 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
     }
     case "instagram": {
       const version = env("META_GRAPH_VERSION");
-      if (!env("INSTAGRAM_APP_ID") || !env("INSTAGRAM_APP_SECRET") || !version) return null;
+      const clientId = env("INSTAGRAM_APP_ID");
+      const clientSecret = env("INSTAGRAM_APP_SECRET");
+      if (!clientId || !clientSecret || !version) return null;
       const profileUrl = env("INSTAGRAM_PROFILE_URL") || `https://graph.instagram.com/${version}/me?fields=user_id,username,account_type,profile_picture_url`;
-      const scopes = env("INSTAGRAM_OAUTH_SCOPES") || "instagram_business_basic,instagram_business_content_publish";
-      return { clientId: env("INSTAGRAM_APP_ID"), clientSecret: env("INSTAGRAM_APP_SECRET"), authorizationUrl: "https://www.instagram.com/oauth/authorize", tokenUrl: "https://api.instagram.com/oauth/access_token", profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri, instagramLogin: true };
+      const scopes = env("META_INSTAGRAM_SCOPES") || env("INSTAGRAM_OAUTH_SCOPES") || "instagram_business_basic,instagram_business_content_publish";
+      return { clientId, clientSecret, authorizationUrl: "https://www.instagram.com/oauth/authorize", tokenUrl: "https://api.instagram.com/oauth/access_token", profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri, instagramLogin: true };
     }
   }
 }
