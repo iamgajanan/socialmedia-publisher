@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
 // Phase 3 sanity verification: account-attention flow is covered in production UI.
+// Production sanity check: connected destinations render the composer; attention states render reconnect.
 export const instant = false;
 
 export default async function CreatePostPage() {
