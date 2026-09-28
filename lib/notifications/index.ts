@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notificationIdempotencyKey } from "./idempotency";
 
 export type NotificationEvent =
   | "post_scheduled"
