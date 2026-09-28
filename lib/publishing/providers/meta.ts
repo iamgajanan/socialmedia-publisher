@@ -8,13 +8,14 @@ function graphVersion() {
   return value;
 }
 
-async function pageContext(accessToken: string, accountId: string) {
-  const version = graphVersion();
-  const response = await providerFetch(`https://graph.facebook.com/${version}/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${encodeURIComponent(accessToken)}`, { method: "GET" });
-  const data = await response.json() as { data?: Array<{ id?: string; name?: string; access_token?: string; instagram_business_account?: { id?: string } }> };
-  const page = data.data?.find((item) => item.id === accountId) ?? data.data?.[0];
-  if (!page?.id || !page.access_token) throw new PublisherError("No publishable Facebook Page was found for this connected Meta account.", { code: "meta_page_not_found" });
-  return page;
+function pageContext(accessToken: string, accountId: string) {
+  if (!accountId) {
+    throw new PublisherError("The connected Facebook Page ID is missing.", { code: "meta_page_not_found" });
+  }
+  if (!accessToken) {
+    throw new PublisherError("The connected Facebook Page token is missing.", { code: "meta_page_token_missing" });
+  }
+  return { id: accountId, accessToken };
 }
 
 export const facebookPublisher: Publisher = {
@@ -25,9 +26,8 @@ export const facebookPublisher: Publisher = {
   },
   async publish(input, accessToken) {
     const version = graphVersion();
-    const page = await pageContext(accessToken, input.account.external_account_id);
-    const pageToken = page.access_token;
-    if (!pageToken) throw new PublisherError("Meta did not return a publishable Page token.", { code: "meta_page_token_missing" });
+    const page = pageContext(accessToken, input.account.external_account_id);
+    const pageToken = page.accessToken;
     if (!input.media.length) {
       const response = await providerFetch(`https://graph.facebook.com/${version}/${page.id}/feed`, {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -72,12 +72,11 @@ export const instagramPublisher: Publisher = {
   },
   async publish(input, accessToken) {
     const version = graphVersion();
-    const page = await pageContext(accessToken, input.account.metadata.facebook_page_id ? String(input.account.metadata.facebook_page_id) : "");
-    const pageToken = page.access_token;
-    if (!pageToken) throw new PublisherError("Meta did not return a publishable Page token.", { code: "meta_page_token_missing" });
+    const page = pageContext(accessToken, input.account.metadata.facebook_page_id ? String(input.account.metadata.facebook_page_id) : "");
+    const pageToken = page.accessToken;
     const igId = input.account.metadata.instagram_business_account_id
       ? String(input.account.metadata.instagram_business_account_id)
-      : page.instagram_business_account?.id;
+      : null;
     if (!igId) throw new PublisherError("No Instagram professional account is linked to the connected Facebook Page.", { code: "instagram_account_not_found" });
     const media = input.media[0];
     const body = new URLSearchParams({ caption: input.content, access_token: pageToken });
