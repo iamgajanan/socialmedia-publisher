@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
+// Phase 3 sanity verification: account-attention flow is covered in production UI.
 export const instant = false;
 
 export default async function CreatePostPage() {
@@ -93,3 +94,4 @@ export default async function CreatePostPage() {
     </div>
   );
 }
+
