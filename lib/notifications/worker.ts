@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notificationIdempotencyKey } from "./idempotency";
 import { canRetryNotification, getNextNotificationAttemptAt } from "./retry";
+import { renderNotificationEmail } from "./email";
 
 const BATCH_SIZE = 20;
 const STALE_SENDING_MINUTES = 10;
@@ -13,38 +14,11 @@ type NotificationRow = {
   attempts: number; next_attempt_at: string; created_at: string;
 };
 
-function esc(value: unknown) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[char] ?? char);
-}
-
-function renderEmail(row: NotificationRow) {
-  const payload = row.payload ?? {};
-  const title =
-    row.event_type === "post_scheduled" ? "Post scheduled" :
-    row.event_type === "post_published" ? "Post published successfully" :
-    row.event_type === "post_failed" ? "Post publishing failed" :
-    row.event_type === "account_disconnected" ? "Social account disconnected" :
-    "Social account token expired";
-  const heading = row.event_type === "post_scheduled" ? "Your post is scheduled." :
-    row.event_type === "post_published" ? "Your post has been published." :
-    row.event_type === "post_failed" ? "A post could not be published." :
-    row.event_type === "account_disconnected" ? "A social account was disconnected." :
-    "A social account needs attention.";
-  const details = Object.entries(payload)
-    .filter(([key]) => !["content"].includes(key))
-    .map(([key, value]) => `<tr><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#6b7280;">${esc(key)}</td><td style="padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;">${esc(value)}</td></tr>`)
-    .join("");
-  return {
-    subject: title,
-    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;background:#f9fafb;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:32px 16px;"><table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;"><tr><td style="padding:32px;font-family:Arial,Helvetica,sans-serif;"><h1 style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:32px;color:#111827;">${esc(title)}</h1><p style="margin:0 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#374151;">${esc(heading)}</p><table width="100%" cellpadding="0" cellspacing="0" border="0">${details}</table></td></tr></table></td></tr></table></body></html>`,
-  };
-}
-
 async function sendWithResend(to: string, row: NotificationRow) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!apiKey || !from) throw new Error("Resend email configuration is missing.");
-  const email = renderEmail(row);
+  const email = renderNotificationEmail(row.event_type, row.payload);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
