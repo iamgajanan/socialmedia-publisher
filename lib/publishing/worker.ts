@@ -9,6 +9,7 @@ import { getPublisher } from "./providers";
 import { PublisherError } from "./providers/types";
 import { getPublishingPostOutcome } from "./outcome";
 import { enqueueNotification } from "@/lib/notifications";
+import { getPostTitle } from "@/lib/notifications/email";
 import type { PublisherAccount } from "./providers/types";
 
 const BATCH_SIZE = 10;
@@ -85,15 +86,56 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       }
     }
 
-    const { data: finalLinks } = await supabase.from("socialmedia_post_platforms").select("status,next_retry_at").eq("post_id",post.id);
+    const { data: finalLinks } = await supabase
+      .from("socialmedia_post_platforms")
+      .select("status,next_retry_at,social_account_id")
+      .eq("post_id",post.id);
     const destinationRows = (finalLinks ?? []).map((link) => ({ status: link.status, nextRetryAt: link.next_retry_at }));
+    const destinationAccountIds = [...new Set((finalLinks ?? []).map((link) => link.social_account_id))];
+    const { data: destinationAccounts } = destinationAccountIds.length
+      ? await supabase.from("socialmedia_social_accounts").select("id,platform").in("id", destinationAccountIds)
+      : { data: [] };
+    const platformByAccountId = new Map((destinationAccounts ?? []).map((account) => [account.id, account.platform]));
+    const publishedPlatforms = (finalLinks ?? [])
+      .filter((link) => link.status === "published")
+      .map((link) => platformByAccountId.get(link.social_account_id))
+      .filter((platform): platform is string => Boolean(platform));
+    const failedPlatforms = (finalLinks ?? [])
+      .filter((link) => link.status === "failed" && !link.next_retry_at)
+      .map((link) => platformByAccountId.get(link.social_account_id))
+      .filter((platform): platform is string => Boolean(platform));
     const outcome = getPublishingPostOutcome(destinationRows);
     if (outcome === "published") {
       await supabase.from("socialmedia_posts").update({status:"published",published_at:now,scheduled_at:null}).eq("id",post.id).eq("status","publishing");
-      await enqueueNotification({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), eventType: "post_published", dedupeKey: `post_published:${post.id}`, postId: post.id, payload: { postId: post.id } });
+      await enqueueNotification({
+        profileId: String((post as { profile_id?: string }).profile_id ?? ""),
+        eventType: "post_published",
+        dedupeKey: `post_published:${post.id}`,
+        postId: post.id,
+        payload: {
+          postId: post.id,
+          postTitle: getPostTitle(post.content),
+          platforms: [...new Set(publishedPlatforms)],
+          publishedAt: now,
+          timezone: "UTC",
+        },
+      });
     } else if (outcome === "failed") {
       await supabase.from("socialmedia_posts").update({status:"failed"}).eq("id",post.id).eq("status","publishing");
-      await enqueueNotification({ profileId: String((post as { profile_id?: string }).profile_id ?? ""), eventType: "post_failed", dedupeKey: `post_failed:${post.id}`, postId: post.id, payload: { postId: post.id } });
+      await enqueueNotification({
+        profileId: String((post as { profile_id?: string }).profile_id ?? ""),
+        eventType: "post_failed",
+        dedupeKey: `post_failed:${post.id}`,
+        postId: post.id,
+        payload: {
+          postId: post.id,
+          postTitle: getPostTitle(post.content),
+          platforms: [...new Set(publishedPlatforms)],
+          failedPlatforms: [...new Set(failedPlatforms)],
+          publishedAt: now,
+          timezone: "UTC",
+        },
+      });
     } else {
       await supabase.from("socialmedia_posts").update({status:"scheduled"}).eq("id",post.id).eq("status","publishing");
       deferred += 1;
