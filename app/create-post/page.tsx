@@ -1,5 +1,6 @@
 import { Link2, Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { PostComposer } from "@/components/create-post/post-composer";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
 // Phase 3 sanity verification: account-attention flow is covered in production UI.\nexport const instant = false;
-export const dynamic = "force-dynamic";
 
 export default async function CreatePostPage() {
+  await connection();
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
