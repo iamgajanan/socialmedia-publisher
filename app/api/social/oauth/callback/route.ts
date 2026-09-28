@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptToken } from "@/lib/social/token-crypto";
-import { canCreatePageContent, discoverMetaPages, getInstagramBusinessProfile } from "@/lib/social/meta-discovery";
+import { canCreatePageContent, discoverMetaPages } from "@/lib/social/meta-discovery";
 import { getPkceVerifierCookieName, getProviderConfig, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social/oauth";
 
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
@@ -32,6 +32,70 @@ function profileValues(platform: SocialPlatform, payload: unknown) {
     const item = record(root.data); const username = stringValue(item.username);
     return { id: stringValue(item.id), name: stringValue(item.name), username, avatar: stringValue(item.profile_image_url), url: username ? `https://x.com/${username}` : undefined };
   }
+  if (platform === "threads") {
+    return {
+      id: stringValue(root.id),
+      name: stringValue(root.name),
+      username: stringValue(root.username),
+      avatar: stringValue(root.threads_profile_picture_url),
+      url: stringValue(root.username) ? `https://www.threads.com/@${root.username}` : undefined,
+    };
+  }
+  if (platform === "tiktok") {
+    const item = record(root.data && typeof root.data === "object" ? record(root.data).user ?? root.data : root.data);
+    return { id: stringValue(item.open_id), name: stringValue(item.display_name), username: stringValue(item.username), avatar: stringValue(item.avatar_url), url: stringValue(item.profile_deep_link) };
+  }
+  if (platform === "linkedin") return { id: stringValue(root.sub), name: stringValue(root.name), username: stringValue(root.email), avatar: stringValue(root.picture), url: undefined };
+  const picture = record(root.picture); const pictureData = record(picture.data);
+  return { id: stringValue(root.id), name: stringValue(root.name), username: stringValue(root.username), avatar: stringValue(pictureData.url) ?? stringValue(root.picture), url: undefined };
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const store = await cookies();
+  const state = url.searchParams.get("state");
+  const expectedState = store.get("social_oauth_state")?.value;
+  const platformValue = store.get("social_oauth_platform")?.value;
+  const pkce = store.get(getPkceVerifierCookieName())?.value;
+  const code = url.searchParams.get("code");
+
+  store.delete("social_oauth_state"); store.delete("social_oauth_platform"); store.delete(getPkceVerifierCookieName());
+
+  if (!state || !expectedState || state !== expectedState || !platformValue || !isPlatform(platformValue)) return NextResponse.redirect(new URL("/connect-accounts?error=state", request.url));
+  const platform = platformValue;
+  if (!code) return NextResponse.redirect(new URL(`/connect-accounts?error=denied&platform=${platform}`, request.url));
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims?.sub;
+  if (!userId) return NextResponse.redirect(new URL("/auth/login", request.url));
+
+  const config = getProviderConfig(platform);
+  if (!config) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
+
+  const body = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: config.redirectUri });
+  if (config.tokenClientKey) { body.set(config.tokenClientKey, config.clientId); body.set("client_secret", config.clientSecret); }
+  else { body.set("client_id", config.clientId); if (!config.clientSecretInBasicAuth) body.set("client_secret", config.clientSecret); }
+  if (pkce) body.set("code_verifier", pkce);
+
+  const headers: HeadersInit = { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" };
+  if (config.clientSecretInBasicAuth) headers.Authorization = `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`;
+
+  const tokenResponse = await fetch(config.tokenUrl, { method: "POST", headers, body, cache: "no-store" });
+  if (!tokenResponse.ok) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+  const tokens = (await tokenResponse.json()) as TokenResponse;
+  const instagramToken = platform === "instagram" ? tokens.data?.[0] : undefined;
+  const initialAccessToken = instagramToken?.access_token ?? tokens.access_token;
+  if (!initialAccessToken) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+
+  let accessToken = initialAccessToken;
+  let expiresIn = instagramToken?.expires_in ?? tokens.expires_in;
+  const grantedScopes = instagramToken?.permissions
+    ? instagramToken.permissions.split(/[ ,]+/).filter(Boolean)
+    : tokens.scope
+      ? tokens.scope.split(/[ ,]+/).filter(Boolean)
+      : config.scopes;
+
   if (platform === "instagram") {
     const longLivedUrl = new URL("https://graph.instagram.com/access_token");
     longLivedUrl.searchParams.set("grant_type", "ig_exchange_token");
@@ -126,70 +190,6 @@ function profileValues(platform: SocialPlatform, payload: unknown) {
 
     return NextResponse.redirect(new URL("/connect-accounts?connected=1&platform=instagram", request.url));
   }
-
-  if (platform === "threads") {
-    return {
-      id: stringValue(root.id),
-      name: stringValue(root.name),
-      username: stringValue(root.username),
-      avatar: stringValue(root.threads_profile_picture_url),
-      url: stringValue(root.username) ? `https://www.threads.com/@${root.username}` : undefined,
-    };
-  }
-  if (platform === "tiktok") {
-    const item = record(root.data && typeof root.data === "object" ? record(root.data).user ?? root.data : root.data);
-    return { id: stringValue(item.open_id), name: stringValue(item.display_name), username: stringValue(item.username), avatar: stringValue(item.avatar_url), url: stringValue(item.profile_deep_link) };
-  }
-  if (platform === "linkedin") return { id: stringValue(root.sub), name: stringValue(root.name), username: stringValue(root.email), avatar: stringValue(root.picture), url: undefined };
-  const picture = record(root.picture); const pictureData = record(picture.data);
-  return { id: stringValue(root.id), name: stringValue(root.name), username: stringValue(root.username), avatar: stringValue(pictureData.url) ?? stringValue(root.picture), url: undefined };
-}
-
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const store = await cookies();
-  const state = url.searchParams.get("state");
-  const expectedState = store.get("social_oauth_state")?.value;
-  const platformValue = store.get("social_oauth_platform")?.value;
-  const pkce = store.get(getPkceVerifierCookieName())?.value;
-  const code = url.searchParams.get("code");
-
-  store.delete("social_oauth_state"); store.delete("social_oauth_platform"); store.delete(getPkceVerifierCookieName());
-
-  if (!state || !expectedState || state !== expectedState || !platformValue || !isPlatform(platformValue)) return NextResponse.redirect(new URL("/connect-accounts?error=state", request.url));
-  const platform = platformValue;
-  if (!code) return NextResponse.redirect(new URL(`/connect-accounts?error=denied&platform=${platform}`, request.url));
-
-  const supabase = await createClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  const userId = claims?.claims?.sub;
-  if (!userId) return NextResponse.redirect(new URL("/auth/login", request.url));
-
-  const config = getProviderConfig(platform);
-  if (!config) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
-
-  const body = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: config.redirectUri });
-  if (config.tokenClientKey) { body.set(config.tokenClientKey, config.clientId); body.set("client_secret", config.clientSecret); }
-  else { body.set("client_id", config.clientId); if (!config.clientSecretInBasicAuth) body.set("client_secret", config.clientSecret); }
-  if (pkce) body.set("code_verifier", pkce);
-
-  const headers: HeadersInit = { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" };
-  if (config.clientSecretInBasicAuth) headers.Authorization = `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`;
-
-  const tokenResponse = await fetch(config.tokenUrl, { method: "POST", headers, body, cache: "no-store" });
-  if (!tokenResponse.ok) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
-  const tokens = (await tokenResponse.json()) as TokenResponse;
-  const instagramToken = platform === "instagram" ? tokens.data?.[0] : undefined;
-  const initialAccessToken = instagramToken?.access_token ?? tokens.access_token;
-  if (!initialAccessToken) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
-
-  let accessToken = initialAccessToken;
-  let expiresIn = instagramToken?.expires_in ?? tokens.expires_in;
-  const grantedScopes = instagramToken?.permissions
-    ? instagramToken.permissions.split(/[ ,]+/).filter(Boolean)
-    : tokens.scope
-      ? tokens.scope.split(/[ ,]+/).filter(Boolean)
-      : config.scopes;
 
   if (platform === "threads") {
     const longLivedUrl = new URL("https://graph.threads.net/access_token");
