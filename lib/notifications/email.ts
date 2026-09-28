@@ -1,5 +1,3 @@
-import "server-only";
-
 export type NotificationEmailPayload = Record<string, unknown>;
 
 function stringValue(value: unknown) {
