@@ -124,6 +124,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
     }
 
+    let savedDestinationCount = 0;
     for (const page of destinations) {
       let instagramProfile: Awaited<ReturnType<typeof getInstagramBusinessProfile>> | null = null;
       if (platform === "instagram" && page.instagramBusinessAccountId) {
@@ -207,8 +208,12 @@ export async function GET(request: Request) {
         });
         return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
       }
+      savedDestinationCount += 1;
     }
 
+    if (!savedDestinationCount) {
+      return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
+    }
     return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=${platform}`, request.url));
   }
 
