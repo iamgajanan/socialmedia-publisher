@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notificationIdempotencyKey } from "./index";
+import { notificationIdempotencyKey } from "./idempotency";
 import { canRetryNotification, getNextNotificationAttemptAt } from "./retry";
 
 const BATCH_SIZE = 20;
