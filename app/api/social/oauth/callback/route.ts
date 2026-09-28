@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptToken } from "@/lib/social/token-crypto";
+import { canCreatePageContent, discoverMetaPages } from "@/lib/social/meta-discovery";
 import { getPkceVerifierCookieName, getProviderConfig, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/social/oauth";
 
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
@@ -91,6 +92,100 @@ export async function GET(request: Request) {
     if (!longLived.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
     accessToken = longLived.access_token;
     expiresIn = longLived.expires_in;
+  }
+
+  if (platform === "facebook" || platform === "instagram") {
+    const graphVersion = process.env.META_GRAPH_VERSION?.trim();
+    if (!graphVersion) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
+
+    const admin = createAdminClient();
+    const { error: profileError } = await admin
+      .from("socialmedia_profiles")
+      .upsert({ id: String(userId) }, { onConflict: "id" });
+
+    if (profileError) {
+      console.error("social_oauth_profile_save_failed", { platform, userId: String(userId), code: profileError.code, message: profileError.message });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    }
+
+    let pages;
+    try {
+      pages = await discoverMetaPages(accessToken, graphVersion);
+    } catch (error) {
+      console.error("meta_page_discovery_failed", { platform, userId: String(userId), error: error instanceof Error ? error.message : String(error) });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
+    }
+
+    const destinations = platform === "facebook"
+      ? pages.filter(canCreatePageContent)
+      : pages.filter((page) => canCreatePageContent(page) && page.instagramBusinessAccountId);
+
+    if (!destinations.length) {
+      return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
+    }
+
+    for (const page of destinations) {
+      const externalAccountId = platform === "facebook" ? page.id : String(page.instagramBusinessAccountId);
+      const accountName = platform === "facebook" ? page.name : `Instagram · ${page.name}`;
+      const username = platform === "instagram" ? String(page.instagramBusinessAccountId) : null;
+      const metadata = {
+        meta_page_id: page.id,
+        facebook_page_id: page.id,
+        ...(page.instagramBusinessAccountId ? { instagram_business_account_id: page.instagramBusinessAccountId } : {}),
+        meta_page_tasks: page.tasks,
+        meta_connection_type: platform,
+      };
+
+      const { data: savedAccount, error: accountError } = await admin
+        .from("socialmedia_social_accounts")
+        .upsert({
+          profile_id: String(userId),
+          platform,
+          account_name: accountName,
+          external_account_id: externalAccountId,
+          username,
+          avatar_url: null,
+          status: "connected",
+          metadata,
+          token_expires_at: null,
+          provider_account_url: platform === "facebook" ? `https://www.facebook.com/${page.id}` : null,
+          scopes: tokens.scope ? tokens.scope.split(/[ ,]+/).filter(Boolean) : config.scopes,
+        }, { onConflict: "profile_id,platform,external_account_id" })
+        .select("id")
+        .single();
+
+      if (accountError || !savedAccount?.id) {
+        console.error("social_oauth_account_save_failed", {
+          platform,
+          userId: String(userId),
+          externalAccountId,
+          code: accountError?.code,
+          message: accountError?.message,
+        });
+        return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+      }
+
+      const { error: secretError } = await admin
+        .from("socialmedia_account_secrets")
+        .upsert({
+          social_account_id: savedAccount.id,
+          access_token_ciphertext: encryptToken(page.accessToken),
+          refresh_token_ciphertext: null,
+        }, { onConflict: "social_account_id" });
+
+      if (secretError) {
+        console.error("social_oauth_secret_save_failed", {
+          platform,
+          userId: String(userId),
+          socialAccountId: String(savedAccount.id),
+          code: secretError.code,
+          message: secretError.message,
+        });
+        return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+      }
+    }
+
+    return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=${platform}`, request.url));
   }
 
   let profilePayload: unknown = {};
