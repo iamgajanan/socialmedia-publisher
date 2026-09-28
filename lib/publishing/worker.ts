@@ -105,6 +105,12 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       .map((link) => platformByAccountId.get(link.social_account_id))
       .filter((platform): platform is string => Boolean(platform));
     const outcome = getPublishingPostOutcome(destinationRows);
+    const { data: notificationProfile } = await supabase
+      .from("socialmedia_profiles")
+      .select("timezone")
+      .eq("id", String((post as { profile_id?: string }).profile_id ?? ""))
+      .maybeSingle();
+    const notificationTimeZone = notificationProfile?.timezone || "Asia/Kolkata";
     if (outcome === "published") {
       await supabase.from("socialmedia_posts").update({status:"published",published_at:now,scheduled_at:null}).eq("id",post.id).eq("status","publishing");
       await enqueueNotification({
@@ -117,7 +123,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
           postTitle: getPostTitle(post.content),
           platforms: [...new Set(publishedPlatforms)],
           publishedAt: now,
-          timezone: "UTC",
+          timezone: notificationTimeZone,
         },
       });
     } else if (outcome === "failed") {
