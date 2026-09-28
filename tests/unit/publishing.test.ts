@@ -42,3 +42,20 @@ test("Threads validation accepts one image and rejects multiple media assets", a
     ],
   }));
 });
+
+
+test("automatic retry keeps the post scheduled and suppresses premature failure notifications", async () => {
+  const { getPublishingPostOutcome } = await import("../../lib/publishing/outcome.ts");
+  assert.equal(getPublishingPostOutcome([
+    { status: "published", nextRetryAt: null },
+    { status: "failed", nextRetryAt: "2026-09-27T00:01:00.000Z" },
+  ]), "retrying");
+  assert.equal(getPublishingPostOutcome([
+    { status: "published", nextRetryAt: null },
+    { status: "failed", nextRetryAt: null },
+  ]), "failed");
+  assert.equal(getPublishingPostOutcome([
+    { status: "published", nextRetryAt: null },
+    { status: "published", nextRetryAt: null },
+  ]), "published");
+});
