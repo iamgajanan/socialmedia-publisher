@@ -5,7 +5,7 @@ export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 export type ProviderConfig = {
   clientId: string; clientSecret: string; authorizationUrl: string; tokenUrl: string; profileUrl: string;
-  scopes: string[]; redirectUri: string; usePkce?: boolean; clientSecretInBasicAuth?: boolean; tokenClientKey?: string;
+  scopes: string[]; redirectUri: string; usePkce?: boolean; clientSecretInBasicAuth?: boolean; tokenClientKey?: string; instagramLogin?: boolean;
 };
 
 function env(name: string) { return process.env[name]?.trim() || ""; }
@@ -56,21 +56,21 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
     case "tiktok":
       if (!env("TIKTOK_CLIENT_KEY") || !env("TIKTOK_CLIENT_SECRET")) return null;
       return { clientId: env("TIKTOK_CLIENT_KEY"), clientSecret: env("TIKTOK_CLIENT_SECRET"), authorizationUrl: "https://www.tiktok.com/v2/auth/authorize/", tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/", profileUrl: "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,profile_deep_link", scopes: (env("TIKTOK_OAUTH_SCOPES") || "user.info.basic,video.publish").split(",").map((v) => v.trim()).filter(Boolean), redirectUri, tokenClientKey: "client_key" };
-    case "facebook":
-    case "instagram": {
+    case "facebook": {
       const version = env("META_GRAPH_VERSION");
       if (!env("META_APP_ID") || !env("META_APP_SECRET") || !version) return null;
-      const profileUrl = env(platform === "facebook" ? "FACEBOOK_PROFILE_URL" : "INSTAGRAM_PROFILE_URL") || `https://graph.facebook.com/${version}/me?fields=id,name`;
-      const configuredScopes =
-        platform === "facebook"
-          ? env("META_FACEBOOK_SCOPES") || env("FACEBOOK_OAUTH_SCOPES")
-          : env("META_INSTAGRAM_SCOPES") || env("INSTAGRAM_OAUTH_SCOPES");
-      const scopes =
-        configuredScopes ||
-        (platform === "facebook"
-          ? "pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list"
-          : "instagram_basic,instagram_content_publish,pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list");
+      const profileUrl = env("FACEBOOK_PROFILE_URL") || `https://graph.facebook.com/${version}/me?fields=id,name`;
+      const scopes = env("META_FACEBOOK_SCOPES") || env("FACEBOOK_OAUTH_SCOPES") || "pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list";
       return { clientId: env("META_APP_ID"), clientSecret: env("META_APP_SECRET"), authorizationUrl: `https://www.facebook.com/${version}/dialog/oauth`, tokenUrl: `https://graph.facebook.com/${version}/oauth/access_token`, profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri };
+    }
+    case "instagram": {
+      const version = env("META_GRAPH_VERSION");
+      const clientId = env("INSTAGRAM_APP_ID");
+      const clientSecret = env("INSTAGRAM_APP_SECRET");
+      if (!clientId || !clientSecret || !version) return null;
+      const profileUrl = env("INSTAGRAM_PROFILE_URL") || `https://graph.instagram.com/${version}/me?fields=user_id,username,account_type,profile_picture_url`;
+      const scopes = env("META_INSTAGRAM_SCOPES") || env("INSTAGRAM_OAUTH_SCOPES") || "instagram_business_basic,instagram_business_content_publish";
+      return { clientId, clientSecret, authorizationUrl: "https://www.instagram.com/oauth/authorize", tokenUrl: "https://api.instagram.com/oauth/access_token", profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri, instagramLogin: true };
     }
   }
 }
