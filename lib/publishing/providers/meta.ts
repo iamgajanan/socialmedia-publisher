@@ -1,6 +1,7 @@
 import "server-only";
 import { providerFetch } from "./http";
 import { PublisherError, type Publisher } from "./types";
+import { buildFacebookPublishRequest } from "./meta-facebook-request";
 
 function graphVersion() {
   const value = process.env.META_GRAPH_VERSION?.trim();
@@ -27,33 +28,22 @@ export const facebookPublisher: Publisher = {
   async publish(input, accessToken) {
     const version = graphVersion();
     const page = pageContext(accessToken, input.account.external_account_id);
-    const pageToken = page.accessToken;
-    if (!input.media.length) {
-      const response = await providerFetch(`https://graph.facebook.com/${version}/${page.id}/feed`, {
-        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ message: input.content, access_token: pageToken }),
-      });
-      const data = await response.json() as { id?: string };
-      if (!data.id) throw new PublisherError("Facebook published the post but did not return a post ID.", { code: "missing_post_id" });
-      return { platformPostId: data.id };
-    }
     const media = input.media[0];
-    const endpoint = media.mimeType.startsWith("image/") ? `https://graph.facebook.com/${version}/${page.id}/photos` : `https://graph.facebook.com/${version}/${page.id}/videos`;
-    const params = new URLSearchParams({ access_token: pageToken });
-    if (media.mimeType.startsWith("image/")) {
-      params.set("url", media.url);
-      params.set("caption", input.content);
-    } else {
-      params.set("file_url", media.url);
-      params.set("description", input.content);
-    }
-    const response = await providerFetch(endpoint, {
-      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params,
+    const request = buildFacebookPublishRequest(
+      version,
+      page.id,
+      page.accessToken,
+      input.content,
+      media ? { url: media.url, mimeType: media.mimeType } : undefined,
+    );
+    const response = await providerFetch(request.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: request.body,
     });
     const data = await response.json() as { id?: string; post_id?: string };
     const id = data.post_id ?? data.id;
-    if (!id) throw new PublisherError("Facebook published the media but did not return a post ID.", { code: "missing_post_id" });
+    if (!id) throw new PublisherError("Facebook published the post but did not return a post ID.", { code: "missing_post_id" });
     return { platformPostId: id };
   },
   async getAccount(accessToken) {
