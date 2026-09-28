@@ -1,5 +1,3 @@
-import "server-only";
-
 export type MetaPageDestination = {
   id: string;
   name: string;
