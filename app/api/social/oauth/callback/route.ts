@@ -8,7 +8,15 @@ import { getPkceVerifierCookieName, getProviderConfig, SOCIAL_PLATFORMS, type So
 
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
 type JsonRecord = Record<string, unknown>;
-type TokenResponse = { access_token?: string; refresh_token?: string; expires_in?: number; refresh_expires_in?: number; scope?: string; open_id?: string };
+type TokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  refresh_expires_in?: number;
+  scope?: string;
+  open_id?: string;
+  data?: Array<{ access_token?: string; user_id?: string; permissions?: string; expires_in?: number }>;
+};
 function record(value: unknown): JsonRecord { return value && typeof value === "object" ? value as JsonRecord : {}; }
 function stringValue(value: unknown) { return typeof value === "string" ? value : undefined; }
 
@@ -24,6 +32,101 @@ function profileValues(platform: SocialPlatform, payload: unknown) {
     const item = record(root.data); const username = stringValue(item.username);
     return { id: stringValue(item.id), name: stringValue(item.name), username, avatar: stringValue(item.profile_image_url), url: username ? `https://x.com/${username}` : undefined };
   }
+  if (platform === "instagram") {
+    const longLivedUrl = new URL("https://graph.instagram.com/access_token");
+    longLivedUrl.searchParams.set("grant_type", "ig_exchange_token");
+    longLivedUrl.searchParams.set("client_secret", config.clientSecret);
+    longLivedUrl.searchParams.set("access_token", accessToken);
+
+    const longLivedResponse = await fetch(longLivedUrl, { method: "GET", cache: "no-store" });
+    if (!longLivedResponse.ok) {
+      console.error("instagram_login_long_lived_token_failed", { userId: String(userId), status: longLivedResponse.status });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+    }
+
+    const longLived = (await longLivedResponse.json()) as TokenResponse;
+    if (!longLived.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+    accessToken = longLived.access_token;
+    expiresIn = longLived.expires_in ?? expiresIn;
+
+    const profileResponse = await fetch(config.profileUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+    if (!profileResponse.ok) {
+      console.error("instagram_login_profile_failed", { userId: String(userId), status: profileResponse.status });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
+    }
+
+    const profile = record(await profileResponse.json());
+    const externalId = stringValue(profile.user_id) ?? stringValue(profile.id);
+    if (!externalId) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
+
+    const admin = createAdminClient();
+    const { error: profileError } = await admin
+      .from("socialmedia_profiles")
+      .upsert({ id: String(userId) }, { onConflict: "id" });
+
+    if (profileError) {
+      console.error("social_oauth_profile_save_failed", { platform, userId: String(userId), code: profileError.code, message: profileError.message });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    }
+
+    const username = stringValue(profile.username);
+    const { data: savedAccount, error: accountError } = await admin
+      .from("socialmedia_social_accounts")
+      .upsert({
+        profile_id: String(userId),
+        platform,
+        account_name: username ? `@${username}` : "Instagram",
+        external_account_id: externalId,
+        username,
+        avatar_url: stringValue(profile.profile_picture_url) ?? null,
+        status: "connected",
+        metadata: {
+          meta_connection_type: "instagram_login",
+          instagram_account_type: stringValue(profile.account_type) ?? null,
+        },
+        token_expires_at: typeof expiresIn === "number" ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
+        provider_account_url: username ? `https://www.instagram.com/${username}` : null,
+        scopes: grantedScopes,
+      }, { onConflict: "profile_id,platform,external_account_id" })
+      .select("id")
+      .single();
+
+    if (accountError || !savedAccount?.id) {
+      console.error("social_oauth_account_save_failed", {
+        platform,
+        userId: String(userId),
+        externalAccountId: externalId,
+        code: accountError?.code,
+        message: accountError?.message,
+      });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    }
+
+    const { error: secretError } = await admin
+      .from("socialmedia_account_secrets")
+      .upsert({
+        social_account_id: savedAccount.id,
+        access_token_ciphertext: encryptToken(accessToken),
+        refresh_token_ciphertext: null,
+      }, { onConflict: "social_account_id" });
+
+    if (secretError) {
+      console.error("social_oauth_secret_save_failed", {
+        platform,
+        userId: String(userId),
+        socialAccountId: String(savedAccount.id),
+        code: secretError.code,
+        message: secretError.message,
+      });
+      return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    }
+
+    return NextResponse.redirect(new URL("/connect-accounts?connected=1&platform=instagram", request.url));
+  }
+
   if (platform === "threads") {
     return {
       id: stringValue(root.id),
@@ -76,10 +179,17 @@ export async function GET(request: Request) {
   const tokenResponse = await fetch(config.tokenUrl, { method: "POST", headers, body, cache: "no-store" });
   if (!tokenResponse.ok) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
   const tokens = (await tokenResponse.json()) as TokenResponse;
-  if (!tokens.access_token) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
+  const instagramToken = platform === "instagram" ? tokens.data?.[0] : undefined;
+  const initialAccessToken = instagramToken?.access_token ?? tokens.access_token;
+  if (!initialAccessToken) return NextResponse.redirect(new URL(`/connect-accounts?error=token&platform=${platform}`, request.url));
 
-  let accessToken = tokens.access_token;
-  let expiresIn = tokens.expires_in;
+  let accessToken = initialAccessToken;
+  let expiresIn = instagramToken?.expires_in ?? tokens.expires_in;
+  const grantedScopes = instagramToken?.permissions
+    ? instagramToken.permissions.split(/[ ,]+/).filter(Boolean)
+    : tokens.scope
+      ? tokens.scope.split(/[ ,]+/).filter(Boolean)
+      : config.scopes;
 
   if (platform === "threads") {
     const longLivedUrl = new URL("https://graph.threads.net/access_token");
@@ -94,7 +204,7 @@ export async function GET(request: Request) {
     expiresIn = longLived.expires_in;
   }
 
-  if (platform === "facebook" || platform === "instagram") {
+  if (platform === "facebook") {
     const graphVersion = process.env.META_GRAPH_VERSION?.trim();
     if (!graphVersion) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
 
@@ -174,7 +284,7 @@ export async function GET(request: Request) {
             : instagramProfile?.username
               ? `https://www.instagram.com/${instagramProfile.username}`
               : null,
-          scopes: tokens.scope ? tokens.scope.split(/[ ,]+/).filter(Boolean) : config.scopes,
+          scopes: grantedScopes,
         }, { onConflict: "profile_id,platform,external_account_id" })
         .select("id")
         .single();
