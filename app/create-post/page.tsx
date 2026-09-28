@@ -17,9 +17,8 @@ export default async function CreatePostPage() {
   const [{ data: accounts }, { data: profile }] = await Promise.all([
     supabase
       .from("socialmedia_social_accounts")
-      .select("id, platform, account_name, username, avatar_url")
+      .select("id, platform, account_name, username, avatar_url, status")
       .eq("profile_id", userId)
-      .eq("status", "connected")
       .order("created_at", { ascending: false }),
     supabase
       .from("socialmedia_profiles")
@@ -29,6 +28,8 @@ export default async function CreatePostPage() {
   ]);
 
   const timezone = profile?.timezone || "Asia/Kolkata";
+  const connectedAccounts = (accounts ?? []).filter((account) => account.status === "connected");
+  const attentionAccounts = (accounts ?? []).filter((account) => account.status !== "connected");
 
   return (
     <div className="space-y-8">
@@ -49,8 +50,34 @@ export default async function CreatePostPage() {
           <Link2 />Manage accounts
         </a>
       </section>
-      {(accounts?.length ?? 0) > 0 ? (
-        <PostComposer accounts={accounts ?? []} timezone={timezone} />
+      {connectedAccounts.length > 0 ? (
+        <PostComposer accounts={connectedAccounts} timezone={timezone} />
+      ) : attentionAccounts.length > 0 ? (
+        <Card className="border-destructive/30 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10">
+              <Link2 className="size-6 text-destructive" />
+            </div>
+            <h2 className="mt-5 text-xl font-semibold">Reconnect your social account</h2>
+            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              Your connected account needs attention before it can be used for publishing. Reconnect it, then return here to create your post.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {attentionAccounts.map((account) => (
+                <a
+                  key={account.id}
+                  href={`/api/social/oauth/start/${account.platform}`}
+                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+                >
+                  Reconnect {account.account_name}
+                </a>
+              ))}
+              <a href="/connect-accounts" className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                Manage accounts
+              </a>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <Card className="border-dashed shadow-sm">
           <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
