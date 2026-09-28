@@ -60,9 +60,16 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
     case "instagram": {
       const version = env("META_GRAPH_VERSION");
       if (!env("META_APP_ID") || !env("META_APP_SECRET") || !version) return null;
-      const profileUrl = env(platform === "facebook" ? "FACEBOOK_PROFILE_URL" : "INSTAGRAM_PROFILE_URL");
-      if (!profileUrl) return null;
-      const scopes = env(platform === "facebook" ? "FACEBOOK_OAUTH_SCOPES" : "INSTAGRAM_OAUTH_SCOPES") || (platform === "facebook" ? "pages_show_list,pages_read_engagement,pages_manage_posts" : "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement");
+      const profileUrl = env(platform === "facebook" ? "FACEBOOK_PROFILE_URL" : "INSTAGRAM_PROFILE_URL") || `https://graph.facebook.com/${version}/me?fields=id,name`;
+      const configuredScopes =
+        platform === "facebook"
+          ? env("META_FACEBOOK_SCOPES") || env("FACEBOOK_OAUTH_SCOPES")
+          : env("META_INSTAGRAM_SCOPES") || env("INSTAGRAM_OAUTH_SCOPES");
+      const scopes =
+        configuredScopes ||
+        (platform === "facebook"
+          ? "pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list"
+          : "instagram_basic,instagram_content_publish,pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list");
       return { clientId: env("META_APP_ID"), clientSecret: env("META_APP_SECRET"), authorizationUrl: `https://www.facebook.com/${version}/dialog/oauth`, tokenUrl: `https://graph.facebook.com/${version}/oauth/access_token`, profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri };
     }
   }
