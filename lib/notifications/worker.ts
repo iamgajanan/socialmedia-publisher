@@ -2,9 +2,9 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notificationIdempotencyKey } from "./index";
+import { canRetryNotification, getNextNotificationAttemptAt } from "./retry";
 
 const BATCH_SIZE = 20;
-const MAX_ATTEMPTS = 5;
 const STALE_SENDING_MINUTES = 10;
 
 type NotificationRow = {
@@ -12,10 +12,6 @@ type NotificationRow = {
   post_id: string | null; social_account_id: string | null; payload: Record<string, unknown>;
   attempts: number; next_attempt_at: string; created_at: string;
 };
-
-function backoff(attempt: number) {
-  return Math.min(60 * 60, 60 * 2 ** Math.max(0, attempt - 1));
-}
 
 function esc(value: unknown) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[char] ?? char);
@@ -113,8 +109,8 @@ export async function runNotificationWorker(): Promise<NotificationWorkerResult>
       sent += 1;
     } catch (error) {
       const attempts = row.attempts + 1;
-      const canRetry = attempts < MAX_ATTEMPTS;
-      const nextAttemptAt = new Date(Date.now() + backoff(attempts) * 1000).toISOString();
+      const canRetry = canRetryNotification(attempts);
+      const nextAttemptAt = getNextNotificationAttemptAt(attempts).toISOString();
       await admin.from("socialmedia_notification_logs").update({
         status: canRetry ? "queued" : "failed",
         next_attempt_at: canRetry ? nextAttemptAt : nowIso,
