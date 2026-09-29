@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Check, ChevronDown, AtSign, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, AtSign, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
 
 import { saveDraft, type SaveDraftState } from "@/app/create-post/actions";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +23,16 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
   tiktok: { name: "TikTok", icon: Send, limit: 2200 },
 };
 
+const PUBLISHING_DISABLED_PLATFORMS = new Set(["x"]);
+
 const initialState: SaveDraftState = { ok: false, message: "" };
 
 export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost }: { accounts: Account[]; timezone?: string; initialPost?: { id: string; content: string; accountIds: string[]; mediaPaths: string[]; mode: "draft" | "schedule"; scheduledAt: string | null } }) {
   const [content, setContent] = useState(initialPost?.content ?? "");
-  const [selected, setSelected] = useState<string[]>(initialPost?.accountIds ?? accounts.map((account) => account.id));
+  const [selected, setSelected] = useState<string[]>(() => {
+    const availableAccountIds = accounts.filter((account) => !PUBLISHING_DISABLED_PLATFORMS.has(account.platform)).map((account) => account.id);
+    return (initialPost?.accountIds ?? availableAccountIds).filter((id) => availableAccountIds.includes(id));
+  });
   const [media, setMedia] = useState<UploadedMedia[]>(initialPost?.mediaPaths.map((path) => ({ path, name: path.split("/").pop() ?? path, size: 0, type: "" })) ?? []);
   const [mode, setMode] = useState<"draft" | "schedule">(initialPost?.mode ?? "draft");
   const [scheduledAtLocal, setScheduledAtLocal] = useState(() => { if (!initialPost?.scheduledAt) return ""; const parts = new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(initialPost.scheduledAt)); const map=Object.fromEntries(parts.filter((part)=>part.type!=="literal").map((part)=>[part.type,part.value])); return map.year ? `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}` : ""; });
@@ -123,10 +128,14 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
                 const platform = meta[account.platform];
                 const Icon = platform?.icon ?? Send;
                 const active = selected.includes(account.id);
-                return <button key={account.id} type="button" onClick={() => toggleAccount(account.id)} className={cn("flex items-center gap-3 rounded-xl border p-3 text-left transition", active ? "border-primary bg-primary/5 shadow-sm" : "bg-background hover:bg-muted/60")}>
-                  <span className={cn("flex size-9 items-center justify-center rounded-lg", active ? "bg-primary text-primary-foreground" : "bg-muted")}><Icon className="size-4" /></span>
+                const publishingDisabled = PUBLISHING_DISABLED_PLATFORMS.has(account.platform);
+                return <button key={account.id} type="button" onClick={() => toggleAccount(account.id)} disabled={publishingDisabled} aria-disabled={publishingDisabled} className={cn(
+                  "flex items-center gap-3 rounded-xl border p-3 text-left transition",
+                  publishingDisabled ? "cursor-not-allowed border-orange-500/70 bg-orange-500/5 opacity-90" : active ? "border-primary bg-primary/5 shadow-sm" : "bg-background hover:bg-muted/60",
+                )}>
+                  <span className={cn("flex size-9 items-center justify-center rounded-lg", publishingDisabled ? "bg-orange-500/10 text-orange-600" : active ? "bg-primary text-primary-foreground" : "bg-muted")}><Icon className="size-4" /></span>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{account.account_name}</span><span className="block truncate text-xs text-muted-foreground">{platform?.name ?? account.platform}{account.username ? ` · @${account.username}` : ""}</span></span>
-                  <span className={cn("flex size-5 items-center justify-center rounded-full border", active && "border-primary bg-primary text-primary-foreground")}>{active && <Check className="size-3" />}</span>
+                  {publishingDisabled ? <span className="flex shrink-0 items-center gap-1 rounded-full border border-orange-500/50 px-2 py-1 text-[11px] font-medium text-orange-600"><AlertTriangle className="size-3" />Paused</span> : <span className={cn("flex size-5 items-center justify-center rounded-full border", active && "border-primary bg-primary text-primary-foreground")}>{active && <Check className="size-3" />}</span>}
                 </button>;
               })}
             </div>
