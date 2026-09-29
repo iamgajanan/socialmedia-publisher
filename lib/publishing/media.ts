@@ -44,12 +44,12 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
   }
 
   const sizeHeader = headResponse.headers.get("content-length");
-  const size = sizeHeader ? Number(sizeHeader) : 0;
-  if (!Number.isFinite(size) || size < 0 || size > MAX_MEDIA_BYTES) {
+  const parsedSize = sizeHeader ? Number(sizeHeader) : 0;
+  if (!Number.isFinite(parsedSize) || parsedSize < 0 || parsedSize > MAX_MEDIA_BYTES) {
     throw new Error("Stored media size could not be validated or exceeds the 100 MB application limit.");
   }
 
-  const resolved = { ...media, mimeType: remoteMimeType, size };
+  const resolved = { ...media, mimeType: remoteMimeType, size: parsedSize };
 
   if (remoteMimeType.startsWith("image/")) {
     const imageResponse = await fetch(media.url, { cache: "no-store" });
@@ -57,10 +57,13 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
       throw new Error(`Unable to read image media (${imageResponse.status}).`);
     }
     const bytes = Buffer.from(await imageResponse.arrayBuffer());
-    if (bytes.byteLength !== size && size > 0) {
+    if (bytes.byteLength !== parsedSize && parsedSize > 0) {
       throw new Error("Stored media size changed while it was being read.");
     }
 
+    if (bytes.byteLength > MAX_MEDIA_BYTES) {
+      throw new Error("Media file exceeds the 100 MB application limit.");
+    }
     const metadata = await inspectImageBuffer(resolved, bytes);
     const validationError = validateMediaMetadata(media, metadata);
     if (validationError) throw new Error(validationError);
@@ -76,6 +79,12 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
       throw new Error(`Unable to inspect video media (${rangeResponse.status}).`);
     }
     const signature = new Uint8Array(await rangeResponse.arrayBuffer());
+    const contentRange = rangeResponse.headers.get("content-range");
+    const totalFromRange = contentRange?.match(/\\/(\\d+)$/)?.[1];
+    const size = parsedSize || Number(totalFromRange ?? 0);
+    if (!size || !Number.isFinite(size) || size > MAX_MEDIA_BYTES) {
+      throw new Error("Stored video size could not be validated or exceeds the 100 MB application limit.");
+    }
     if (!hasVideoContainerSignature(remoteMimeType, signature)) {
       throw new Error("Video container does not match its declared MIME type.");
     }
