@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { API_SOCIAL_PLATFORMS, type ApiSocialPlatform } from "./connected-accounts-core";
+import { API_SOCIAL_PLATFORMS, type ApiSocialPlatform } from "./connected-accounts-core.ts";
 
 export const API_PUBLISH_PLATFORMS = API_SOCIAL_PLATFORMS.filter(
   (platform): platform is Exclude<ApiSocialPlatform, "x"> => platform !== "x",
