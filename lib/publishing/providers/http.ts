@@ -18,6 +18,14 @@ export async function providerFetch(url: string, init: RequestInit): Promise<Res
             ? json.message
             : text;
   } catch {}
-  const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+  const providerCode = typeof nestedError?.code === "number" ? nestedError.code : undefined;
+  const providerSubcode = typeof nestedError?.error_subcode === "number" ? nestedError.error_subcode : undefined;
+  const retryable =
+    response.status === 408 ||
+    response.status === 425 ||
+    response.status === 429 ||
+    response.status >= 500 ||
+    (providerCode === 9007 && providerSubcode === 2207027) ||
+    (providerCode === 24 && providerSubcode === 2207008);
   throw new PublisherError(message || `Provider request failed (${response.status}).`, { retryable, code: `http_${response.status}` });
 }
