@@ -10,12 +10,12 @@ export function buildFacebookPublishRequest(
   content: string,
   media?: { url: string; mimeType: string },
 ): FacebookPublishRequest {
+  if (!graphVersion.trim()) throw new Error("Facebook Graph API version is required.");
+  if (!pageId.trim()) throw new Error("Facebook Page ID is required.");
+  if (!pageToken.trim()) throw new Error("Facebook Page access token is required.");
+
   const isImage = media?.mimeType.startsWith("image/") ?? false;
-  const endpoint = !media
-    ? "feed"
-    : isImage
-      ? "photos"
-      : "videos";
+  const endpoint = !media ? "feed" : isImage ? "photos" : "videos";
   const body = new URLSearchParams({ access_token: pageToken });
 
   if (!media) {
@@ -29,7 +29,7 @@ export function buildFacebookPublishRequest(
   }
 
   return {
-    url: `https://graph.facebook.com/${graphVersion}/${pageId}/${endpoint}`,
+    url: `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pageId)}/${endpoint}`,
     body,
   };
 }
