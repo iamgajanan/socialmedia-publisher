@@ -38,6 +38,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   url.searchParams.set("state", state);
   url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
 
+  if (config.configId) {
+    url.searchParams.set("config_id", config.configId);
+  }
+
   if (config.instagramLogin) {
     url.searchParams.set("enable_fb_login", "0");
     url.searchParams.set("force_authentication", "1");
