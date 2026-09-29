@@ -7,6 +7,7 @@ import { useActionState } from "react";
 
 import { deletePost, duplicatePost, queuePublishNow, retryPost, type PostActionState } from "@/app/post-history/actions";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PostStatusBadge } from "@/components/post-status-badge";
