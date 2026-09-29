@@ -62,6 +62,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
   const selectedPlatforms = [...new Set((selectedAccountRows.data ?? []).map((account) => account.platform))];
   if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, message: "One or more selected accounts are no longer connected." };
+  if (selectedPlatforms.includes("x")) return { ok: false, message: "X publishing is temporarily disabled in Omnisocial." };
 
   if (parsed.data.mediaPaths.some((path) => !path.startsWith(userPathPrefix) || path.includes(".."))) {
     return { ok: false, message: "One or more media files are not owned by your account." };
