@@ -22,7 +22,7 @@ function claimsError(error: unknown) {
   return Boolean(error);
 }
 
-export type PostActionState = { ok: boolean; message: string };
+export type PostActionState = { ok: boolean; message: string; kind?: "success" | "error" | "scheduled" };
 
 export async function deletePost(_previous: PostActionState, formData: FormData): Promise<PostActionState> {
   const parsed = postIdSchema.safeParse({ postId: formData.get("postId") });
@@ -36,7 +36,7 @@ export async function deletePost(_previous: PostActionState, formData: FormData)
   revalidatePath("/post-history");
   revalidatePath("/dashboard");
   revalidatePath("/schedule");
-  return { ok: true, message: "Post deleted." };
+  return { ok: true, kind: "success", message: "Post deleted." };
 }
 
 export async function duplicatePost(_previous: PostActionState, formData: FormData): Promise<PostActionState> {
@@ -65,7 +65,7 @@ export async function duplicatePost(_previous: PostActionState, formData: FormDa
   }
   revalidatePath("/post-history");
   revalidatePath("/dashboard");
-  return { ok: true, message: "Post duplicated as a draft." };
+  return { ok: true, kind: "success", message: "Post duplicated as a draft." };
 }
 
 export async function retryPost(_previous: PostActionState, formData: FormData): Promise<PostActionState> {
@@ -86,7 +86,7 @@ export async function retryPost(_previous: PostActionState, formData: FormData):
   revalidatePath("/post-history");
   revalidatePath("/schedule");
   revalidatePath("/dashboard");
-  return { ok: true, message: "Failed destinations queued for retry." };
+  return { ok: true, kind: "success", message: "Failed destinations queued for retry." };
 }
 
 export async function queuePublishNow(_previous: PostActionState, formData: FormData): Promise<PostActionState> {
@@ -104,5 +104,5 @@ export async function queuePublishNow(_previous: PostActionState, formData: Form
   revalidatePath("/post-history");
   revalidatePath("/schedule");
   revalidatePath("/dashboard");
-  return { ok: true, message: "Queued for publishing." };
+  return { ok: true, kind: "success", message: "Queued for publishing." };
 }
