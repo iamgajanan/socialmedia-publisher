@@ -6,9 +6,10 @@ export async function providerFetch(url: string, init: RequestInit): Promise<Res
   if (response.ok) return response;
   const text = await response.text().catch(() => "");
   let message = text;
+  let nestedError: Record<string, unknown> | null = null;
   try {
     const json = JSON.parse(text) as Record<string, unknown>;
-    const nestedError = json.error && typeof json.error === "object" ? json.error as Record<string, unknown> : null;
+    nestedError = json.error && typeof json.error === "object" ? json.error as Record<string, unknown> : null;
     message =
       typeof nestedError?.message === "string"
         ? nestedError.message
