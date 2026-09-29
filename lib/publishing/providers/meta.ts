@@ -58,4 +58,58 @@ export const facebookPublisher: Publisher = {
   },
 };
 
+export const instagramPublisher: Publisher = {
+  platform: "instagram",
+  validate(input) {
+    if (input.media.length !== 1) throw new PublisherError("Instagram publishing currently requires exactly one image or video.", { code: "instagram_media_required" });
+    if (input.content.length > 2200) throw new PublisherError("Instagram caption exceeds 2,200 characters.", { code: "content_too_long" });
+  },
+  async publish(input, accessToken) {
+    const base = instagramGraphBase();
+    const igId = input.account.external_account_id;
+    if (!igId) throw new PublisherError("The connected Instagram account ID is missing.", { code: "instagram_account_not_found" });
+    if (!accessToken) throw new PublisherError("The connected Instagram access token is missing.", { code: "meta_page_token_missing" });
 
+    const media = input.media[0];
+    const body = new URLSearchParams({ caption: input.content });
+    body.set("access_token", accessToken);
+    let containerReady = false;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const statusResponse = await providerFetch(
+        `${base}/${container.id}?fields=status_code,status&access_token=${encodeURIComponent(accessToken)}`,
+        { method: "GET" },
+      );
+      const status = await statusResponse.json() as { status_code?: string; status?: string };
+      if (status.status_code === "FINISHED" || status.status_code === "PUBLISHED") {
+        containerReady = true;
+        break;
+      }
+      if (status.status_code === "ERROR") {
+        throw new PublisherError(status.status || "Instagram media processing failed.", { code: "instagram_processing_failed" });
+      }
+      if (status.status_code === "EXPIRED") {
+        throw new PublisherError("Instagram media container expired before publishing.", { retryable: true, code: "instagram_container_expired" });
+      }
+      if (attempt < 19) await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+    if (!containerReady) {
+      throw new PublisherError("Instagram media is still processing; retry later.", { retryable: true, code: "instagram_processing" });
+    }
+
+    const publishResponse = await providerFetch(`${base}/${igId}/media_publish`, {
+      method: "POST",
+      body: new URLSearchParams({ creation_id: container.id, access_token: accessToken }),
+    });
+    const result = await publishResponse.json() as { id?: string };
+    if (!result.id) throw new PublisherError("Instagram published the media but did not return a media ID.", { code: "missing_post_id" });
+    return { platformPostId: result.id };
+  },
+  async getAccount(accessToken) {
+    const response = await providerFetch(
+      `${instagramGraphBase()}/me?fields=user_id,username,account_type&access_token=${encodeURIComponent(accessToken)}`,
+      { method: "GET" },
+    );
+    const data = await response.json() as { user_id?: string; username?: string; account_type?: string };
+    return { external_account_id: data.user_id, account_name: data.username ? `@${data.username}` : "Instagram" };
+  },
+};
