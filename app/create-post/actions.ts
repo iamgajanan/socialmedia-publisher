@@ -86,7 +86,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
 
 
   const mediaPathValidationError = validateMediaSelection(selectedPlatforms, parsed.data.mediaPaths.map(mediaTypeFromPath));
-  if (mediaPathValidationError) return { ok: false, message: mediaPathValidationError };
+  if (mediaPathValidationError) return { ok: false, kind: "error", message: mediaPathValidationError };
 
   let postId = parsed.data.postId;
   if (postId) {
