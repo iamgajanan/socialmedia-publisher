@@ -11,7 +11,19 @@ import { useToast } from "@/components/ui/toast-provider";
 
 function Action({ action, postId, children }: { action:(state:PostActionState, formData:FormData)=>Promise<PostActionState>; postId:string; children:React.ReactNode }) {
   const [state, formAction, pending] = useActionState(action,{ok:false,message:""});
-  return <form action={formAction}><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="outline" size="sm" disabled={pending}>{children}</Button>{state.message&&<span className="ml-2 text-xs text-muted-foreground">{state.message}</span>}</form>;
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!state.message) return;
+    const scheduled = state.ok && state.kind === "scheduled";
+    toast({
+      title: state.ok ? (scheduled ? "Post queued" : "Success") : "Action failed",
+      message: state.message,
+      variant: state.ok ? (scheduled ? "scheduled" : "success") : "error",
+    });
+  }, [state, toast]);
+
+  return <form action={formAction}><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="outline" size="sm" disabled={pending}>{children}</Button></form>;
 }
 export function HistoryActionButtons({postId,status}:{postId:string;status:string}) {
  return <div className="flex flex-wrap gap-2">
