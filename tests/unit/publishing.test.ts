@@ -65,11 +65,14 @@ test("media capability matrix enforces selected destination requirements", async
   const instagram = getMediaCapability(["instagram"]);
   assert.equal(instagram.minFiles, 1);
   assert.equal(instagram.maxFiles, 1);
-  assert.deepEqual(instagram.imageTypes, ["image/jpeg"]);
+  assert.deepEqual(instagram.imageTypes, ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"]);
   assert.deepEqual(instagram.videoTypes, ["video/mp4", "video/quicktime"]);
   assert.equal(validateMediaSelection(["instagram"], []), "instagram requires at least 1 image or video.");
-  assert.equal(validateMediaSelection(["instagram"], ["image/png"]), "image/png is not supported by the selected destination.");
+  assert.equal(validateMediaSelection(["instagram"], ["image/png"]), null);
+  assert.equal(validateMediaSelection(["instagram"], ["image/webp"]), null);
+  assert.equal(validateMediaSelection(["instagram"], ["image/avif"]), null);
   assert.equal(validateMediaSelection(["instagram"], ["image/jpeg"]), null);
+  assert.equal(validateMediaSelection(["instagram"], ["image/tiff"]), null);
   const mixed = getMediaCapability(["facebook", "instagram"]);
   assert.equal(mixed.maxFiles, 1);
   assert.deepEqual(mixed.imageTypes, ["image/jpeg"]);
@@ -80,5 +83,9 @@ test("media paths are classified from persisted extensions", async () => {
   const { mediaTypeFromPath } = await import("../../lib/publishing/media-capabilities.ts");
   assert.equal(mediaTypeFromPath("user/photo.jpg"), "image/jpeg");
   assert.equal(mediaTypeFromPath("user/video.mp4"), "video/mp4");
+  assert.equal(mediaTypeFromPath("user/photo.webp"), "image/webp");
+  assert.equal(mediaTypeFromPath("user/photo.avif"), "image/avif");
+  assert.equal(mediaTypeFromPath("user/photo.tiff"), "image/tiff");
+  assert.equal(mediaTypeFromPath("user/photo.bmp"), "image/bmp");
   assert.equal(mediaTypeFromPath("user/clip.mov"), "video/quicktime");
 });
