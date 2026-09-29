@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, KeyRound, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ export default function ApiKeysManager() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  async function loadKeys() {
+  const loadKeys = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
