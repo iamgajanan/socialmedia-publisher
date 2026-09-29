@@ -32,12 +32,10 @@ export default function ApiKeysManager() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const loadKeys = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const response = await fetch("/api/v1/api-keys", { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
@@ -45,16 +43,15 @@ export default function ApiKeysManager() {
       setKeys(body.apiKeys ?? []);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Unable to load API keys.";
-      setError(message);
       toast({ title: "API keys could not be loaded", message, variant: "error" });
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
 
   useEffect(() => {
     void loadKeys();
-  }, []);
+  }, [loadKeys]);
 
   async function createKey(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,7 +59,6 @@ export default function ApiKeysManager() {
     if (!trimmedName) return;
 
     setCreating(true);
-    setError(null);
     setCreatedToken(null);
     setCopied(false);
     try {
@@ -78,7 +74,6 @@ export default function ApiKeysManager() {
       await loadKeys();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Unable to create API key.";
-      setError(message);
       toast({ title: "API key creation failed", message, variant: "error" });
     } finally {
       setCreating(false);
@@ -89,7 +84,6 @@ export default function ApiKeysManager() {
     if (!window.confirm("Revoke this API key? Any integration using it will stop authenticating.")) return;
 
     setRevokingId(id);
-    setError(null);
     try {
       const response = await fetch(`/api/v1/api-keys/${id}`, { method: "DELETE" });
       const body = await response.json().catch(() => ({}));
@@ -97,7 +91,6 @@ export default function ApiKeysManager() {
       await loadKeys();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Unable to revoke API key.";
-      setError(message);
       toast({ title: "API key revocation failed", message, variant: "error" });
     } finally {
       setRevokingId(null);
