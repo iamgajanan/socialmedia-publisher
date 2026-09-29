@@ -23,7 +23,7 @@ const draftSchema = z.object({
   timezone: z.string().default("Asia/Kolkata"),
 });
 
-export type SaveDraftState = { ok: boolean; message: string; postId?: string };
+export type SaveDraftState = { ok: boolean; message: string; postId?: string; kind?: "success" | "error" | "scheduled" };
 
 export async function saveDraft(_previous: SaveDraftState, formData: FormData): Promise<SaveDraftState> {
   const rawAccountIds = formData.getAll("accountIds").filter((value): value is string => typeof value === "string");
@@ -38,7 +38,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     scheduledAtLocal: typeof formData.get("scheduledAtLocal") === "string" ? String(formData.get("scheduledAtLocal")) : undefined,
     timezone: typeof formData.get("timezone") === "string" ? String(formData.get("timezone")) : "Asia/Kolkata",
   });
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Please review the post." };
+  if (!parsed.success) return { ok: false, kind: "error", message: parsed.error.issues[0]?.message ?? "Please review the post." };
 
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
@@ -51,21 +51,21 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   if (parsed.data.intent === "publish") {
     scheduledAt = new Date(Date.now() + 60_000).toISOString();
   } else if (parsed.data.mode === "schedule") {
-    if (!parsed.data.scheduledAtLocal) return { ok: false, message: "Choose a date and time for the scheduled post." };
+    if (!parsed.data.scheduledAtLocal) return { ok: false, kind: "error", message: "Choose a date and time for the scheduled post." };
     const scheduledDate = zonedDateTimeToUtc(parsed.data.scheduledAtLocal, timezone);
-    if (!scheduledDate) return { ok: false, message: "The selected date and time is invalid for the workspace timezone." };
-    if (scheduledDate.getTime() <= Date.now()) return { ok: false, message: "Scheduled posts must be set for a future time." };
+    if (!scheduledDate) return { ok: false, kind: "error", message: "The selected date and time is invalid for the workspace timezone." };
+    if (scheduledDate.getTime() <= Date.now()) return { ok: false, kind: "error", message: "Scheduled posts must be set for a future time." };
     scheduledAt = scheduledDate.toISOString();
   }
 
   const userPathPrefix = `${String(userId)}/`;
   const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
   const selectedPlatforms = [...new Set((selectedAccountRows.data ?? []).map((account) => account.platform))];
-  if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, message: "One or more selected accounts are no longer connected." };
-  if (selectedPlatforms.includes("x")) return { ok: false, message: "X publishing is temporarily disabled in Omnisocial." };
+  if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, kind: "error", message: "One or more selected accounts are no longer connected." };
+  if (selectedPlatforms.includes("x")) return { ok: false, kind: "error", message: "X publishing is temporarily disabled in Omnisocial." };
 
   if (parsed.data.mediaPaths.some((path) => !path.startsWith(userPathPrefix) || path.includes(".."))) {
-    return { ok: false, message: "One or more media files are not owned by your account." };
+    return { ok: false, kind: "error", message: "One or more media files are not owned by your account." };
   }
 
   if (parsed.data.mediaPaths.length > 0) {
@@ -73,15 +73,15 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     const { data: ownedFiles, error: mediaError } = await admin.storage
       .from("social-media-assets")
       .list(String(userId), { limit: 1000, sortBy: { column: "created_at", order: "desc" } });
-    if (mediaError) return { ok: false, message: "The media could not be verified." };
+    if (mediaError) return { ok: false, kind: "error", message: "The media could not be verified." };
     const ownedFilesByPath = new Map((ownedFiles ?? []).map((file) => [`${userPathPrefix}${file.name}`, file]));
-    if (parsed.data.mediaPaths.some((path) => !ownedFilesByPath.has(path))) return { ok: false, message: "One or more selected media files could not be verified." };
+    if (parsed.data.mediaPaths.some((path) => !ownedFilesByPath.has(path))) return { ok: false, kind: "error", message: "One or more selected media files could not be verified." };
     const selectedMedia = parsed.data.mediaPaths.map((path) => ownedFilesByPath.get(path)).filter(Boolean);
     const invalidMedia = selectedMedia.find((file) => !file?.metadata?.mimetype || (file.metadata.size ?? 0) > 100 * 1024 * 1024);
-    if (invalidMedia) return { ok: false, message: "One or more media files exceed the supported type or 100 MB size limit." };
+    if (invalidMedia) return { ok: false, kind: "error", message: "One or more media files exceed the supported type or 100 MB size limit." };
     const mediaTypes = selectedMedia.map((file) => String(file?.metadata?.mimetype ?? ""));
     const mediaValidationError = validateMediaSelection(selectedPlatforms, mediaTypes);
-    if (mediaValidationError) return { ok: false, message: mediaValidationError };
+    if (mediaValidationError) return { ok: false, kind: "error", message: mediaValidationError };
   }
 
 
@@ -91,28 +91,28 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   let postId = parsed.data.postId;
   if (postId) {
     const { data: existingPost, error: existingPostError } = await supabase.from("socialmedia_posts").select("id,status").eq("id", postId).eq("profile_id", String(userId)).maybeSingle();
-    if (existingPostError || !existingPost) return { ok: false, message: "Post not found." };
-    if (existingPost.status === "published" || existingPost.status === "publishing") return { ok: false, message: "Published or currently publishing posts cannot be changed." };
+    if (existingPostError || !existingPost) return { ok: false, kind: "error", message: "Post not found." };
+    if (existingPost.status === "published" || existingPost.status === "publishing") return { ok: false, kind: "error", message: "Published or currently publishing posts cannot be changed." };
     const { error } = await supabase.from("socialmedia_posts")
       .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .eq("id", postId)
       .eq("profile_id", String(userId));
-    if (error) return { ok: false, message: "The draft could not be updated." };
+    if (error) return { ok: false, kind: "error", message: "The draft could not be updated." };
     const { error: deleteError } = await supabase.from("socialmedia_post_platforms").delete().eq("post_id", postId);
-    if (deleteError) return { ok: false, message: "The draft changed, but its destinations could not be updated." };
+    if (deleteError) return { ok: false, kind: "error", message: "The draft changed, but its destinations could not be updated." };
   } else {
     const { data: post, error } = await supabase.from("socialmedia_posts")
       .insert({ profile_id: String(userId), content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .select("id")
       .single();
-    if (error || !post) return { ok: false, message: "The draft could not be saved." };
+    if (error || !post) return { ok: false, kind: "error", message: "The draft could not be saved." };
     postId = post.id;
   }
 
   const { error: linksError } = await supabase.from("socialmedia_post_platforms").insert(
     parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
   );
-  if (linksError) return { ok: false, message: "The draft was saved, but its destinations could not be saved." };
+  if (linksError) return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
 
   if (parsed.data.mode === "schedule" && scheduledAt) {
     const platforms = [...new Set(selectedAccountRows.data.map((account) => account.platform))];
@@ -133,6 +133,8 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
 
   revalidatePath("/create-post");
   revalidatePath("/dashboard");
-  if (parsed.data.intent === "publish") return { ok: true, message: "Publish queued. The publishing worker will publish it shortly.", postId };
-  return { ok: true, message: parsed.data.mode === "schedule" ? `Post scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(scheduledAt!))} (${timezone}).` : "Draft saved.", postId };
+  if (parsed.data.intent === "publish") return { ok: true, kind: "success", message: "Your post will publish soon.", postId };
+  return parsed.data.mode === "schedule"
+    ? { ok: true, kind: "scheduled", message: `Your post is scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(scheduledAt!))} (${timezone}).`, postId }
+    : { ok: true, kind: "success", message: "Your draft has been saved.", postId };
 }
