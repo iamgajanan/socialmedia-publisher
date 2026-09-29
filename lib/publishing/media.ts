@@ -12,6 +12,9 @@ function mimeFromPath(path: string) {
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".gif")) return "image/gif";
   if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".avif")) return "image/avif";
+  if (lower.endsWith(".tif") || lower.endsWith(".tiff")) return "image/tiff";
+  if (lower.endsWith(".bmp")) return "image/bmp";
   return "application/octet-stream";
 }
 export async function resolveMedia(paths: string[]): Promise<MediaAsset[]> {
