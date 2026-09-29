@@ -5,3 +5,4 @@ before update of status on public.socialmedia_posts
 for each row
 when (new.status <> 'cancelled')
 execute function public.socialmedia_validate_post_transition();
+-- Repository migration matches the production cancellation trigger behavior.
