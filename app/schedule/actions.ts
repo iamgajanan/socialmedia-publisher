@@ -12,7 +12,7 @@ const schema = z.object({
   scheduledAtLocal: z.string().min(1),
 });
 
-export type RescheduleState = { ok: boolean; message: string };
+export type RescheduleState = { ok: boolean; message: string; kind?: "success" | "error" | "scheduled" };
 
 export async function reschedulePost(_previous: RescheduleState, formData: FormData): Promise<RescheduleState> {
   const parsed = schema.safeParse({
