@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Link2, LockKeyhole, Plus } from "lucide-react";
+import { ArrowRight, Link2, LockKeyhole, Plus, RefreshCw as RefreshCwIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createClient } from "@/lib/supabase/server";
 import { getProviderConfig } from "@/lib/social/oauth";
 import { AccountsManager, type AccountRow } from "@/components/connect-accounts/accounts-manager";
+import { ToastMessage } from "@/components/ui/toast-provider";
 
 export const instant = false;
 
@@ -73,9 +74,9 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
       </div>
     </section>
 
-    {(connected || disconnected || error) && <div className={`rounded-2xl border px-4 py-3 text-sm ${error ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-primary/20 bg-primary/5"}`}>
-      {error ? `${errors[error] ?? "Something went wrong."}${platform ? ` Platform: ${platform}.` : ""}` : connected ? "Account connected successfully." : "Account disconnected successfully."}
-    </div>}
+    {connected && <ToastMessage title="Account connected" message="Your social account is ready to use." variant="success" />}
+    {disconnected && <ToastMessage title="Account disconnected" message="The account was removed from this workspace." variant="success" />}
+    {error && <ToastMessage title="Connection failed" message={`${errors[error] ?? "Something went wrong."}${platform ? ` Platform: ${platform}.` : ""}`} variant="error" />}
 
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {providers.map(([id, name, description]) => {
@@ -87,11 +88,53 @@ export default async function ConnectAccountsPage({ searchParams }: { searchPara
         return <Card key={id} className={"overflow-hidden shadow-sm transition " + (isConnected ? "border-primary/30 bg-primary/[0.02]" : "")}><CardHeader className="pb-4">
           <div className="flex items-start justify-between gap-3"><div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-sm font-bold">{mark}</div><Badge variant={isConnected ? "secondary" : "outline"}>{isConnected ? "Connected" : configured ? "Ready" : "Setup required"}</Badge></div>
           <CardTitle className="mt-2">{name}</CardTitle><CardDescription>{description}</CardDescription>
-        </CardHeader><CardContent>{account ? <div className="space-y-4 rounded-2xl border bg-background/70 p-4">
-          <div className="flex min-w-0 items-center gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-bold">{mark}</div><div className="min-w-0"><p className="truncate text-sm font-semibold">{account.account_name}</p><p className="truncate text-xs text-muted-foreground">{account.username ? "@" + account.username : name + " account"}</p></div></div>
-          <div className="flex flex-wrap items-center gap-2"><Badge variant={isConnected ? "secondary" : "destructive"}>{isConnected ? "Connected" : "Needs attention"}</Badge>{platformAccounts.length > 1 && <Badge variant="outline">+{platformAccounts.length - 1} more</Badge>}</div>
-          <div className="flex flex-wrap gap-2">{isConnected ? <Button asChild className="flex-1" size="sm"><Link href="/create-post"><ArrowRight />Create post</Link></Button> : configured ? <Button asChild className="flex-1" size="sm"><a href={`/api/social/oauth/start/${id}`}><Plus />Reconnect {name}</a></Button> : null}{account.provider_account_url && <Button asChild size="sm" variant="outline"><Link href={account.provider_account_url} target="_blank" rel="noreferrer">View</Link></Button>}</div>
-        </div> : configured ? <Button asChild className="w-full"><a href={"/api/social/oauth/start/" + id}><Plus />Connect {name}</a></Button> : <Button className="w-full" variant="outline" disabled><LockKeyhole />Configure OAuth first</Button>}</CardContent></Card>;
+        </CardHeader><CardContent>
+          <div className="min-h-[214px] rounded-2xl border bg-background/70 p-4">
+            {account ? (
+              <div className="flex h-full min-h-[182px] flex-col">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-bold">{mark}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{account.account_name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{account.username ? "@" + account.username : name + " account"}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Badge variant={isConnected ? "secondary" : "outline"}>{isConnected ? "Connected" : "Needs attention"}</Badge>
+                  {platformAccounts.length > 1 && <Badge variant="outline">+{platformAccounts.length - 1} more</Badge>}
+                </div>
+                <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                  {isConnected ? (
+                    <Button asChild className="flex-1" size="sm"><Link href="/create-post"><ArrowRight />Create post</Link></Button>
+                  ) : configured ? (
+                    <Button asChild className="flex-1" size="sm"><a href={`/api/social/oauth/start/${id}`}><RefreshCwIcon />Reconnect {name}</a></Button>
+                  ) : (
+                    <Button className="flex-1" size="sm" variant="outline" disabled><LockKeyhole />OAuth setup required</Button>
+                  )}
+                  {account.provider_account_url && <Button asChild size="sm" variant="outline"><Link href={account.provider_account_url} target="_blank" rel="noreferrer">View</Link></Button>}
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full min-h-[182px] flex-col">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-bold">{mark}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">No account connected</p>
+                    <p className="truncate text-xs text-muted-foreground">{name} destination</p>
+                  </div>
+                </div>
+                <div className="mt-4"><Badge variant="outline">{configured ? "Ready to connect" : "Setup required"}</Badge></div>
+                <div className="mt-auto pt-5">
+                  {configured ? (
+                    <Button asChild className="w-full" size="sm"><a href={"/api/social/oauth/start/" + id}><Plus />Connect {name}</a></Button>
+                  ) : (
+                    <Button className="w-full" size="sm" variant="outline" disabled><LockKeyhole />Configure OAuth first</Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent></Card>;
       })}
     </section>
 

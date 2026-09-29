@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, AtSign, Facebook, Instagram, Linkedin, Loader2, Send, Sparkles, Youtube } from "lucide-react";
 
 import { saveDraft, type SaveDraftState } from "@/app/create-post/actions";
@@ -11,6 +11,7 @@ import { MediaUploader, type UploadedMedia } from "@/components/create-post/medi
 import { cn } from "@/lib/utils";
 import { formatTimeZoneName } from "@/lib/scheduling/timezone";
 import { getMediaCapability } from "@/lib/publishing/media-capabilities";
+import { useToast } from "@/components/ui/toast-provider";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
 const meta: Record<string, { name: string; icon: typeof Facebook; limit: number }> = {
@@ -38,6 +39,25 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
   const [scheduledAtLocal, setScheduledAtLocal] = useState(() => { if (!initialPost?.scheduledAt) return ""; const parts = new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(initialPost.scheduledAt)); const map=Object.fromEntries(parts.filter((part)=>part.type!=="literal").map((part)=>[part.type,part.value])); return map.year ? `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}` : ""; });
   const [state, formAction, pending] = useActionState(saveDraft, initialState);
   const [previewPlatform, setPreviewPlatform] = useState<string | null>(accounts[0]?.platform ?? null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!state.message) return;
+
+    const scheduled = state.ok && state.kind === "scheduled";
+    toast({
+      title: state.ok ? (scheduled ? "Post scheduled" : "Success") : "Post not saved",
+      message: state.message,
+      variant: state.ok ? (scheduled ? "scheduled" : "success") : "error",
+    });
+
+    if (state.ok) {
+      setContent("");
+      setMedia([]);
+      setScheduledAtLocal("");
+      setMode("draft");
+    }
+  }, [state, toast]);
 
   const selectedAccounts = accounts.filter((account) => selected.includes(account.id));
   const selectedPlatforms = useMemo(() => [...new Set(selectedAccounts.map((account) => account.platform))], [selectedAccounts]);
@@ -77,7 +97,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
           </div>
         </CardHeader>
         <CardContent className="p-5 sm:p-6">
-          <textarea spellCheck value={content} onChange={(event) => setContent(event.target.value)} placeholder="What do you want to share?" aria-label="Post content" className="min-h-[280px] w-full resize-y rounded-2xl border bg-background p-4 text-sm leading-6 outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+          <textarea spellCheck value={content} onChange={(event) => setContent(event.target.value)} placeholder="What do you want to share?" aria-label="Post content" className="min-h-[280px] w-full resize-y select-text cursor-text rounded-2xl border bg-background p-4 text-sm leading-6 outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" style={{ userSelect: "text" }} />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{content.length.toLocaleString()} characters</span>
             {selectedMeta && <span className={cn(overLimit && "font-medium text-destructive")}>{content.length.toLocaleString()} / {selectedMeta.limit.toLocaleString()} for {selectedMeta.name}</span>}
@@ -140,8 +160,6 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
               })}
             </div>
           </div>
-
-          {state.message && <div className={cn("mt-4 rounded-xl border px-4 py-3 text-sm", state.ok ? "border-primary/20 bg-primary/5" : "border-destructive/30 bg-destructive/5 text-destructive")}>{state.message}</div>}
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled><ChevronDown />More actions</Button>

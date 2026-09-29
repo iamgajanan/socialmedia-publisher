@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { PostComposer } from "@/components/create-post/post-composer";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,9 +49,7 @@ export default async function CreatePostPage() {
             Compose once, choose your destinations, and save a draft or prepare a scheduled post.
           </p>
         </div>
-        <a href="/connect-accounts" className="inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-          <Link2 />Manage accounts
-        </a>
+        <Button asChild variant="outline"><a href="/connect-accounts"><Link2 />Manage accounts</a></Button>
       </section>
       {connectedAccounts.length > 0 ? (
         <PostComposer accounts={connectedAccounts} timezone={timezone} />
@@ -66,17 +65,9 @@ export default async function CreatePostPage() {
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {attentionAccounts.map((account) => (
-                <a
-                  key={account.id}
-                  href={`/api/social/oauth/start/${account.platform}`}
-                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
-                >
-                  Reconnect {account.account_name}
-                </a>
+                <Button key={account.id} asChild><a href={`/api/social/oauth/start/${account.platform}`}>Reconnect {account.account_name}</a></Button>
               ))}
-              <a href="/connect-accounts" className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-                Manage accounts
-              </a>
+              <Button asChild variant="outline"><a href="/connect-accounts">Manage accounts</a></Button>
             </div>
           </CardContent>
         </Card>
@@ -88,7 +79,7 @@ export default async function CreatePostPage() {
             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
               Your composer needs at least one connected destination. Connect a Facebook, Instagram, Threads, LinkedIn, X, YouTube, or TikTok account to start.
             </p>
-            <a href="/connect-accounts" className="mt-6 inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">Connect social account</a>
+            <Button asChild className="mt-6"><a href="/connect-accounts">Connect social account</a></Button>
           </CardContent>
         </Card>
       )}

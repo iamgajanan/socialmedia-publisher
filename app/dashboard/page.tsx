@@ -25,20 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-
-const statusStyles = {
-  draft: "secondary",
-  scheduled: "outline",
-  published: "default",
-  failed: "destructive",
-} as const;
-
-const statusLabels = {
-  draft: "Draft",
-  scheduled: "Scheduled",
-  published: "Published",
-  failed: "Failed",
-} as const;
+import { PostStatusBadge } from "@/components/post-status-badge";
 
 const platformNames: Record<string, string> = {
   facebook: "Facebook",
@@ -293,7 +280,7 @@ export default async function DashboardPage() {
                       <p className="truncate text-sm font-medium">{post.content?.trim() || "Untitled post"}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{formatDate(post.scheduled_at)}</p>
                     </div>
-                    <Badge variant="outline">Scheduled</Badge>
+                    <PostStatusBadge status="scheduled" />
                   </div>
                 ))}
               </div>
@@ -359,9 +346,7 @@ export default async function DashboardPage() {
                     <p className="truncate text-sm font-medium">{post.content?.trim() || "Untitled post"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Created {formatDate(post.created_at)}</p>
                   </div>
-                  <Badge variant={statusStyles[post.status as keyof typeof statusStyles] ?? "secondary"}>
-                    {statusLabels[post.status as keyof typeof statusLabels] ?? post.status}
-                  </Badge>
+                  <PostStatusBadge status={post.status} />
                 </div>
               ))}
             </div>

@@ -1,25 +1,25 @@
 "use client";
 
-import { useActionState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { useActionState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast-provider";
 
 type State = { error: string | null; success: string | null };
 
-function Feedback({ state }: { state: State }) {
-  if (state.error) {
-    return <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{state.error}</p>;
-  }
-  if (state.success) {
-    return <p role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-4" />{state.success}</p>;
-  }
-  return null;
-}
-
 const initialState: State = { error: null, success: null };
+
+function useSettingsToast(state: State) {
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (state.error) toast({ title: "Update failed", message: state.error, variant: "error" });
+    if (state.success) toast({ title: "Settings saved", message: state.success, variant: "success" });
+  }, [state, toast]);
+}
 
 export function ProfileForm({
   action,
@@ -29,6 +29,7 @@ export function ProfileForm({
   displayName: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -37,7 +38,6 @@ export function ProfileForm({
         <Input id="displayName" name="displayName" defaultValue={displayName} maxLength={80} required />
         <p className="text-xs text-muted-foreground">This name appears across your OmniSocial workspace.</p>
       </div>
-      <Feedback state={state} />
       <Button type="submit" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Save profile</Button>
     </form>
   );
@@ -57,6 +57,7 @@ export function WorkspaceForm({
   defaultStatus: "draft" | "scheduled";
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
   const timezones = ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles", "UTC"];
 
   return (
@@ -91,7 +92,6 @@ export function WorkspaceForm({
           </div>
         </div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Save workspace settings</Button>
     </form>
   );
@@ -105,6 +105,7 @@ export function AccountSecurityForm({
   currentEmail: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -113,7 +114,6 @@ export function AccountSecurityForm({
         <Input id="email" name="email" type="email" defaultValue={currentEmail} required />
         <p className="text-xs text-muted-foreground">Changing your email requires confirmation from the new address.</p>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="outline" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Update email</Button>
     </form>
   );
@@ -125,6 +125,7 @@ export function PasswordForm({
   action: (state: State, formData: FormData) => Promise<State>;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -132,7 +133,6 @@ export function PasswordForm({
         <div className="space-y-2"><Label htmlFor="password">New password</Label><Input id="password" name="password" type="password" minLength={6} required /></div>
         <div className="space-y-2"><Label htmlFor="repeatPassword">Confirm password</Label><Input id="repeatPassword" name="repeatPassword" type="password" minLength={6} required /></div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="outline" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Update password</Button>
     </form>
   );
@@ -144,6 +144,7 @@ export function DeleteAccountForm({
   action: (state: State, formData: FormData) => Promise<State>;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -155,7 +156,6 @@ export function DeleteAccountForm({
           <Input id="confirmation" name="confirmation" placeholder="DELETE" autoComplete="off" required />
         </div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="destructive" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Delete my account</Button>
     </form>
   );

@@ -1,23 +1,22 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { Copy, Edit3, Eye, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useActionState } from "react";
 
 import { deletePost, duplicatePost, queuePublishNow, retryPost, type PostActionState } from "@/app/post-history/actions";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { PostStatusBadge } from "@/components/post-status-badge";
+import { useToast } from "@/components/ui/toast-provider";
 
 type HistoryPost = {
   id: string; content: string; status: string; scheduled_at: string | null; published_at: string | null; created_at: string;
   platforms: { platform: string; account_name: string; status: string }[];
 };
-
-const labels: Record<string,string> = { draft:"Draft", scheduled:"Scheduled", publishing:"Publishing", published:"Published", failed:"Failed" };
-const variants: Record<string,"secondary"|"outline"|"default"|"destructive"> = { draft:"secondary", scheduled:"outline", publishing:"outline", published:"default", failed:"destructive" };
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -26,7 +25,19 @@ function formatDate(value: string | null) {
 
 function ActionForm({ action, postId, children }: { action:(state:PostActionState, formData:FormData)=>Promise<PostActionState>; postId:string; children:React.ReactNode }) {
   const [state, formAction, pending] = useActionState(action,{ok:false,message:""});
-  return <form action={formAction} className="inline-flex"><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="ghost" size="sm" disabled={pending}>{children}</Button>{state.message && <span className={cn("sr-only",state.ok?"":"text-destructive")}>{state.message}</span>}</form>;
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (!state.message) return;
+    const scheduled = state.ok && state.kind === "scheduled";
+    toast({
+      title: state.ok ? (scheduled ? "Post queued" : "Success") : "Action failed",
+      message: state.message,
+      variant: state.ok ? (scheduled ? "scheduled" : "success") : "error",
+    });
+  }, [state, toast]);
+
+  return <form action={formAction} className="inline-flex"><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="outline" size="sm" disabled={pending}>{children}</Button></form>;
 }
 
 export function HistoryList({ posts }: { posts: HistoryPost[] }) {
@@ -38,7 +49,7 @@ export function HistoryList({ posts }: { posts: HistoryPost[] }) {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={variants[post.status] ?? "secondary"}>{labels[post.status] ?? post.status}</Badge>
+                  <PostStatusBadge status={post.status} />
                   {post.platforms.slice(0,4).map((p)=><Badge key={p.platform+p.account_name} variant="outline">{p.platform}</Badge>)}
                 </div>
                 <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-6">{post.content || "Untitled post"}</p>
@@ -68,7 +79,7 @@ export function HistoryFilters({ query, status }: { query: string; status: strin
   return <form method="get" className="grid gap-3 rounded-2xl border bg-muted/20 p-4 sm:grid-cols-[1fr_180px_auto]">
     <div className="relative"><Input name="q" defaultValue={query} placeholder="Search post content, platform, account…" aria-label="Search posts"/><span className="sr-only">Search</span></div>
     <select name="status" defaultValue={status} aria-label="Filter by status" className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-      <option value="">All statuses</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option><option value="publishing">Publishing</option><option value="published">Published</option><option value="failed">Failed</option>
+      <option value="">All statuses</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option><option value="publishing">Publishing</option><option value="published">Published</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option>
     </select>
     <Button type="submit">Filter</Button>
   </form>;

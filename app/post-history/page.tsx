@@ -20,7 +20,7 @@ export default async function PostHistoryPage({ searchParams }: { searchParams: 
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const status = params.status ?? "";
-  const validStatuses = ["draft","scheduled","publishing","published","failed"];
+  const validStatuses = ["draft","scheduled","publishing","published","failed","cancelled"];
   const safeStatus = validStatuses.includes(status) ? status : "";
 
   let postQuery = supabase.from("socialmedia_posts").select("id,content,status,scheduled_at,published_at,created_at").eq("profile_id",userId).order("created_at",{ascending:false}).limit(100);

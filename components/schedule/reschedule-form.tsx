@@ -1,15 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Check, Loader2 } from "lucide-react";
 
 import { reschedulePost, type RescheduleState } from "@/app/schedule/actions";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 
 const initialState: RescheduleState = { ok: false, message: "" };
 
 export function RescheduleForm({ postId, scheduledAt, timezone }: { postId: string; scheduledAt: string; timezone: string }) {
   const [state, formAction, pending] = useActionState(reschedulePost, initialState);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!state.message) return;
+    toast({
+      title: state.ok ? "Post rescheduled" : "Reschedule failed",
+      message: state.message,
+      variant: state.ok ? "scheduled" : "error",
+    });
+  }, [state, toast]);
   const date = new Date(scheduledAt);
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone: timezone,
@@ -43,7 +54,7 @@ export function RescheduleForm({ postId, scheduledAt, timezone }: { postId: stri
         {pending ? <Loader2 className="animate-spin" /> : <Check />}
         {pending ? "Rescheduling…" : "Reschedule"}
       </Button>
-      {state.message && <p className={state.ok ? "text-xs text-primary sm:col-span-2" : "text-xs text-destructive sm:col-span-2"}>{state.message}</p>}
+
     </form>
   );
 }
