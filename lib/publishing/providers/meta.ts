@@ -33,46 +33,22 @@ export const facebookPublisher: Publisher = {
     const version = graphVersion();
     const page = pageContext(accessToken, input.account.external_account_id);
     const media = input.media[0];
-    const request = buildFacebookPublishRequest(
-      version,
-      page.id,
-      page.accessToken,
-      input.content,
-      media ? { url: media.url, mimeType: media.mimeType } : undefined,
-    );
-    const response = await providerFetch(request.url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: request.body,
-    });
-    const data = await response.json() as { id?: string; post_id?: string };
-    const id = data.post_id ?? data.id;
-    if (!id) throw new PublisherError("Facebook published the post but did not return a post ID.", { code: "missing_post_id" });
-    return { platformPostId: id };
-  },
-  async getAccount(accessToken) {
-    const version = graphVersion();
-    const response = await providerFetch(`https://graph.facebook.com/${version}/me?fields=id,name`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const data = await response.json() as { id?: string; name?: string };
-    return { external_account_id: data.id, account_name: data.name };
-  },
-};
-
-export const instagramPublisher: Publisher = {
-  platform: "instagram",
-  validate(input) {
-    if (input.media.length !== 1) throw new PublisherError("Instagram publishing currently requires exactly one image or video.", { code: "instagram_media_required" });
-    if (input.content.length > 2200) throw new PublisherError("Instagram caption exceeds 2,200 characters.", { code: "content_too_long" });
-  },
-  async publish(input, accessToken) {
-    const base = instagramGraphBase();
-    const igId = input.account.external_account_id;
-    if (!igId) throw new PublisherError("The connected Instagram account ID is missing.", { code: "instagram_account_not_found" });
-    if (!accessToken) throw new PublisherError("The connected Instagram access token is missing.", { code: "meta_page_token_missing" });
-
-    const media = input.media[0];
     const body = new URLSearchParams({ caption: input.content });
     body.set("access_token", accessToken);
+    if (media.mimeType.startsWith("video/")) {
+      body.set("media_type", "REELS");
+      body.set("video_url", media.url);
+    } else {
+      body.set("image_url", media.url);
+    }
+
+    const containerResponse = await providerFetch(`${base}/${igId}/media`, {
+      method: "POST",
+      body,
+    });
+    const container = await containerResponse.json() as { id?: string };
+    if (!container.id) throw new PublisherError("Instagram did not return a media container ID.", { code: "missing_container_id" });
+
     // Poll every Instagram media container before publishing. Images can also
     // take a few seconds to become publishable; publishing too early returns
     // Meta error 9007 / 2207027 ("Media ID is not available").
