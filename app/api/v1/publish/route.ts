@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const parsed = parsePublishRequest(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.message }, { status: 400 });
 
-  const { platforms, text, media_paths: mediaPaths } = parsed.data;
+  const { platforms, text, media_paths: mediaPaths, scheduled_at: requestedScheduledAt } = parsed.data;
 
   const unsupported = platforms.filter((platform) => !API_SOCIAL_PLATFORMS.includes(platform));
   if (unsupported.length) {
@@ -40,14 +40,16 @@ export async function POST(request: Request) {
     platforms,
     connectedResult.accounts.map((account) => account.platform),
   );
-  if (missingPlatforms.length) {
+
+  if (missingPlatforms.length === platforms.length) {
     return NextResponse.json({
-      error: "One or more requested platforms are not connected.",
+      error: "None of the requested platforms are connected.",
       code: "account_not_connected",
       platforms: missingPlatforms,
     }, { status: 400 });
   }
 
+  const connectedPlatforms = connectedResult.accounts.map((account) => account.platform);
   if (mediaPaths.some((path) => !path.startsWith(`${authentication.profileId}/`) || path.includes(".."))) {
     return NextResponse.json({ error: "One or more media files are not owned by your account." }, { status: 400 });
   }
@@ -85,12 +87,14 @@ export async function POST(request: Request) {
     }
 
     const mediaTypes = selectedFiles.map((file, index) => String(file?.metadata?.mimetype ?? mediaTypeFromPath(mediaPaths[index] ?? "")));
-    const mediaValidationError = validateMediaSelection(platforms, mediaTypes);
+    const mediaValidationError = validateMediaSelection(connectedPlatforms, mediaTypes);
     if (mediaValidationError) return NextResponse.json({ error: mediaValidationError }, { status: 400 });
   } else {
-    const mediaValidationError = validateMediaSelection(platforms, []);
+    const mediaValidationError = validateMediaSelection(connectedPlatforms, []);
     if (mediaValidationError) return NextResponse.json({ error: mediaValidationError }, { status: 400 });
   }
+
+  const scheduledAt = requestedScheduledAt ?? new Date().toISOString();
 
   const { data: post, error: postError } = await admin
     .from("socialmedia_posts")
@@ -98,7 +102,7 @@ export async function POST(request: Request) {
       profile_id: authentication.profileId,
       content: text,
       status: "scheduled",
-      scheduled_at: new Date().toISOString(),
+      scheduled_at: scheduledAt,
       media_urls: mediaPaths,
     })
     .select("id")
@@ -113,13 +117,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to create the post." }, { status: 500 });
   }
 
-  const destinations = connectedResult.accounts.map((account) => ({
-    post_id: post.id,
-    social_account_id: account.id,
-    status: "scheduled",
-    scheduled_at: new Date().toISOString(),
-    idempotency_key: buildIdempotencyKey(post.id, account.id),
-  }));
+  const connectedByPlatform = new Map(connectedResult.accounts.map((account) => [account.platform, account]));
+  const destinations = platforms.map((platform) => {
+    const account = connectedByPlatform.get(platform);
+    if (!account) {
+      return {
+        post_id: post.id,
+        social_account_id: null,
+        platform,
+        status: "skipped",
+        error_message: "account_not_connected",
+        scheduled_at: null,
+        idempotency_key: null,
+      };
+    }
+
+    return {
+      post_id: post.id,
+      social_account_id: account.id,
+      platform,
+      status: "scheduled",
+      error_message: null,
+      scheduled_at: scheduledAt,
+      idempotency_key: buildIdempotencyKey(post.id, account.id),
+    };
+  });
 
   const { error: destinationError } = await admin
     .from("socialmedia_post_platforms")
@@ -136,13 +158,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to create publishing destinations." }, { status: 500 });
   }
 
+  const isScheduled = Boolean(requestedScheduledAt);
   return NextResponse.json({
     success: true,
     post_id: post.id,
-    results: connectedResult.accounts.map((account) => ({
-      platform: account.platform,
-      account_id: account.id,
-      status: "queued",
+    scheduled_at: scheduledAt,
+    results: destinations.map((destination) => ({
+      platform: destination.platform,
+      account_id: destination.social_account_id,
+      status: destination.status === "skipped" ? "skipped" : isScheduled ? "scheduled" : "queued",
+      ...(destination.status === "skipped" ? { reason: "account_not_connected" } : {}),
     })),
   }, { status: 202 });
 }

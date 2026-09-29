@@ -7,8 +7,9 @@ export type PublishingPostOutcome = "published" | "retrying" | "failed" | "sched
 
 export function getPublishingPostOutcome(rows: PublishingDestinationOutcome[]): PublishingPostOutcome {
   const statuses = rows.map((row) => row.status);
-  if (statuses.length && statuses.every((status) => status === "published")) return "published";
+  const terminalStatuses = statuses.filter((status) => status !== "skipped");
+  if (terminalStatuses.length && terminalStatuses.every((status) => status === "published")) return "published";
   if (rows.some((row) => row.status === "failed" && row.nextRetryAt)) return "retrying";
-  if (statuses.some((status) => status === "failed")) return "failed";
+  if (terminalStatuses.some((status) => status === "failed")) return "failed";
   return "scheduled";
 }

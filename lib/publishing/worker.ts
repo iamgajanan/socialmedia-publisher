@@ -48,6 +48,7 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
 
     const rows: WorkerRow[] = [];
     for (const link of links) {
+      if (link.status === "skipped") continue;
       const { data: account } = await supabase.from("socialmedia_social_accounts").select("id,platform,external_account_id,account_name,username,metadata,token_expires_at").eq("id",link.social_account_id).maybeSingle();
       if (!account) {
         await supabase.from("socialmedia_post_platforms").update({status:"failed",error_message:"Connected social account was not found.",last_attempt_at:now}).eq("id",link.id).eq("status","scheduled");
@@ -97,21 +98,21 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
 
     const { data: finalLinks } = await supabase
       .from("socialmedia_post_platforms")
-      .select("status,next_retry_at,social_account_id")
+      .select("status,next_retry_at,social_account_id,platform")
       .eq("post_id",post.id);
     const destinationRows = (finalLinks ?? []).map((link) => ({ status: link.status, nextRetryAt: link.next_retry_at }));
-    const destinationAccountIds = [...new Set((finalLinks ?? []).map((link) => link.social_account_id))];
+    const destinationAccountIds = [...new Set((finalLinks ?? []).map((link) => link.social_account_id).filter((id): id is string => Boolean(id)))];
     const { data: destinationAccounts } = destinationAccountIds.length
       ? await supabase.from("socialmedia_social_accounts").select("id,platform").in("id", destinationAccountIds)
       : { data: [] };
     const platformByAccountId = new Map((destinationAccounts ?? []).map((account) => [account.id, account.platform]));
     const publishedPlatforms = (finalLinks ?? [])
       .filter((link) => link.status === "published")
-      .map((link) => platformByAccountId.get(link.social_account_id))
+      .map((link) => link.platform ?? platformByAccountId.get(link.social_account_id))
       .filter((platform): platform is string => Boolean(platform));
     const failedPlatforms = (finalLinks ?? [])
       .filter((link) => link.status === "failed" && !link.next_retry_at)
-      .map((link) => platformByAccountId.get(link.social_account_id))
+      .map((link) => link.platform ?? platformByAccountId.get(link.social_account_id))
       .filter((platform): platform is string => Boolean(platform));
     const outcome = getPublishingPostOutcome(destinationRows);
     const { data: notificationProfile } = await supabase
