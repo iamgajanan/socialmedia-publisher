@@ -1,5 +1,3 @@
-import "server-only";
-
 import sharp from "sharp";
 import type { MediaAsset } from "./providers/types";
 
