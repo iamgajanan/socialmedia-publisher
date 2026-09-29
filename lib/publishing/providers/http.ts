@@ -1,8 +1,16 @@
 import "server-only";
 import { PublisherError } from "./types";
 
+const PROVIDER_REQUEST_TIMEOUT_MS = 30_000;
+
 export async function providerFetch(url: string, init: RequestInit): Promise<Response> {
-  const response = await fetch(url, { ...init, cache: "no-store" });
+  const timeout = AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS);
+  const response = await fetch(url, { ...init, signal: init.signal ?? timeout, cache: "no-store" }).catch((error) => {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new PublisherError("The provider request timed out; retry later.", { retryable: true, code: "provider_timeout" });
+    }
+    throw error;
+  });
   if (response.ok) return response;
   const text = await response.text().catch(() => "");
   let message = text;
