@@ -117,3 +117,8 @@ Developer documentation: docs/API.md
 OpenAPI 3.1 specification: docs/openapi.yaml
 
 Production API base URL: https://socialmedia-publisher-gules.vercel.app
+
+
+## Security
+
+See docs/SECURITY.md for the production API security model and release checklist.
