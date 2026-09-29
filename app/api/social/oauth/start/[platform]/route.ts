@@ -39,9 +39,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
 
   if (config.configId) {
     // Facebook Login for Business uses the configuration's permission set.
-    // Do not send a legacy scope parameter alongside config_id.
+    // Do not send legacy scopes or override the response type alongside config_id.
     url.searchParams.set("config_id", config.configId);
-    url.searchParams.set("override_default_response_type", "true");
   } else {
     url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
   }
