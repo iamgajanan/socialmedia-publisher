@@ -30,7 +30,6 @@ export function ProfileForm({
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   useSettingsToast(state);
-  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -93,7 +92,6 @@ export function WorkspaceForm({
           </div>
         </div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Save workspace settings</Button>
     </form>
   );
