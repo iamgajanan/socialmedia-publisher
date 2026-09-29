@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isValidIdempotencyKey, normalizeIdempotencyKey, hashRequestBody, API_JSON_BODY_MAX_BYTES } from "@/lib/api/idempotency";
+import { isValidIdempotencyKey, normalizeIdempotencyKey, hashRequestBody, API_JSON_BODY_MAX_BYTES } from "../../lib/api/idempotency.ts";
 
 test("Phase 10: idempotency keys reject unsafe input", () => {
   assert.equal(isValidIdempotencyKey("safe-key_01"), true);
