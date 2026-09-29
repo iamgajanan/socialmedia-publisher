@@ -86,7 +86,7 @@ export async function retryPost(_previous: PostActionState, formData: FormData):
   revalidatePath("/post-history");
   revalidatePath("/schedule");
   revalidatePath("/dashboard");
-  return { ok: true, kind: "success", message: "Failed destinations queued for retry." };
+  return { ok: true, kind: "scheduled", message: "Failed destinations queued for retry." };
 }
 
 export async function queuePublishNow(_previous: PostActionState, formData: FormData): Promise<PostActionState> {
@@ -104,5 +104,5 @@ export async function queuePublishNow(_previous: PostActionState, formData: Form
   revalidatePath("/post-history");
   revalidatePath("/schedule");
   revalidatePath("/dashboard");
-  return { ok: true, kind: "success", message: "Queued for publishing." };
+  return { ok: true, kind: "scheduled", message: "Your post is queued and will publish soon." };
 }
