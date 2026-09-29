@@ -11,12 +11,20 @@ export const publishRequestSchema = z.object({
   platforms: z.array(publishPlatformSchema).min(1).max(API_PUBLISH_PLATFORMS.length),
   text: z.string().max(5000).default(""),
   media_paths: z.array(z.string().min(1).max(500)).max(20).default([]),
+  scheduled_at: z.string().datetime({ offset: true }).optional(),
 }).strict().superRefine((value, ctx) => {
   if (!value.text.trim() && value.media_paths.length === 0) {
     ctx.addIssue({
       code: "custom",
       path: ["text"],
       message: "Provide text or at least one media file.",
+    });
+  }
+  if (value.scheduled_at && new Date(value.scheduled_at).getTime() <= Date.now()) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["scheduled_at"],
+      message: "scheduled_at must be in the future.",
     });
   }
 }).transform((value) => ({

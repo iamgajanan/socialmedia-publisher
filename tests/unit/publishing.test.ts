@@ -25,24 +25,11 @@ test("idempotency keys are stable and destination-specific", () => {
   assert.notEqual(a, buildIdempotencyKey("post-1", "account-2"));
 });
 
-
-
-
 test("Threads validation accepts one image and rejects multiple media assets", async () => {
   const { validateThreadsPublishInput } = await import("../../lib/publishing/providers/threads-validation.ts");
-  validateThreadsPublishInput({
-    content: "hello",
-    media: [{ mimeType: "image/png" }],
-  });
-  assert.throws(() => validateThreadsPublishInput({
-    content: "hello",
-    media: [
-      { mimeType: "image/png" },
-      { mimeType: "image/png" },
-    ],
-  }));
+  validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/png" }] });
+  assert.throws(() => validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/png" }, { mimeType: "image/png" }] }));
 });
-
 
 test("automatic retry keeps the post scheduled and suppresses premature failure notifications", async () => {
   const { getPublishingPostOutcome } = await import("../../lib/publishing/outcome.ts");
@@ -58,6 +45,14 @@ test("automatic retry keeps the post scheduled and suppresses premature failure 
     { status: "published", nextRetryAt: null },
     { status: "published", nextRetryAt: null },
   ]), "published");
+  assert.equal(getPublishingPostOutcome([
+    { status: "published", nextRetryAt: null },
+    { status: "skipped", nextRetryAt: null },
+  ]), "published");
+  assert.equal(getPublishingPostOutcome([
+    { status: "skipped", nextRetryAt: null },
+    { status: "skipped", nextRetryAt: null },
+  ]), "scheduled");
 });
 
 test("media capability matrix enforces selected destination requirements", async () => {
