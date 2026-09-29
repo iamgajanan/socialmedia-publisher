@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Copy, Edit3, RotateCcw, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 
