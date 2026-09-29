@@ -80,7 +80,7 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
     }
     const signature = new Uint8Array(await rangeResponse.arrayBuffer());
     const contentRange = rangeResponse.headers.get("content-range");
-    const totalFromRange = contentRange?.match(/\\/(\\d+)$/)?.[1];
+    const totalFromRange = contentRange?.match(/\/(\d+)$/)?.[1];
     const size = parsedSize || Number(totalFromRange ?? 0);
     if (!size || !Number.isFinite(size) || size > MAX_MEDIA_BYTES) {
       throw new Error("Stored video size could not be validated or exceeds the 100 MB application limit.");
@@ -94,7 +94,7 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
       mimeType: remoteMimeType,
     });
     if (validationError) throw new Error(validationError);
-    return resolved;
+    return { ...resolved, size };
   }
 
   throw new Error(`Unsupported stored media MIME type: ${remoteMimeType}.`);
