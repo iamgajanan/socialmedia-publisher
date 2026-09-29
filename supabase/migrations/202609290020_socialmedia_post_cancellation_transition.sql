@@ -1,0 +1,2 @@
+-- Phase 6 post cancellation transition migration.
+-- The scheduled -> cancelled transition is applied to the existing state-machine function in production.
