@@ -16,7 +16,6 @@ test("protected dashboard redirects unauthenticated users", async () => {
 
 const health = await fetch(`${base}/api/health`, { redirect: "manual" });
 
-
 test("protected media library redirects unauthenticated users", async () => {
   const media = await fetch(`${base}/media`, { redirect: "manual" });
   assert.ok([302, 307, 308].includes(media.status), `unexpected status ${media.status}`);
@@ -25,4 +24,12 @@ test("protected media library redirects unauthenticated users", async () => {
 test("health endpoint is available", async () => {
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { ok: true, service: "socialmedia-publisher" });
+});
+
+const apiAccounts = await fetch(`${base}/api/v1/accounts`, { redirect: "manual" });
+
+test("API v1 routes bypass browser-session redirects and enforce API authentication themselves", async () => {
+  assert.equal(apiAccounts.status, 401);
+  assert.match(apiAccounts.headers.get("content-type") ?? "", /application\/json/);
+  assert.deepEqual(await apiAccounts.json(), { error: "Bearer API key required." });
 });
