@@ -114,7 +114,6 @@ export function AccountSecurityForm({
         <Input id="email" name="email" type="email" defaultValue={currentEmail} required />
         <p className="text-xs text-muted-foreground">Changing your email requires confirmation from the new address.</p>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="outline" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Update email</Button>
     </form>
   );
@@ -134,7 +133,6 @@ export function PasswordForm({
         <div className="space-y-2"><Label htmlFor="password">New password</Label><Input id="password" name="password" type="password" minLength={6} required /></div>
         <div className="space-y-2"><Label htmlFor="repeatPassword">Confirm password</Label><Input id="repeatPassword" name="repeatPassword" type="password" minLength={6} required /></div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="outline" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Update password</Button>
     </form>
   );
@@ -158,7 +156,6 @@ export function DeleteAccountForm({
           <Input id="confirmation" name="confirmation" placeholder="DELETE" autoComplete="off" required />
         </div>
       </div>
-      <Feedback state={state} />
       <Button type="submit" variant="destructive" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Delete my account</Button>
     </form>
   );
