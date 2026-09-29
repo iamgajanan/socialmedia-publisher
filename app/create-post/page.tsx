@@ -65,7 +65,7 @@ export default async function CreatePostPage() {
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {attentionAccounts.map((account) => (
-                <Button asChild><a href={`/api/social/oauth/start/${account.platform}`}>Reconnect {account.account_name}</a></Button>
+                <Button key={account.id} asChild><a href={`/api/social/oauth/start/${account.platform}`}>Reconnect {account.account_name}</a></Button>
               ))}
               <Button asChild variant="outline"><a href="/connect-accounts">Manage accounts</a></Button>
             </div>
