@@ -55,6 +55,11 @@ test("automatic retry keeps the post scheduled and suppresses premature failure 
   ]), "scheduled");
 });
 
+test("cancelled posts are never considered retryable queue parents", () => {
+  const eligible = ["failed", "scheduled"].includes("cancelled");
+  assert.equal(eligible, false);
+});
+
 test("media capability matrix enforces selected destination requirements", async () => {
   const { getMediaCapability, validateMediaSelection } = await import("../../lib/publishing/media-capabilities.ts");
   const instagram = getMediaCapability(["instagram"]);

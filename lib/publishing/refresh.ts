@@ -2,13 +2,14 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptToken, encryptToken } from "@/lib/social/token-crypto";
 import { getPublisher } from "./providers";
+import { PublisherError } from "./providers/types";
 import type { PublisherAccount } from "./providers/types";
 
 export async function getUsableAccessToken(account: PublisherAccount) {
   const admin = createAdminClient();
   const { data: secrets, error: secretError } = await admin.from("socialmedia_account_secrets").select("access_token_ciphertext,refresh_token_ciphertext").eq("social_account_id", account.id).maybeSingle();
   if (secretError) throw new Error(`Unable to load social account secrets: ${secretError.message}`);
-  if (!secrets?.access_token_ciphertext) throw new Error("This social account has no stored access token.");
+  if (!secrets?.access_token_ciphertext) throw new PublisherError("This social account has no stored access token.", { code: "token_missing" });
   const current = decryptToken(secrets.access_token_ciphertext);
   const expiresAt = account.token_expires_at ? Date.parse(account.token_expires_at) : Number.POSITIVE_INFINITY;
   if (expiresAt > Date.now() + 120_000) return current;
@@ -23,7 +24,7 @@ export async function getUsableAccessToken(account: PublisherAccount) {
   }
   if (!secrets.refresh_token_ciphertext || !publisher.refreshToken) return current;
   const refreshed = await publisher.refreshToken(account, decryptToken(secrets.refresh_token_ciphertext));
-  if (!refreshed) return current;
+  if (!refreshed) throw new PublisherError("The provider rejected the token refresh.", { code: "token_refresh_failed" });
   await persistRefreshedToken(admin, account.id, refreshed);
   return refreshed.accessToken;
 }

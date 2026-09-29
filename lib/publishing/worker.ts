@@ -17,10 +17,44 @@ const BATCH_SIZE = 10;
 type WorkerRow = { profileId: string; id: string; post_id: string; social_account_id: string; status: string; platform_post_id: string | null; retry_count: number; max_retries: number; account: PublisherAccount; content: string; mediaPaths: string[] };
 
 async function requeueDueRetries(supabase: ReturnType<typeof createAdminClient>, now: string) {
-  const { data } = await supabase.from("socialmedia_post_platforms").select("id,post_id").eq("status","failed").not("next_retry_at","is",null).lte("next_retry_at",now).limit(BATCH_SIZE * 5);
-  for (const row of data ?? []) {
-    await supabase.from("socialmedia_post_platforms").update({ status: "scheduled", next_retry_at: null }).eq("id",row.id).eq("status","failed");
-    await supabase.from("socialmedia_posts").update({ status: "scheduled", scheduled_at: now }).eq("id",row.post_id).eq("status","failed");
+  const { data: retryRows } = await supabase
+    .from("socialmedia_post_platforms")
+    .select("id,post_id")
+    .eq("status", "failed")
+    .not("next_retry_at", "is", null)
+    .lte("next_retry_at", now)
+    .limit(BATCH_SIZE * 5);
+
+  const postIds = [...new Set((retryRows ?? []).map((row) => row.post_id))];
+  if (!postIds.length) return;
+
+  const { data: posts } = await supabase
+    .from("socialmedia_posts")
+    .select("id,status")
+    .in("id", postIds);
+
+  const eligiblePostIds = new Set(
+    (posts ?? [])
+      .filter((post) => post.status === "failed" || post.status === "scheduled")
+      .map((post) => post.id),
+  );
+
+  for (const row of retryRows ?? []) {
+    if (!eligiblePostIds.has(row.post_id)) continue;
+
+    await supabase
+      .from("socialmedia_post_platforms")
+      .update({ status: "scheduled", next_retry_at: null })
+      .eq("id", row.id)
+      .eq("status", "failed")
+      .not("next_retry_at", "is", null)
+      .lte("next_retry_at", now);
+
+    await supabase
+      .from("socialmedia_posts")
+      .update({ status: "scheduled", scheduled_at: now })
+      .eq("id", row.post_id)
+      .eq("status", "failed");
   }
 }
 
@@ -90,8 +124,10 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
           status:"failed", error_message:providerError.message.slice(0,1000), retry_count:row.retry_count+1,
           next_retry_at:next.canRetry && providerError.retryable ? next.nextRetryAt : null, last_attempt_at:now
         }).eq("id",row.id).eq("status","publishing");
-        if (providerError.code === "http_401" || providerError.code === "http_403") { await supabase.from("socialmedia_social_accounts").update({status:"error"}).eq("id",row.social_account_id);
-          await enqueueNotification({ profileId: row.profileId, eventType: "token_expired", dedupeKey: `token_expired:${row.social_account_id}`, socialAccountId: row.social_account_id, payload: { platform: row.account.platform, account: row.account.account_name } }); }
+        if (providerError.code === "http_401" || providerError.code === "http_403" || providerError.code === "token_refresh_failed") {
+          await supabase.from("socialmedia_social_accounts").update({status:"error"}).eq("id",row.social_account_id);
+          await enqueueNotification({ profileId: row.profileId, eventType: "token_expired", dedupeKey: `token_expired:${row.social_account_id}`, socialAccountId: row.social_account_id, payload: { platform: row.account.platform, account: row.account.account_name } });
+        }
         failed += 1;
       }
     }
