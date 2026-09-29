@@ -1,10 +1,10 @@
 export type MediaKind = "image" | "video";
 export type MediaCapability = { minFiles: number; maxFiles: number; imageTypes: string[]; videoTypes: string[] };
-const ALL_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const ALL_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"];
 const ALL_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
 export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   facebook: { minFiles: 0, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES },
-  instagram: { minFiles: 1, maxFiles: 1, imageTypes: ["image/jpeg"], videoTypes: ["video/mp4", "video/quicktime"] },
+  instagram: { minFiles: 1, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ["video/mp4", "video/quicktime"] },
   threads: { minFiles: 0, maxFiles: 1, imageTypes: ["image/jpeg", "image/png"], videoTypes: ["video/mp4", "video/quicktime"] },
   youtube: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ALL_VIDEO_TYPES },
   tiktok: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ["video/mp4", "video/quicktime"] },
@@ -25,6 +25,8 @@ export function mediaTypeFromPath(path: string): string {
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
   if (lower.endsWith(".avif")) return "image/avif";
+  if (lower.endsWith(".tif") || lower.endsWith(".tiff")) return "image/tiff";
+  if (lower.endsWith(".bmp")) return "image/bmp";
   if (lower.endsWith(".mp4")) return "video/mp4";
   if (lower.endsWith(".webm")) return "video/webm";
   if (lower.endsWith(".mov")) return "video/quicktime";

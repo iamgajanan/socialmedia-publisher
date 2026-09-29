@@ -16,6 +16,8 @@ const ACCEPTED_TYPES = [
   "image/webp",
   "image/gif",
   "image/avif",
+  "image/tiff",
+  "image/bmp",
   "video/mp4",
   "video/webm",
   "video/quicktime",
