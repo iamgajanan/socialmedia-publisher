@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast-provider";
 
 type ApiKey = {
   id: string;
@@ -32,6 +33,7 @@ export default function ApiKeysManager() {
   const [creating, setCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   async function loadKeys() {
     setLoading(true);
@@ -42,7 +44,9 @@ export default function ApiKeysManager() {
       if (!response.ok) throw new Error(body.error ?? "Unable to load API keys.");
       setKeys(body.apiKeys ?? []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load API keys.");
+      const message = cause instanceof Error ? cause.message : "Unable to load API keys.";
+      setError(message);
+      toast({ title: "API keys could not be loaded", message, variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -73,7 +77,9 @@ export default function ApiKeysManager() {
       setName("");
       await loadKeys();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to create API key.");
+      const message = cause instanceof Error ? cause.message : "Unable to create API key.";
+      setError(message);
+      toast({ title: "API key creation failed", message, variant: "error" });
     } finally {
       setCreating(false);
     }
@@ -90,7 +96,9 @@ export default function ApiKeysManager() {
       if (!response.ok) throw new Error(body.error ?? "Unable to revoke API key.");
       await loadKeys();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to revoke API key.");
+      const message = cause instanceof Error ? cause.message : "Unable to revoke API key.";
+      setError(message);
+      toast({ title: "API key revocation failed", message, variant: "error" });
     } finally {
       setRevokingId(null);
     }
@@ -100,6 +108,7 @@ export default function ApiKeysManager() {
     if (!createdToken) return;
     await navigator.clipboard.writeText(createdToken.token);
     setCopied(true);
+    toast({ title: "API key copied", message: "Store it somewhere secure.", variant: "success" });
     window.setTimeout(() => setCopied(false), 1800);
   }
 
@@ -121,12 +130,6 @@ export default function ApiKeysManager() {
           </Button>
         </form>
       </div>
-
-      {error ? (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
 
       {createdToken ? (
         <div className="rounded-2xl border border-amber-300/60 bg-amber-50/70 p-5 dark:border-amber-500/30 dark:bg-amber-950/20">
