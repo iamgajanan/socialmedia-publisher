@@ -4,58 +4,59 @@
 
 @layer base {
   :root {
-    --background: 240 25% 98%;
-    --foreground: 230 28% 15%;
-    --card: 0 0% 100%;
-    --card-foreground: 230 28% 15%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 230 28% 15%;
-    --primary: 247 83% 59%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 244 34% 96%;
-    --secondary-foreground: 245 38% 28%;
-    --muted: 240 18% 95%;
-    --muted-foreground: 230 12% 46%;
-    --accent: 246 100% 96%;
-    --accent-foreground: 247 58% 42%;
+    /* Change these theme tokens to retheme the entire product instantly. */
+    --background: 44 36% 97%;
+    --foreground: 32 24% 14%;
+    --card: 45 40% 99%;
+    --card-foreground: 32 24% 14%;
+    --popover: 45 40% 99%;
+    --popover-foreground: 32 24% 14%;
+    --primary: 43 96% 52%;
+    --primary-foreground: 32 30% 10%;
+    --secondary: 42 42% 92%;
+    --secondary-foreground: 31 28% 20%;
+    --muted: 42 28% 93%;
+    --muted-foreground: 31 10% 45%;
+    --accent: 45 100% 89%;
+    --accent-foreground: 31 65% 23%;
     --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 232 20% 89%;
-    --input: 232 20% 85%;
-    --ring: 247 83% 59%;
-    --chart-1: 247 83% 59%;
-    --chart-2: 196 84% 45%;
-    --chart-3: 164 72% 43%;
-    --chart-4: 36 90% 55%;
-    --chart-5: 338 78% 58%;
-    --radius: 0.9rem;
+    --border: 38 23% 84%;
+    --input: 38 23% 80%;
+    --ring: 43 96% 52%;
+    --chart-1: 43 96% 52%;
+    --chart-2: 28 88% 55%;
+    --chart-3: 155 55% 40%;
+    --chart-4: 205 70% 50%;
+    --chart-5: 338 70% 55%;
+    --radius: 0.95rem;
   }
 
   .dark {
-    --background: 235 29% 8%;
-    --foreground: 230 25% 96%;
-    --card: 235 25% 11%;
-    --card-foreground: 230 25% 96%;
-    --popover: 235 25% 11%;
-    --popover-foreground: 230 25% 96%;
-    --primary: 248 89% 68%;
-    --primary-foreground: 235 29% 8%;
-    --secondary: 239 25% 17%;
-    --secondary-foreground: 230 25% 94%;
-    --muted: 238 20% 15%;
-    --muted-foreground: 232 13% 67%;
-    --accent: 243 46% 20%;
-    --accent-foreground: 248 92% 80%;
+    --background: 30 18% 8%;
+    --foreground: 42 35% 96%;
+    --card: 31 17% 11%;
+    --card-foreground: 42 35% 96%;
+    --popover: 31 17% 11%;
+    --popover-foreground: 42 35% 96%;
+    --primary: 43 96% 58%;
+    --primary-foreground: 30 24% 9%;
+    --secondary: 31 18% 17%;
+    --secondary-foreground: 42 30% 94%;
+    --muted: 31 15% 15%;
+    --muted-foreground: 38 12% 66%;
+    --accent: 38 45% 21%;
+    --accent-foreground: 45 96% 78%;
     --destructive: 0 62% 43%;
     --destructive-foreground: 0 0% 100%;
-    --border: 237 20% 22%;
-    --input: 237 20% 25%;
-    --ring: 248 89% 68%;
-    --chart-1: 248 89% 68%;
-    --chart-2: 196 84% 58%;
-    --chart-3: 164 72% 52%;
-    --chart-4: 36 90% 62%;
-    --chart-5: 338 78% 66%;
+    --border: 31 16% 23%;
+    --input: 31 16% 27%;
+    --ring: 43 96% 58%;
+    --chart-1: 43 96% 58%;
+    --chart-2: 28 88% 62%;
+    --chart-3: 155 55% 50%;
+    --chart-4: 205 70% 60%;
+    --chart-5: 338 70% 64%;
   }
 }
 
@@ -65,7 +66,7 @@
   body { @apply bg-background text-foreground antialiased; }
   button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
   :focus-visible { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }
-  ::selection { @apply bg-primary/15; }
+  ::selection { @apply bg-primary/20; }
 }
 
 @layer components {
@@ -82,7 +83,7 @@
   }
 
   .ui-surface-hover {
-    @apply hover:border-primary/20 hover:bg-accent/60;
+    @apply hover:border-primary/30 hover:bg-accent/60;
   }
 }
 
