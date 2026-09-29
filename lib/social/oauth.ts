@@ -6,6 +6,7 @@ export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 export type ProviderConfig = {
   clientId: string; clientSecret: string; authorizationUrl: string; tokenUrl: string; profileUrl: string;
   scopes: string[]; redirectUri: string; usePkce?: boolean; clientSecretInBasicAuth?: boolean; tokenClientKey?: string; instagramLogin?: boolean;
+  configId?: string;
 };
 
 function env(name: string) { return process.env[name]?.trim() || ""; }
@@ -61,7 +62,16 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
       if (!env("META_APP_ID") || !env("META_APP_SECRET") || !version) return null;
       const profileUrl = env("FACEBOOK_PROFILE_URL") || `https://graph.facebook.com/${version}/me?fields=id,name`;
       const scopes = env("META_FACEBOOK_SCOPES") || env("FACEBOOK_OAUTH_SCOPES") || "pages_manage_metadata,pages_manage_posts,pages_manage_read_engagement,pages_show_list";
-      return { clientId: env("META_APP_ID"), clientSecret: env("META_APP_SECRET"), authorizationUrl: `https://www.facebook.com/${version}/dialog/oauth`, tokenUrl: `https://graph.facebook.com/${version}/oauth/access_token`, profileUrl, scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean), redirectUri };
+      return {
+        clientId: env("META_APP_ID"),
+        clientSecret: env("META_APP_SECRET"),
+        authorizationUrl: `https://www.facebook.com/${version}/dialog/oauth`,
+        tokenUrl: `https://graph.facebook.com/${version}/oauth/access_token`,
+        profileUrl,
+        scopes: scopes.split(",").map((v) => v.trim()).filter(Boolean),
+        redirectUri,
+        configId: env("META_FACEBOOK_LOGIN_CONFIG_ID") || undefined,
+      };
     }
     case "instagram": {
       const version = env("META_GRAPH_VERSION");
