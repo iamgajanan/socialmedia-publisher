@@ -32,9 +32,13 @@ export type UploadedMedia = {
 export function MediaUploader({
   uploaded,
   onUploaded,
+  allowedTypes,
+  maxFiles = 20,
 }: {
   uploaded: UploadedMedia[];
   onUploaded: (media: UploadedMedia[]) => void;
+  allowedTypes?: string[];
+  maxFiles?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -46,14 +50,12 @@ export function MediaUploader({
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const uploadBody = new FormData();
-      uploadBody.append("cacheControl", "3600");
-      uploadBody.append("", file, file.name);
-
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         abortRef.current = xhr;
         xhr.open("PUT", signedUrl);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.setRequestHeader("Cache-Control", "max-age=3600");
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
         };
@@ -74,7 +76,7 @@ export function MediaUploader({
           abortRef.current = null;
           reject(new Error("Upload cancelled."));
         };
-        xhr.send(uploadBody);
+        xhr.send(file);
       });
       return;
     } catch (error) {
@@ -108,11 +110,12 @@ function removeFromPost(path: string) {
     try {
       const results: UploadedMedia[] = [];
       for (const file of Array.from(files)) {
-        if (!ACCEPTED_TYPES.includes(file.type)) {
-          throw new Error(`Unsupported file type: ${file.type || "unknown"}.`);
+        const supportedTypes = allowedTypes?.length ? allowedTypes : ACCEPTED_TYPES;
+        if (!supportedTypes.includes(file.type)) {
+          throw new Error(`${file.name} (${file.type || "unknown"}) is not supported by the selected destination. Supported: ${supportedTypes.map((type) => type.split("/")[1]?.toUpperCase()).join(", ")}.`);
         }
         if (file.size > MAX_FILE_SIZE) throw new Error(`${file.name} is larger than the 100 MB upload limit.`);
-        if (uploaded.length + results.length >= 20) throw new Error("A draft can contain at most 20 media files.");
+        if (uploaded.length + results.length >= maxFiles) throw new Error(`The selected destination supports at most ${maxFiles} media file${maxFiles === 1 ? "" : "s"} per post.`);
 
         if (file.type.startsWith("image/")) {
           const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -176,7 +179,7 @@ function removeFromPost(path: string) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold">Media</p>
-          <p className="text-xs leading-5 text-muted-foreground">Upload images or videos to your private media storage.</p>
+          <p className="text-xs leading-5 text-muted-foreground">Upload media once to private storage; the publishing worker sends it to each selected destination.</p>
         </div>
         <input
           ref={inputRef}

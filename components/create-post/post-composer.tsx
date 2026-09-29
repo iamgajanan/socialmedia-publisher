@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MediaUploader, type UploadedMedia } from "@/components/create-post/media-uploader";
 import { cn } from "@/lib/utils";
 import { formatTimeZoneName } from "@/lib/scheduling/timezone";
+import { getMediaCapability } from "@/lib/publishing/media-capabilities";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
 const meta: Record<string, { name: string; icon: typeof Facebook; limit: number }> = {
@@ -35,6 +36,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
 
   const selectedAccounts = accounts.filter((account) => selected.includes(account.id));
   const selectedPlatforms = useMemo(() => [...new Set(selectedAccounts.map((account) => account.platform))], [selectedAccounts]);
+  const mediaCapability = useMemo(() => getMediaCapability(selectedPlatforms), [selectedPlatforms]);
   const previewAccount = selectedAccounts.find((account) => account.platform === previewPlatform) ?? selectedAccounts[0];
   const selectedMeta = previewPlatform ? meta[previewPlatform] : null;
   const overLimit = selectedMeta ? content.length > selectedMeta.limit : false;
@@ -76,7 +78,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
             {selectedMeta && <span className={cn(overLimit && "font-medium text-destructive")}>{content.length.toLocaleString()} / {selectedMeta.limit.toLocaleString()} for {selectedMeta.name}</span>}
           </div>
 
-          <MediaUploader uploaded={media} onUploaded={setMedia} />
+          <MediaUploader uploaded={media} onUploaded={setMedia} allowedTypes={[...mediaCapability.imageTypes, ...mediaCapability.videoTypes]} maxFiles={mediaCapability.maxFiles} />
 
           <div className="mt-5 rounded-2xl border bg-muted/20 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -104,6 +106,12 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
             )}
           </div>
 
+          {selectedPlatforms.length > 0 && mediaCapability.minFiles > media.length && (
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {selectedPlatforms.join(" + ")} requires {mediaCapability.minFiles === 1 ? "one image or video" : `${mediaCapability.minFiles} media files`} before publishing.
+            </div>
+          )}
+
           <div className="mt-5 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled><Sparkles />AI assist</Button>
           </div>
@@ -130,7 +138,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
             <Button type="button" variant="outline" disabled><ChevronDown />More actions</Button>
             <Button type="submit" name="intent" value="draft" variant="outline" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Saving…" : "Save draft"}</Button>
             {mode === "schedule" && <Button type="submit" name="intent" value="schedule" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Scheduling…" : "Schedule post"}</Button>}
-            <Button type="submit" name="intent" value="publish" onClick={confirmPublish} disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />}{pending ? "Publishing…" : "Publish now"}</Button>
+            <Button type="submit" name="intent" value="publish" onClick={confirmPublish} disabled={!canSave || pending || media.length < mediaCapability.minFiles}>{pending ? <Loader2 className="animate-spin" /> : <Send />}{pending ? "Publishing…" : "Publish now"}</Button>
           </div>
         </CardContent>
       </Card>
