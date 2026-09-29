@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { MediaAsset } from "./providers/types";
+import { validateInstagramPreparedImage } from "./media-validation";
 
 const BUCKET = "social-media-assets";
 const DERIVED_URL_TTL = 60 * 30;
@@ -76,6 +77,15 @@ async function prepareInstagramImage(media: MediaAsset): Promise<MediaAsset> {
       .jpeg({ quality: 88, mozjpeg: true })
       .toBuffer();
   }
+
+  const preparedMetadata = await sharp(output).metadata();
+  const validationError = validateInstagramPreparedImage({
+    width: preparedMetadata.width,
+    height: preparedMetadata.height,
+    size: output.byteLength,
+    mimeType: "image/jpeg",
+  });
+  if (validationError) throw new Error(validationError);
 
   const admin = createAdminClient();
   const path = derivedPath(media);
