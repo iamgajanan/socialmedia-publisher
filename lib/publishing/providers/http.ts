@@ -6,9 +6,10 @@ export async function providerFetch(url: string, init: RequestInit): Promise<Res
   if (response.ok) return response;
   const text = await response.text().catch(() => "");
   let message = text;
+  let nestedError: Record<string, unknown> | null = null;
   try {
     const json = JSON.parse(text) as Record<string, unknown>;
-    const nestedError = json.error && typeof json.error === "object" ? json.error as Record<string, unknown> : null;
+    nestedError = json.error && typeof json.error === "object" ? json.error as Record<string, unknown> : null;
     message =
       typeof nestedError?.message === "string"
         ? nestedError.message
@@ -18,6 +19,14 @@ export async function providerFetch(url: string, init: RequestInit): Promise<Res
             ? json.message
             : text;
   } catch {}
-  const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+  const providerCode = typeof nestedError?.code === "number" ? nestedError.code : undefined;
+  const providerSubcode = typeof nestedError?.error_subcode === "number" ? nestedError.error_subcode : undefined;
+  const retryable =
+    response.status === 408 ||
+    response.status === 425 ||
+    response.status === 429 ||
+    response.status >= 500 ||
+    (providerCode === 9007 && providerSubcode === 2207027) ||
+    (providerCode === 24 && providerSubcode === 2207008);
   throw new PublisherError(message || `Provider request failed (${response.status}).`, { retryable, code: `http_${response.status}` });
 }

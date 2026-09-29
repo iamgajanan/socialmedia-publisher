@@ -87,18 +87,27 @@ export const instagramPublisher: Publisher = {
     const container = await containerResponse.json() as { id?: string };
     if (!container.id) throw new PublisherError("Instagram did not return a media container ID.", { code: "missing_container_id" });
 
-    if (media.mimeType.startsWith("video/")) {
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        const statusResponse = await providerFetch(
-          `${base}/${container.id}?fields=status_code&access_token=${encodeURIComponent(accessToken)}`,
-          { method: "GET" },
-        );
-        const status = await statusResponse.json() as { status_code?: string };
-        if (status.status_code === "ERROR") throw new PublisherError("Instagram video processing failed.", { code: "instagram_processing_failed" });
-        if (status.status_code === "FINISHED") break;
-        if (attempt === 19) throw new PublisherError("Instagram video is still processing; retry later.", { retryable: true, code: "instagram_processing" });
+    let containerReady = false;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const statusResponse = await providerFetch(
+        `${base}/${container.id}?fields=status_code,status&access_token=${encodeURIComponent(accessToken)}`,
+        { method: "GET" },
+      );
+      const status = await statusResponse.json() as { status_code?: string; status?: string };
+      if (status.status_code === "FINISHED" || status.status_code === "PUBLISHED") {
+        containerReady = true;
+        break;
       }
+      if (status.status_code === "ERROR") {
+        throw new PublisherError(status.status || "Instagram media processing failed.", { code: "instagram_processing_failed" });
+      }
+      if (status.status_code === "EXPIRED") {
+        throw new PublisherError("Instagram media container expired before publishing.", { retryable: true, code: "instagram_container_expired" });
+      }
+      if (attempt < 19) await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+    if (!containerReady) {
+      throw new PublisherError("Instagram media is still processing; retry later.", { retryable: true, code: "instagram_processing" });
     }
 
     const publishResponse = await providerFetch(`${base}/${igId}/media_publish`, {
