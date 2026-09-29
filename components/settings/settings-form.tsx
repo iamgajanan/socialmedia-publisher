@@ -30,6 +30,7 @@ export function ProfileForm({
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   useSettingsToast(state);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -57,6 +58,7 @@ export function WorkspaceForm({
   defaultStatus: "draft" | "scheduled";
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
   const timezones = ["Asia/Kolkata", "Asia/Dubai", "Asia/Singapore", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles", "UTC"];
 
   return (
@@ -105,6 +107,7 @@ export function AccountSecurityForm({
   currentEmail: string;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -125,6 +128,7 @@ export function PasswordForm({
   action: (state: State, formData: FormData) => Promise<State>;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -144,6 +148,7 @@ export function DeleteAccountForm({
   action: (state: State, formData: FormData) => Promise<State>;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  useSettingsToast(state);
 
   return (
     <form action={formAction} className="space-y-4">
