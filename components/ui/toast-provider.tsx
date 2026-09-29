@@ -30,7 +30,7 @@ const variantStyles: Record<ToastVariant, { icon: typeof CheckCircle2; className
   },
   scheduled: {
     icon: Clock3,
-    className: "border-orange-500/35 bg-orange-500/10 text-orange-900 dark:text-orange-200",
+    className: "border-orange-500/30 bg-orange-500/10 text-orange-900 dark:text-orange-200",
   },
 };
 
@@ -75,7 +75,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <Icon className="mt-0.5 size-5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">{item.title}</p>
-                  {item.message && <p className="mt-1 text-xs leading-5 opacity-85">{item.message}</p>}
+                  {item.message && <p className="mt-1 text-xs leading-5 opacity-80">{item.message}</p>}
                 </div>
                 <button
                   type="button"
