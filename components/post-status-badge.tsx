@@ -12,15 +12,15 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   },
   scheduled: {
     label: "Scheduled",
-    className: "border-amber-500/35 bg-amber-400/15 text-amber-800 dark:text-amber-200",
+    className: "border-amber-500/30 bg-amber-400/10 text-amber-800 dark:text-amber-200",
   },
   publishing: {
     label: "Publishing",
-    className: "border-orange-500/35 bg-orange-500/12 text-orange-800 dark:text-orange-200",
+    className: "border-orange-500/30 bg-orange-500/10 text-orange-800 dark:text-orange-200",
   },
   published: {
     label: "Published",
-    className: "border-emerald-500/30 bg-emerald-500/12 text-emerald-800 dark:text-emerald-200",
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
   },
   failed: {
     label: "Failed",
@@ -28,7 +28,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   },
   cancelled: {
     label: "Cancelled",
-    className: "border-slate-500/30 bg-slate-500/12 text-slate-700 dark:text-slate-200",
+    className: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-200",
   },
 };
 
