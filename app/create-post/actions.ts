@@ -10,6 +10,7 @@ import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
 import { enqueueNotification } from "@/lib/notifications";
 import { getPostTitle } from "@/lib/notifications/email";
+import { mediaTypeFromPath, validateMediaSelection } from "@/lib/publishing/media-capabilities";
 
 const draftSchema = z.object({
   postId: z.string().uuid().optional(),
@@ -59,6 +60,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
 
   const userPathPrefix = `${String(userId)}/`;
   const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
+  const selectedPlatforms = [...new Set((selectedAccountRows.data ?? []).map((account) => account.platform))];
   if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, message: "One or more selected accounts are no longer connected." };
 
   if (parsed.data.mediaPaths.some((path) => !path.startsWith(userPathPrefix) || path.includes(".."))) {
@@ -77,32 +79,13 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     const invalidMedia = selectedMedia.find((file) => !file?.metadata?.mimetype || (file.metadata.size ?? 0) > 100 * 1024 * 1024);
     if (invalidMedia) return { ok: false, message: "One or more media files exceed the supported type or 100 MB size limit." };
     const mediaTypes = selectedMedia.map((file) => String(file?.metadata?.mimetype ?? ""));
-    const hasImage = mediaTypes.some((type) => type.startsWith("image/"));
-    const hasVideo = mediaTypes.some((type) => type.startsWith("video/"));
-    const selectedPlatforms = selectedAccountRows.data.map((account) => account.platform);
-    if (!hasImage && !hasVideo) return { ok: false, message: "The selected media type is not supported." };
-
-    const mediaCount = selectedMedia.length;
-    if (selectedPlatforms.includes("instagram") && (mediaCount !== 1 || (!hasImage && !hasVideo))) {
-      return { ok: false, message: "Instagram requires exactly one image or video." };
-    }
-    if ((selectedPlatforms.includes("youtube") || selectedPlatforms.includes("tiktok")) && (mediaCount !== 1 || !hasVideo)) {
-      return { ok: false, message: "YouTube and TikTok require exactly one video." };
-    }
-    if (selectedPlatforms.includes("linkedin") && mediaCount > 0) {
-      return { ok: false, message: "LinkedIn media publishing is not enabled for this connected account yet." };
-    }
-    if (selectedPlatforms.includes("x") && mediaCount > 0) {
-      return { ok: false, message: "X media publishing is not enabled for this connected account yet." };
-    }
-    if (selectedPlatforms.includes("threads") && mediaCount > 1) {
-      return { ok: false, message: "Threads currently supports one media asset per post." };
-    }
-    if (selectedPlatforms.includes("facebook") && mediaCount > 1) {
-      return { ok: false, message: "Facebook currently supports one media asset per post." };
-    }
+    const mediaValidationError = validateMediaSelection(selectedPlatforms, mediaTypes);
+    if (mediaValidationError) return { ok: false, message: mediaValidationError };
   }
 
+
+  const mediaPathValidationError = validateMediaSelection(selectedPlatforms, parsed.data.mediaPaths.map(mediaTypeFromPath));
+  if (mediaPathValidationError) return { ok: false, message: mediaPathValidationError };
 
   let postId = parsed.data.postId;
   if (postId) {
