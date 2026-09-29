@@ -23,11 +23,16 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
   tiktok: { name: "TikTok", icon: Send, limit: 2200 },
 };
 
-const PUBLISHING_DISABLED_PLATFORMS = new Set(["x"]);\n\nconst initialState: SaveDraftState = { ok: false, message: "" };
+const PUBLISHING_DISABLED_PLATFORMS = new Set(["x"]);
+
+const initialState: SaveDraftState = { ok: false, message: "" };
 
 export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost }: { accounts: Account[]; timezone?: string; initialPost?: { id: string; content: string; accountIds: string[]; mediaPaths: string[]; mode: "draft" | "schedule"; scheduledAt: string | null } }) {
   const [content, setContent] = useState(initialPost?.content ?? "");
-  const [selected, setSelected] = useState<string[]>(() => {\n    const availableAccountIds = accounts.filter((account) => !PUBLISHING_DISABLED_PLATFORMS.has(account.platform)).map((account) => account.id);\n    return (initialPost?.accountIds ?? availableAccountIds).filter((id) => availableAccountIds.includes(id));\n  });
+  const [selected, setSelected] = useState<string[]>(() => {
+    const availableAccountIds = accounts.filter((account) => !PUBLISHING_DISABLED_PLATFORMS.has(account.platform)).map((account) => account.id);
+    return (initialPost?.accountIds ?? availableAccountIds).filter((id) => availableAccountIds.includes(id));
+  });
   const [media, setMedia] = useState<UploadedMedia[]>(initialPost?.mediaPaths.map((path) => ({ path, name: path.split("/").pop() ?? path, size: 0, type: "" })) ?? []);
   const [mode, setMode] = useState<"draft" | "schedule">(initialPost?.mode ?? "draft");
   const [scheduledAtLocal, setScheduledAtLocal] = useState(() => { if (!initialPost?.scheduledAt) return ""; const parts = new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(initialPost.scheduledAt)); const map=Object.fromEntries(parts.filter((part)=>part.type!=="literal").map((part)=>[part.type,part.value])); return map.year ? `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}` : ""; });
