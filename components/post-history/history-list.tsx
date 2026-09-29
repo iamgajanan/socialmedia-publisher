@@ -6,11 +6,9 @@ import { Copy, Edit3, Eye, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useActionState } from "react";
 
 import { deletePost, duplicatePost, queuePublishNow, retryPost, type PostActionState } from "@/app/post-history/actions";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { PostStatusBadge } from "@/components/post-status-badge";
 import { useToast } from "@/components/ui/toast-provider";
 
@@ -19,9 +17,6 @@ type HistoryPost = {
   platforms: { platform: string; account_name: string; status: string }[];
 };
 
-const labels: Record<string,string> = { draft:"Draft", scheduled:"Scheduled", publishing:"Publishing", published:"Published", failed:"Failed" };
-const variants: Record<string,"secondary"|"outline"|"default"|"destructive"> = { draft:"secondary", scheduled:"outline", publishing:"outline", published:"default", failed:"destructive" };
-
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-IN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value));
@@ -29,7 +24,19 @@ function formatDate(value: string | null) {
 
 function ActionForm({ action, postId, children }: { action:(state:PostActionState, formData:FormData)=>Promise<PostActionState>; postId:string; children:React.ReactNode }) {
   const [state, formAction, pending] = useActionState(action,{ok:false,message:""});
-  return <form action={formAction} className="inline-flex"><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="ghost" size="sm" disabled={pending}>{children}</Button>{state.message && <span className={cn("sr-only",state.ok?"":"text-destructive")}>{state.message}</span>}</form>;
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (!state.message) return;
+    const scheduled = state.ok && state.kind === "scheduled";
+    toast({
+      title: state.ok ? (scheduled ? "Post queued" : "Success") : "Action failed",
+      message: state.message,
+      variant: state.ok ? (scheduled ? "scheduled" : "success") : "error",
+    });
+  }, [state, toast]);
+
+  return <form action={formAction} className="inline-flex"><input type="hidden" name="postId" value={postId}/><Button type="submit" variant="outline" size="sm" disabled={pending}>{children}</Button></form>;
 }
 
 export function HistoryList({ posts }: { posts: HistoryPost[] }) {
