@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getRetrySchedule } from "./retry";
 import { buildIdempotencyKey } from "./idempotency";
 import { resolveMedia } from "./media";
+import { prepareMediaForPlatform } from "./media-preparation";
 import { getUsableAccessToken } from "./refresh";
 import { getPublisher } from "./providers";
 import { PublisherError } from "./providers/types";
@@ -67,7 +68,8 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       try {
         const publisher = getPublisher(row.account.platform);
         const media = await resolveMedia(row.mediaPaths);
-        const input = { account:row.account, content:row.content, media, idempotencyKey:buildIdempotencyKey(row.post_id,row.social_account_id) };
+        const preparedMedia = await prepareMediaForPlatform(row.account.platform, media);
+        const input = { account:row.account, content:row.content, media:preparedMedia, idempotencyKey:buildIdempotencyKey(row.post_id,row.social_account_id) };
         publisher.validate(input);
         const token = await getUsableAccessToken(row.account);
         const result = await publisher.publish(input,token);
@@ -75,6 +77,13 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
         published += 1;
       } catch (error) {
         const providerError = error instanceof PublisherError ? error : new PublisherError(error instanceof Error ? error.message : "Publishing failed.");
+        console.error("[publishing] destination failed", {
+          platform: row.account.platform,
+          accountId: row.social_account_id,
+          postId: row.post_id,
+          code: providerError.code,
+          message: providerError.message,
+        });
         const next = getRetrySchedule(row.retry_count + 1,row.max_retries,new Date());
         await supabase.from("socialmedia_post_platforms").update({
           status:"failed", error_message:providerError.message.slice(0,1000), retry_count:row.retry_count+1,
