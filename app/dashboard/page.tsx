@@ -346,9 +346,7 @@ export default async function DashboardPage() {
                     <p className="truncate text-sm font-medium">{post.content?.trim() || "Untitled post"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Created {formatDate(post.created_at)}</p>
                   </div>
-                  <Badge variant={statusStyles[post.status as keyof typeof statusStyles] ?? "secondary"}>
-                    {statusLabels[post.status as keyof typeof statusLabels] ?? post.status}
-                  </Badge>
+                  <PostStatusBadge status={post.status} />
                 </div>
               ))}
             </div>
