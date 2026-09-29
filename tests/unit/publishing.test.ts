@@ -75,7 +75,7 @@ test("media capability matrix enforces selected destination requirements", async
   assert.equal(validateMediaSelection(["instagram"], ["image/tiff"]), null);
   const mixed = getMediaCapability(["facebook", "instagram"]);
   assert.equal(mixed.maxFiles, 1);
-  assert.deepEqual(mixed.imageTypes, ["image/jpeg"]);
+  assert.deepEqual(mixed.imageTypes, ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"]);
   assert.deepEqual(mixed.videoTypes, ["video/mp4", "video/quicktime"]);
 });
 
