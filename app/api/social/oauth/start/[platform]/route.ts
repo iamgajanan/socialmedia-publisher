@@ -36,10 +36,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
-  url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
 
   if (config.configId) {
+    // Facebook Login for Business uses the configuration's permission set.
+    // Do not send a legacy scope parameter alongside config_id.
     url.searchParams.set("config_id", config.configId);
+    url.searchParams.set("override_default_response_type", "true");
+  } else {
+    url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
   }
 
   if (config.instagramLogin) {
