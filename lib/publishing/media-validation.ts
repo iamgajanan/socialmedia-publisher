@@ -25,16 +25,6 @@ const SUPPORTED_MEDIA_TYPES = new Set([
   "video/x-matroska",
 ]);
 
-const IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/avif",
-  "image/tiff",
-  "image/bmp",
-]);
-
 const VIDEO_SIGNATURES: Record<string, (bytes: Uint8Array) => boolean> = {
   "video/mp4": (bytes) =>
     bytes.length >= 12 &&
