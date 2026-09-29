@@ -15,6 +15,7 @@ import {
   Settings,
   Sparkles,
   X,
+  CreditCard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -144,11 +145,7 @@ function UserIdentity({
         <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background text-xs font-semibold shadow-sm">
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.avatarUrl}
-              alt=""
-              className="size-full object-cover"
-            />
+            <img src={user.avatarUrl} alt="" className="size-full object-cover" />
           ) : (
             initials
           )}
@@ -254,35 +251,53 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               <ThemeSwitcher />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex size-10 items-center justify-center overflow-hidden rounded-xl border bg-background text-xs font-semibold shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-primary/20 hover:bg-accent hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                  <button
+                    aria-label="Open account menu"
+                    className="flex size-10 items-center justify-center overflow-hidden rounded-xl border bg-background text-xs font-semibold shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-primary/30 hover:bg-accent hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
                     {user.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={user.avatarUrl}
-                        alt=""
-                        className="size-full object-cover"
-                      />
+                      <img src={user.avatarUrl} alt="" className="size-full object-cover" />
                     ) : (
                       initials
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-2xl">
-                  <div className="px-3 py-2.5">
-                    <p className="truncate text-sm font-medium">{user.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </p>
+                <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2">
+                  <div className="rounded-xl bg-accent/55 p-3">
+                    <p className="truncate text-sm font-semibold">{user.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                   </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">
-                      <Settings className="size-4" />
-                      Settings
-                    </Link>
+                  <div className="my-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+                    Workspace
+                  </div>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/dashboard"><LayoutDashboard className="size-4" />Overview</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/create-post"><Plus className="size-4" />Create post</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/connect-accounts"><Link2 className="size-4" />Connected platforms</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/post-history"><FileText className="size-4" />Post history</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-2" />
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+                    Account
+                  </div>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/settings"><Settings className="size-4" />Settings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/api-keys"><KeyRound className="size-4" />API keys</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/#pricing"><CreditCard className="size-4" />Plans & pricing</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-2" />
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
                     <LogoutButton />
                   </DropdownMenuItem>
                 </DropdownMenuContent>
