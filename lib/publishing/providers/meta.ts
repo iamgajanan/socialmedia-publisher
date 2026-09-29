@@ -73,6 +73,20 @@ export const instagramPublisher: Publisher = {
     const media = input.media[0];
     const body = new URLSearchParams({ caption: input.content });
     body.set("access_token", accessToken);
+    if (media.mimeType.startsWith("video/")) {
+      body.set("media_type", "REELS");
+      body.set("video_url", media.url);
+    } else {
+      body.set("image_url", media.url);
+    }
+
+    const containerResponse = await providerFetch(`${base}/${igId}/media`, {
+      method: "POST",
+      body,
+    });
+    const container = await containerResponse.json() as { id?: string };
+    if (!container.id) throw new PublisherError("Instagram did not return a media container ID.", { code: "missing_container_id" });
+
     let containerReady = false;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const statusResponse = await providerFetch(
