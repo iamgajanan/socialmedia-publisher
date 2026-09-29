@@ -64,5 +64,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
     url.searchParams.set("code_challenge_method", "S256");
   }
 
+  if (platform === "facebook") {
+    console.info("[facebook-oauth-diagnostic]", {
+      clientIdPresent: Boolean(config.clientId),
+      configIdPresent: Boolean(config.configId),
+      configId: config.configId ?? null,
+      redirectUri: config.redirectUri,
+      responseType: url.searchParams.get("response_type"),
+      overrideDefaultResponseType: url.searchParams.get("override_default_response_type"),
+      scopePresent: url.searchParams.has("scope"),
+      authorizationHost: url.host,
+      authorizationPath: url.pathname,
+    });
+  }
+
   return NextResponse.redirect(url);
 }
