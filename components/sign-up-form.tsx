@@ -13,9 +13,9 @@ import { useToast } from "@/components/ui/toast-provider";
 
 const initialState = { error: null };
 const plans = [
-  { code: "starter", name: "Starter", price: "₹999 / $9", members: "Up to 5 members", description: "For individuals and small teams" },
-  { code: "pro", name: "Pro", price: "₹1,999 / $19", members: "Up to 20 members", description: "For growing social teams" },
-  { code: "premium", name: "Premium", price: "₹2,999 / $29", members: "Up to 50 members", description: "For larger publishing teams" },
+  { code: "starter", name: "Starter", price: "₹999 / $9", users: "5 publishing users", accounts: "10 social accounts", description: "For individuals and small businesses" },
+  { code: "pro", name: "Pro", price: "₹1,999 / $19", users: "20 publishing users", accounts: "30 social accounts", description: "For growing publishing workflows" },
+  { code: "premium", name: "Premium", price: "₹2,999 / $29", users: "50 publishing users", accounts: "100 social accounts", description: "For larger publishing operations" },
 ] as const;
 
 export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
@@ -28,7 +28,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Create your workspace</CardTitle>
-          <CardDescription>Choose a starting plan. Billing and Stripe activation will be connected in the billing phase.</CardDescription>
+          <CardDescription>Choose your starting plan. You can activate Stripe billing from Billing after your workspace is created.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction}>
@@ -45,7 +45,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                       <input type="radio" name="plan" value={plan.code} defaultChecked={plan.code === "starter"} className="peer sr-only" />
                       <div className="rounded-2xl border p-4 transition group-hover:border-primary/30 peer-checked:border-primary peer-checked:bg-primary/[0.05] peer-checked:ring-1 peer-checked:ring-primary/20">
                         <div className="flex items-start justify-between gap-3">
-                          <div><div className="flex items-center gap-2"><p className="font-semibold">{plan.name}</p>{plan.code === "pro" && <Badge variant="secondary">Popular</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{plan.description} · {plan.members}</p></div>
+                          <div><div className="flex items-center gap-2"><p className="font-semibold">{plan.name}</p>{plan.code === "pro" && <Badge variant="secondary">Popular</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{plan.description} · {plan.users} · {plan.accounts} · unlimited publishing</p></div>
                           <p className="shrink-0 text-sm font-semibold">{plan.price}<span className="font-normal text-muted-foreground">/mo</span></p>
                         </div>
                       </div>
