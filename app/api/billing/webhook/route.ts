@@ -6,6 +6,17 @@ import { getStripePlanByPriceId } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
+type WorkspaceUpdate = {
+  workspaceId: string;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+  subscriptionStatus?: string;
+  priceId?: string | null;
+  currency?: string | null;
+  currentPeriodEnd?: number | null;
+  checkoutSessionId?: string | null;
+};
+
 function verifyStripeSignature(payload: string, signature: string | null, secret: string) {
   if (!signature) return false;
   const parts = signature.split(",");
@@ -34,24 +45,17 @@ function mapSubscriptionStatus(status: string | undefined) {
   return "cancelled" as const;
 }
 
-async function updateWorkspaceById(input: {
-  workspaceId: string;
-  customerId?: string | null;
-  subscriptionId?: string | null;
-  subscriptionStatus?: string;
-  priceId?: string | null;
-  currency?: string | null;
-  currentPeriodEnd?: number | null;
-}) {
+async function updateWorkspaceById(input: WorkspaceUpdate) {
   const admin = createAdminClient();
   const planCode = getStripePlanByPriceId(input.priceId);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.customerId) patch.stripe_customer_id = input.customerId;
   if (input.subscriptionId !== undefined) patch.stripe_subscription_id = input.subscriptionId;
   if (input.subscriptionStatus) patch.subscription_status = mapSubscriptionStatus(input.subscriptionStatus);
-  if (input.priceId !== undefined) patch.stripe_price_id = input.priceId;
-  if (input.currency !== undefined) patch.stripe_billing_currency = input.currency;
+  if (input.priceId !== undefined && input.priceId !== null) patch.stripe_price_id = input.priceId;
+  if (input.currency !== undefined && input.currency !== null) patch.stripe_billing_currency = input.currency;
   if (input.currentPeriodEnd !== undefined) patch.stripe_current_period_end = input.currentPeriodEnd ? new Date(input.currentPeriodEnd * 1000).toISOString() : null;
+  if (input.checkoutSessionId !== undefined) patch.stripe_checkout_session_id = input.checkoutSessionId;
 
   if (planCode) {
     const { data: plan, error: planError } = await admin.from("socialmedia_plans").select("id").eq("code", planCode).single();
@@ -63,9 +67,9 @@ async function updateWorkspaceById(input: {
   if (error) throw new Error(error.message);
 }
 
-async function updateWorkspaceByCustomer(input: Parameters<typeof updateWorkspaceById>[0] & { customerId: string }) {
+async function updateWorkspaceByCustomer(customerId: string, input: Omit<WorkspaceUpdate, "workspaceId">) {
   const admin = createAdminClient();
-  const { data: workspace, error } = await admin.from("socialmedia_workspaces").select("id").eq("stripe_customer_id", input.customerId).maybeSingle();
+  const { data: workspace, error } = await admin.from("socialmedia_workspaces").select("id").eq("stripe_customer_id", customerId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!workspace) return;
   await updateWorkspaceById({ ...input, workspaceId: workspace.id });
@@ -93,8 +97,7 @@ export async function POST(request: Request) {
             workspaceId,
             customerId: typeof object.customer === "string" ? object.customer : null,
             subscriptionId: typeof object.subscription === "string" ? object.subscription : null,
-            subscriptionStatus: "active",
-            priceId: null,
+            checkoutSessionId: typeof object.id === "string" ? object.id : null,
             currency: metadata.currency ?? null,
           });
         }
@@ -108,7 +111,6 @@ export async function POST(request: Request) {
         const currency = items[0]?.price?.currency ?? null;
         const customerId = typeof object.customer === "string" ? object.customer : null;
         const input = {
-          workspaceId: metadata.workspace_id,
           customerId,
           subscriptionId: typeof object.id === "string" ? object.id : null,
           subscriptionStatus: typeof object.status === "string" ? object.status : undefined,
@@ -116,26 +118,26 @@ export async function POST(request: Request) {
           currency,
           currentPeriodEnd: typeof object.current_period_end === "number" ? object.current_period_end : null,
         };
-        if (input.workspaceId) await updateWorkspaceById(input);
-        else if (customerId) await updateWorkspaceByCustomer({ ...input, customerId });
+        if (metadata.workspace_id) await updateWorkspaceById({ ...input, workspaceId: metadata.workspace_id });
+        else if (customerId) await updateWorkspaceByCustomer(customerId, input);
         break;
       }
       case "customer.subscription.deleted": {
         const customerId = typeof object.customer === "string" ? object.customer : null;
         const metadata = (object.metadata ?? {}) as Record<string, string>;
-        const workspaceId = metadata.workspace_id;
-        if (workspaceId) await updateWorkspaceById({ workspaceId, customerId, subscriptionId: null, subscriptionStatus: "cancelled" });
-        else if (customerId) await updateWorkspaceByCustomer({ workspaceId: "", customerId, subscriptionStatus: "cancelled", subscriptionId: null });
+        const input = { subscriptionId: null, subscriptionStatus: "cancelled" };
+        if (metadata.workspace_id) await updateWorkspaceById({ ...input, workspaceId: metadata.workspace_id, customerId });
+        else if (customerId) await updateWorkspaceByCustomer(customerId, input);
         break;
       }
       case "invoice.payment_failed": {
         const customerId = typeof object.customer === "string" ? object.customer : null;
-        if (customerId) await updateWorkspaceByCustomer({ workspaceId: "", customerId, subscriptionStatus: "past_due" });
+        if (customerId) await updateWorkspaceByCustomer(customerId, { subscriptionStatus: "past_due" });
         break;
       }
       case "invoice.paid": {
         const customerId = typeof object.customer === "string" ? object.customer : null;
-        if (customerId) await updateWorkspaceByCustomer({ workspaceId: "", customerId, subscriptionStatus: "active" });
+        if (customerId) await updateWorkspaceByCustomer(customerId, { subscriptionStatus: "active" });
         break;
       }
       default:
