@@ -25,10 +25,13 @@ export async function POST(request: Request) {
     const priceId = getStripePriceId(plan, currency);
     const origin = getOrigin(request);
     let customerId = context.workspace.stripe_customer_id;
+    const { data: user } = await context.supabase.auth.getUser();
+    const email = user.user?.email?.trim();
+    if (!email) return NextResponse.json({ error: "Your account email is required for billing." }, { status: 400 });
 
     if (!customerId) {
       const customer = await createStripeCustomer({
-        email: String(context.supabase.auth.getUser ? (await context.supabase.auth.getUser()).data.user?.email ?? "" : ""),
+        email,
         name: context.workspace.name,
         workspaceId: context.workspace.id,
       });
@@ -51,6 +54,12 @@ export async function POST(request: Request) {
     });
 
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
+    const { error: sessionError } = await context.supabase
+      .from("socialmedia_workspaces")
+      .update({ stripe_checkout_session_id: session.id, stripe_price_id: priceId, stripe_billing_currency: currency, updated_at: new Date().toISOString() })
+      .eq("id", context.workspace.id);
+    if (sessionError) throw new Error(sessionError.message);
+
     return NextResponse.json({ url: session.url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to start Stripe Checkout.";
