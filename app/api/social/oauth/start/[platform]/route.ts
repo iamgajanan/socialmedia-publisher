@@ -29,6 +29,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   const { data: selectedUser } = await supabase.from("socialmedia_users").select("id").eq("id", workspaceUserId ?? "").eq("workspace_id", profile.workspace_id).maybeSingle();
   if (!selectedUser) return NextResponse.redirect(new URL("/connect-accounts?error=user_required", request.url));
 
+  const [{ data: workspace }, { data: existingAccount }, { count: connectedCount }] = await Promise.all([
+    supabase.from("socialmedia_workspaces").select("plan_id").eq("id", profile.workspace_id).single(),
+    supabase.from("socialmedia_social_accounts").select("id").eq("workspace_id", profile.workspace_id).eq("socialmedia_user_id", selectedUser.id).eq("platform", platform).maybeSingle(),
+    supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("status", "connected"),
+  ]);
+  if (!workspace) return NextResponse.redirect(new URL("/users?error=workspace", request.url));
+  const { data: plan } = await supabase.from("socialmedia_plans").select("max_social_accounts").eq("id", workspace.plan_id).single();
+  if (!plan) return NextResponse.redirect(new URL("/users?error=plan", request.url));
+  if (!existingAccount && (connectedCount ?? 0) >= plan.max_social_accounts) return NextResponse.redirect(new URL(`/connect-accounts?error=account_limit&platform=${platform}&user=${selectedUser.id}`, request.url));
+
   const state = randomBytes(32).toString("base64url");
   const store = await cookies();
   const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, maxAge: 600, path: "/" };
