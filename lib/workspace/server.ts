@@ -10,6 +10,7 @@ export type WorkspacePlan = {
   monthly_price_inr: number;
   monthly_price_usd: number;
   max_team_members: number;
+  max_users: number;
   max_social_accounts: number;
   monthly_post_limit: number;
 };
@@ -46,7 +47,7 @@ export async function getCurrentWorkspace() {
 
   const { data: plan, error: planError } = await supabase
     .from("socialmedia_plans")
-    .select("id, code, name, monthly_price_inr, monthly_price_usd, max_team_members, max_social_accounts, monthly_post_limit")
+    .select("id, code, name, monthly_price_inr, monthly_price_usd, max_team_members, max_users, max_social_accounts, monthly_post_limit")
     .eq("id", workspace.plan_id)
     .single();
   if (planError) throw new Error(planError.message);
