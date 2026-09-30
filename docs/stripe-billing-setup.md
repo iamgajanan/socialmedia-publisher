@@ -68,3 +68,7 @@ Install the Stripe CLI and forward events to the local route:
 `stripe listen --forward-to localhost:3000/api/billing/webhook`
 
 Use the signing secret printed by the CLI as `STRIPE_WEBHOOK_SECRET`, then trigger a subscription/checkout event from the Stripe test environment.
+
+## Production database migration
+
+The Phase 15 billing migration is recorded in Supabase as `20260930192449_phase_15_stripe_billing` and the repository uses the same migration version so future migration pushes remain in sync.
