@@ -121,5 +121,5 @@ export async function GET(request: Request) {
   if (accountError || !savedAccount?.id) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
   const { error: secretError } = await admin.from("socialmedia_account_secrets").upsert({ social_account_id: savedAccount.id, access_token_ciphertext: encryptToken(accessToken), refresh_token_ciphertext: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null }, { onConflict: "social_account_id" });
   if (secretError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
-  return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=${workspaceUserId ? platform : platform}&user=${workspaceUserId}`, request.url));
+  return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=${platform}&user=${workspaceUserId}`, request.url));
 }
