@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, KeyRound, LayoutDashboard, PenSquare, Settings, Share2 } from "lucide-react";
+import { BarChart3, CalendarDays, KeyRound, LayoutDashboard, PenSquare, Settings, Share2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -10,6 +10,7 @@ const items = [
   { href: "/connect-accounts", label: "Connect accounts", icon: Share2 },
   { href: "/create-post", label: "Create post", icon: PenSquare },
   { href: "/post-history", label: "Post history", icon: CalendarDays },
+  { href: "/team", label: "Team & access", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/api-keys", label: "API keys", icon: KeyRound },
 ];
@@ -25,12 +26,8 @@ export function DashboardSidebar() {
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {items.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link key={href} href={href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground", active && "bg-muted font-medium text-foreground")}>
-                <Icon className="h-4 w-4" />{label}
-              </Link>
-            );
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return <Link key={href} href={href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground", active && "bg-muted font-medium text-foreground")}><Icon className="h-4 w-4" />{label}</Link>;
           })}
         </nav>
         <div className="border-t p-4 text-xs text-muted-foreground">Publishing workspace</div>
