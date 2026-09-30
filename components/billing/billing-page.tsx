@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Check, CreditCard, ExternalLink, Loader2, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,15 +21,14 @@ type BillingPageProps = {
   billingCurrency: "inr" | "usd";
   hasStripeCustomer: boolean;
   stripeConfigured: boolean;
+  checkoutResult?: "success" | "cancelled";
 };
 
-export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, billingCurrency: initialCurrency, hasStripeCustomer, stripeConfigured }: BillingPageProps) {
+export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, billingCurrency: initialCurrency, hasStripeCustomer, stripeConfigured, checkoutResult }: BillingPageProps) {
   const [currency, setCurrency] = useState<"inr" | "usd">(initialCurrency);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const { toast } = useToast();
-  const searchParams = useSearchParams();
-  const checkoutResult = searchParams.get("checkout");
 
   useEffect(() => {
     if (checkoutResult === "success") toast({ title: "Checkout completed", message: "Stripe is confirming your subscription. Your plan will update as soon as the webhook is processed.", variant: "success" });
@@ -67,12 +65,10 @@ export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, 
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div><Badge variant="secondary" className="rounded-full px-3 py-1"><CreditCard className="mr-1.5 size-3.5" />Billing</Badge><h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Choose your publishing plan.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Unlimited publishing on every paid plan. Your plan controls publishing users and connected social accounts, while platform limits still apply.</p></div>
-        <div className="flex items-center gap-2 rounded-xl border bg-card p-1"><button type="button" onClick={() => setCurrency("inr")} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currency === "inr" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>₹ INR</button><button type="button" onClick={() => setCurrency("usd")} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currency === "usd" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>$ USD</button></div>
-      </div>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><Badge variant="secondary" className="rounded-full px-3 py-1"><CreditCard className="mr-1.5 size-3.5" />Billing</Badge><h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Choose your publishing plan.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Unlimited publishing on every paid plan. Your plan controls publishing users and connected social accounts, while platform limits still apply.</p></div><div className="flex items-center gap-2 rounded-xl border bg-card p-1"><button type="button" onClick={() => setCurrency("inr")} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currency === "inr" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>₹ INR</button><button type="button" onClick={() => setCurrency("usd")} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currency === "usd" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>$ USD</button></div></div>
 
       {checkoutResult === "success" && <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm"><Check className="mt-0.5 size-4 text-emerald-600" /><div><p className="font-medium">Payment completed.</p><p className="mt-1 text-muted-foreground">We are waiting for Stripe to confirm the subscription webhook. Refresh this page in a moment if the status has not updated.</p></div></div>}
+      {checkoutResult === "cancelled" && <div className="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">Checkout was cancelled. No subscription changes were made.</div>}
 
       <Card className="overflow-hidden border-primary/20 bg-primary/[0.04] shadow-sm"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current workspace</p><div className="mt-2 flex flex-wrap items-center gap-2"><p className="font-semibold">{currentPlanName}</p><Badge variant="secondary">{statusLabel}</Badge></div></div>{hasStripeCustomer && <Button variant="outline" onClick={openPortal} disabled={portalLoading}>{portalLoading ? <Loader2 className="animate-spin" /> : <ExternalLink />}Manage billing</Button>}</CardContent></Card>
 
