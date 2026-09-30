@@ -24,10 +24,10 @@ function getSecretKey() {
   return key;
 }
 
-export function getStripePriceId(plan: "starter" | "pro" | "premium", currency: "inr" | "usd") {
-  const key = `STRIPE_PRICE_${plan.toUpperCase()}_${currency.toUpperCase()}` as const;
+export function getStripePriceId(plan: "starter" | "pro" | "premium") {
+  const key = `STRIPE_PRICE_${plan.toUpperCase()}_USD` as const;
   const priceId = process.env[key]?.trim();
-  if (!priceId) throw new Error(`Stripe price is not configured for ${plan} (${currency.toUpperCase()}). Add ${key}.`);
+  if (!priceId) throw new Error(`Stripe price is not configured for ${plan} (USD). Add ${key}.`);
   return priceId;
 }
 
@@ -35,10 +35,8 @@ export function getStripePlanByPriceId(priceId: string | null | undefined) {
   if (!priceId) return null;
   const prices: Record<string, "starter" | "pro" | "premium"> = {};
   for (const plan of ["starter", "pro", "premium"] as const) {
-    for (const currency of ["inr", "usd"] as const) {
-      const id = process.env[`STRIPE_PRICE_${plan.toUpperCase()}_${currency.toUpperCase()}`]?.trim();
-      if (id) prices[id] = plan;
-    }
+    const id = process.env[`STRIPE_PRICE_${plan.toUpperCase()}_USD`]?.trim();
+    if (id) prices[id] = plan;
   }
   return prices[priceId] ?? null;
 }
@@ -75,7 +73,6 @@ export function createStripeCheckoutSession(input: {
   priceId: string;
   workspaceId: string;
   plan: "starter" | "pro" | "premium";
-  currency: "inr" | "usd";
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -90,10 +87,10 @@ export function createStripeCheckoutSession(input: {
   body.set("allow_promotion_codes", "true");
   body.set("subscription_data[metadata][workspace_id]", input.workspaceId);
   body.set("subscription_data[metadata][plan]", input.plan);
-  body.set("subscription_data[metadata][currency]", input.currency);
+  body.set("subscription_data[metadata][currency]", "usd");
   body.set("metadata[workspace_id]", input.workspaceId);
   body.set("metadata[plan]", input.plan);
-  body.set("metadata[currency]", input.currency);
+  body.set("metadata[currency]", "usd");
   return stripeRequest<StripeCheckoutSession>("/checkout/sessions", body);
 }
 
