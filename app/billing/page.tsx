@@ -1,10 +1,16 @@
-import { getCurrentWorkspace } from "@/lib/workspace/server";
 import { BillingPage } from "@/components/billing/billing-page";
+import { getCurrentWorkspace } from "@/lib/workspace/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function BillingRoute() {
-  const context = await getCurrentWorkspace();
+type BillingRouteProps = {
+  searchParams: Promise<{ checkout?: string }>;
+};
+
+export default async function BillingRoute({ searchParams }: BillingRouteProps) {
+  const [context, params] = await Promise.all([getCurrentWorkspace(), searchParams]);
+  const checkoutResult = params.checkout === "success" || params.checkout === "cancelled" ? params.checkout : undefined;
+
   return (
     <BillingPage
       currentPlan={context.plan.code}
@@ -21,6 +27,7 @@ export default async function BillingRoute() {
         process.env.STRIPE_PRICE_PREMIUM_INR &&
         process.env.STRIPE_PRICE_PREMIUM_USD,
       )}
+      checkoutResult={checkoutResult}
     />
   );
 }
