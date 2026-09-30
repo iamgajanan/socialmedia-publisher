@@ -4,8 +4,6 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripePlanByPriceId } from "@/lib/stripe";
 
-export const runtime = "nodejs";
-
 type WorkspaceUpdate = {
   workspaceId: string;
   customerId?: string | null;
