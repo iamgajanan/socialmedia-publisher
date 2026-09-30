@@ -6,7 +6,6 @@ import { createStripeCheckoutSession, createStripeCustomer, getStripePriceId } f
 
 const schema = z.object({
   plan: z.enum(["starter", "pro", "premium"]),
-  currency: z.enum(["inr", "usd"]),
 });
 
 function getOrigin(request: Request) {
@@ -19,10 +18,10 @@ export async function POST(request: Request) {
   try {
     const context = await requireWorkspaceAdmin();
     const parsed = schema.safeParse(await request.json());
-    if (!parsed.success) return NextResponse.json({ error: "Choose a valid plan and currency." }, { status: 400 });
+    if (!parsed.success) return NextResponse.json({ error: "Choose a valid plan." }, { status: 400 });
 
-    const { plan, currency } = parsed.data;
-    const priceId = getStripePriceId(plan, currency);
+    const { plan } = parsed.data;
+    const priceId = getStripePriceId(plan);
     const origin = getOrigin(request);
     let customerId = context.workspace.stripe_customer_id;
     const { data: user } = await context.supabase.auth.getUser();
@@ -48,7 +47,6 @@ export async function POST(request: Request) {
       priceId,
       workspaceId: context.workspace.id,
       plan,
-      currency,
       successUrl: `${origin}/billing?checkout=success`,
       cancelUrl: `${origin}/billing?checkout=cancelled`,
     });
@@ -56,7 +54,7 @@ export async function POST(request: Request) {
     if (!session.url) throw new Error("Stripe did not return a checkout URL.");
     const { error: sessionError } = await context.supabase
       .from("socialmedia_workspaces")
-      .update({ stripe_checkout_session_id: session.id, stripe_price_id: priceId, stripe_billing_currency: currency, updated_at: new Date().toISOString() })
+      .update({ stripe_checkout_session_id: session.id, stripe_price_id: priceId, stripe_billing_currency: "usd", updated_at: new Date().toISOString() })
       .eq("id", context.workspace.id);
     if (sessionError) throw new Error(sessionError.message);
 
