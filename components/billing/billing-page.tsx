@@ -9,9 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/components/ui/toast-provider";
 
 const plans = [
-  { code: "starter", name: "Starter", inr: "₹999", usd: "$9", users: 5, accounts: 10, description: "A simple publishing workspace for individuals and small businesses." },
+  { code: "starter", name: "Starter", inr: "₹999", usd: "$9", users: 5, accounts: 10, description: "A simple publishing workspace for individuals and small businesses.", popular: false },
   { code: "pro", name: "Pro", inr: "₹1,999", usd: "$19", users: 20, accounts: 30, description: "More publishing users and destinations for growing workflows.", popular: true },
-  { code: "premium", name: "Premium", inr: "₹2,999", usd: "$29", users: 50, accounts: 100, description: "Built for larger publishing operations with many destinations." },
+  { code: "premium", name: "Premium", inr: "₹2,999", usd: "$29", users: 50, accounts: 100, description: "Built for larger publishing operations with many destinations.", popular: false },
 ] as const;
 
 type BillingPageProps = {
