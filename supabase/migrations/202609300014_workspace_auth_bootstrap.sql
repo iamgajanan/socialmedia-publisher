@@ -30,9 +30,9 @@ begin
     values (profile_name || '''s workspace', new.id)
     returning id into workspace_id;
 
-    update public.socialmedia_profiles
+    update public.socialmedia_profiles as p
     set workspace_id = workspace_id
-    where id = new.id;
+    where p.id = new.id;
   end if;
 
   insert into public.socialmedia_workspace_members (workspace_id, profile_id, role, status)
