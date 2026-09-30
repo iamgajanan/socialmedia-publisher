@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Mail, Palette, ShieldCheck, UserRound, Users, Workflow } from "lucide-react";
+import { ArrowUpRight, CreditCard, Mail, Palette, ShieldCheck, UserRound, Workflow } from "lucide-react";
 
 import { AccountSecurityForm, DeleteAccountForm, PasswordForm, ProfileForm, WorkspaceForm } from "@/components/settings/settings-form";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ export default async function SettingsPage() {
       <div className="max-w-3xl">
         <Badge variant="secondary" className="rounded-full px-3 py-1"><Palette className="mr-1.5 size-3.5" />Workspace settings</Badge>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Make OmniSocial yours.</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Manage your profile, workspace defaults, team access, and account security from one place.</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Manage your profile, workspace defaults, billing, and account security from one place.</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
@@ -50,9 +50,9 @@ export default async function SettingsPage() {
             <CardContent><WorkspaceForm action={updateWorkspace} workspaceName={profile?.workspace_name ?? "My workspace"} timezone={profile?.timezone ?? "Asia/Kolkata"} autoSaveDrafts={preferences.autoSaveDrafts ?? true} defaultStatus={preferences.defaultStatus ?? "draft"} /></CardContent>
           </Card>
 
-          <Card className="overflow-hidden shadow-sm">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5" />Team & access</CardTitle><CardDescription>Invite teammates with their own login and share the same publishing workspace.</CardDescription></CardHeader>
-            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Workspace members</p><p className="mt-1 text-sm text-muted-foreground">Manage roles and invitations without sharing social passwords.</p></div><Button asChild variant="outline"><Link href="/team">Manage team <ArrowUpRight /></Link></Button></CardContent>
+          <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm">
+            <CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="size-5" />Billing</CardTitle><CardDescription>Choose your plan, update your subscription, and manage invoices securely through Stripe.</CardDescription></CardHeader>
+            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Plans & subscription</p><p className="mt-1 text-sm text-muted-foreground">Publishing is unlimited on every paid plan.</p></div><Button asChild variant="outline"><Link href="/billing">Open billing <ArrowUpRight /></Link></Button></CardContent>
           </Card>
 
           <Card className="shadow-sm">
@@ -69,7 +69,7 @@ export default async function SettingsPage() {
         </div>
 
         <aside className="h-fit space-y-4 xl:sticky xl:top-24">
-          <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="p-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10"><Palette className="size-5 text-primary" /></div><h2 className="mt-4 font-semibold">A workspace that fits you</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Your workspace is now the shared boundary for team access, connected social accounts, publishing, and future billing limits.</p></CardContent></Card>
+          <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm"><CardContent className="p-6"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10"><Palette className="size-5 text-primary" /></div><h2 className="mt-4 font-semibold">A workspace that fits you</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Your workspace is the shared boundary for publishing users, connected social accounts, publishing, and billing.</p></CardContent></Card>
           <Card className="shadow-sm"><CardContent className="p-6"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Current timezone</p><p className="mt-2 text-lg font-semibold">{profile?.timezone ?? "Asia/Kolkata"}</p><p className="mt-1 text-xs text-muted-foreground">All future scheduling UI will respect this preference.</p></CardContent></Card>
         </aside>
       </div>
