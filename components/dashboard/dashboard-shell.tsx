@@ -14,6 +14,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Users,
   X,
   CreditCard,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const navigation = [
   { label: "Post history", href: "/post-history", icon: FileText },
   { label: "Media library", href: "/media", icon: ImageIcon },
   { label: "Connected accounts", href: "/connect-accounts", icon: Link2 },
+  { label: "Team & access", href: "/team", icon: Users },
 ];
 
 const secondaryNavigation = [
@@ -279,6 +281,9 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl py-2.5">
                     <Link href="/connect-accounts"><Link2 className="size-4" />Connected platforms</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="rounded-xl py-2.5">
+                    <Link href="/team"><Users className="size-4" />Team & access</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className="rounded-xl py-2.5">
                     <Link href="/post-history"><FileText className="size-4" />Post history</Link>
