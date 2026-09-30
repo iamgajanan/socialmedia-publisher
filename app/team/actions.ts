@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 
@@ -18,15 +17,23 @@ export async function inviteTeamMember(_state: TeamActionState, formData: FormDa
     if (!validRoles.has(role)) return { ok: false, message: "Choose a valid team role." };
     if (email === (await getCurrentUserEmail())) return { ok: false, message: "You are already the workspace owner." };
 
+    const { count, error: countError } = await context.supabase
+      .from("socialmedia_workspace_members")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", context.workspace.id)
+      .in("status", ["active", "invited"]);
+    if (countError) throw countError;
+    if ((count ?? 0) >= context.plan.max_team_members) {
+      return { ok: false, message: `${context.plan.name} allows up to ${context.plan.max_team_members} workspace members. Upgrade your plan to add more.` };
+    }
+
     const admin = createAdminClient();
     const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     if (usersError) throw usersError;
     let user = usersData.users.find((candidate) => candidate.email?.toLowerCase() === email);
 
     if (!user) {
-      const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${siteUrl()}/auth/confirm?next=/team`,
-      });
+      const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${siteUrl()}/auth/confirm?next=/team` });
       if (inviteError) throw inviteError;
       user = inviteData.user;
     }
@@ -41,8 +48,6 @@ export async function inviteTeamMember(_state: TeamActionState, formData: FormDa
     );
     if (memberError) throw memberError;
 
-    // OmniSocial currently has one active workspace per login. Point the invited
-    // member at the shared workspace so their normal login immediately lands in it.
     const { error: workspaceAttachError } = await admin.from("socialmedia_profiles").update({ workspace_id: context.workspace.id }).eq("id", user.id);
     if (workspaceAttachError) throw workspaceAttachError;
 
