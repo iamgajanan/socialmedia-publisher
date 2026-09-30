@@ -100,17 +100,13 @@ export async function GET(request: Request) {
     let pages;
     try { pages = await discoverMetaPages(accessToken, graphVersion); } catch { return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url)); }
     const destinations = pages.filter(canCreatePageContent); if (!destinations.length) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
-    let savedDestinationCount = 0;
-    for (const page of destinations) {
-      const externalAccountId = page.id; const metadata = { meta_page_id: page.id, facebook_page_id: page.id, ...(page.instagramBusinessAccountId ? { instagram_business_account_id: page.instagramBusinessAccountId } : {}), meta_page_tasks: page.tasks, meta_connection_type: "facebook" };
-      const { data: savedAccount, error: accountError } = await admin.from("socialmedia_social_accounts").upsert({ profile_id: String(userId), workspace_id: ownerProfile.workspace_id, socialmedia_user_id: workspaceUserId, platform, account_name: page.name, external_account_id: externalAccountId, username: null, avatar_url: null, status: "connected", metadata, token_expires_at: null, provider_account_url: `https://www.facebook.com/${page.id}`, scopes: grantedScopes }, { onConflict: "profile_id,platform,external_account_id" }).select("id").single();
-      if (accountError || !savedAccount?.id) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
-      const { error: secretError } = await admin.from("socialmedia_account_secrets").upsert({ social_account_id: savedAccount.id, access_token_ciphertext: encryptToken(page.accessToken), refresh_token_ciphertext: null }, { onConflict: "social_account_id" });
-      if (secretError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
-      savedDestinationCount += 1;
-    }
-    if (!savedDestinationCount) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
-    return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=${platform}&user=${workspaceUserId}`, request.url));
+    const page = destinations[0];
+    const externalAccountId = page.id; const metadata = { meta_page_id: page.id, facebook_page_id: page.id, ...(page.instagramBusinessAccountId ? { instagram_business_account_id: page.instagramBusinessAccountId } : {}), meta_page_tasks: page.tasks, meta_connection_type: "facebook" };
+    const { data: savedAccount, error: accountError } = await admin.from("socialmedia_social_accounts").upsert({ profile_id: String(userId), workspace_id: ownerProfile.workspace_id, socialmedia_user_id: workspaceUserId, platform, account_name: page.name, external_account_id: externalAccountId, username: null, avatar_url: null, status: "connected", metadata, token_expires_at: null, provider_account_url: `https://www.facebook.com/${page.id}`, scopes: grantedScopes }, { onConflict: "profile_id,platform,external_account_id" }).select("id").single();
+    if (accountError || !savedAccount?.id) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    const { error: secretError } = await admin.from("socialmedia_account_secrets").upsert({ social_account_id: savedAccount.id, access_token_ciphertext: encryptToken(page.accessToken), refresh_token_ciphertext: null }, { onConflict: "social_account_id" });
+    if (secretError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    return NextResponse.redirect(new URL(`/connect-accounts?connected=1&platform=facebook&user=${workspaceUserId}`, request.url));
   }
 
   let profilePayload: unknown = {};
