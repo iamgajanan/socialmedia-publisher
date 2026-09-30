@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { TeamManagement, type TeamMemberView } from "@/components/team/team-management";
+import { WorkspacePlanCard } from "@/components/team/workspace-plan-card";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 
@@ -13,7 +14,6 @@ export default async function TeamPage() {
     .select("id, profile_id, role, status, joined_at")
     .eq("workspace_id", context.workspace.id)
     .order("joined_at", { ascending: true });
-
   if (error) throw new Error(error.message);
 
   const admin = createAdminClient();
@@ -47,8 +47,9 @@ export default async function TeamPage() {
       <div className="max-w-3xl">
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Workspace</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Team & access</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Manage who can work inside {context.workspace.name}. Every teammate uses their own OmniSocial login while sharing the same social publishing workspace.</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">Manage who can work inside {context.workspace.name}. Every teammate uses their own OmniSocial login while sharing the same workspace boundary.</p>
       </div>
+      <WorkspacePlanCard plan={context.plan} memberCount={members.length} />
       <TeamManagement members={members} />
     </div>
   );
