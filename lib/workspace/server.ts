@@ -41,7 +41,7 @@ export async function getCurrentWorkspace() {
 
   const { data: workspace, error: workspaceError } = await supabase
     .from("socialmedia_workspaces")
-    .select("id, name, timezone, owner_profile_id, plan_id, subscription_status")
+    .select("id, name, timezone, owner_profile_id, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, stripe_price_id, stripe_billing_currency, stripe_current_period_end")
     .eq("id", profile.workspace_id)
     .single();
   if (workspaceError) throw new Error(workspaceError.message);
