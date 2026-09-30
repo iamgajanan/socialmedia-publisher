@@ -1,6 +1,8 @@
 import { BillingPage } from "@/components/billing/billing-page";
 import { getCurrentWorkspace } from "@/lib/workspace/server";
 
+export const instant = false;
+
 type BillingRouteProps = {
   searchParams: Promise<{ checkout?: string }>;
 };
