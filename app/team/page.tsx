@@ -23,7 +23,7 @@ export default async function TeamPage() {
   const userMap = new Map(usersData.users.map((user) => [user.id, user]));
   const profileIds = memberships?.map((member) => member.profile_id) ?? [];
   const { data: profiles, error: profilesError } = profileIds.length
-    ? await context.supabase.from("socialmedia_profiles").select("id, display_name").in("id", profileIds)
+    ? await admin.from("socialmedia_profiles").select("id, display_name").in("id", profileIds)
     : { data: [], error: null };
   if (profilesError) throw new Error(profilesError.message);
 
@@ -40,9 +40,7 @@ export default async function TeamPage() {
     };
   });
 
-  if (!members.some((member) => member.isOwner)) {
-    redirect("/settings");
-  }
+  if (!members.some((member) => member.isOwner)) redirect("/settings");
 
   return (
     <div className="space-y-8">
