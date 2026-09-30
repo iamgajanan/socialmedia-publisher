@@ -1,8 +1,6 @@
 import { BillingPage } from "@/components/billing/billing-page";
 import { getCurrentWorkspace } from "@/lib/workspace/server";
 
-export const dynamic = "force-dynamic";
-
 type BillingRouteProps = {
   searchParams: Promise<{ checkout?: string }>;
 };
