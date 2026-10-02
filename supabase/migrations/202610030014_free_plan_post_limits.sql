@@ -176,5 +176,7 @@ end;
 $$;
 
 revoke all on function public.socialmedia_release_post_usage(uuid) from public, anon, authenticated;
+grant execute on function public.socialmedia_release_post_usage(uuid) to service_role;
+
 comment on column public.socialmedia_workspaces.post_usage_started_at is 'Start of the current rolling free-plan post quota window.';
 comment on column public.socialmedia_workspaces.post_usage_count is 'Posts created in the current rolling free-plan quota window.';
