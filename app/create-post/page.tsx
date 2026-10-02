@@ -1,4 +1,4 @@
-import { Link2, Sparkles } from "lucide-react";
+import { Link2, Sparkles, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { PostComposer } from "@/components/create-post/post-composer";
@@ -8,31 +8,52 @@ import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
 // Phase 3 sanity verification: account-attention flow is covered in production UI.
-// Production sanity check: connected destinations render the composer; attention states render reconnect.
+// Publishing users are intentionally isolated: the composer only receives destinations
+// belonging to the selected logical publishing user.
 export const instant = false;
 
-export default async function CreatePostPage() {
+export default async function CreatePostPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const requestedUser = typeof params.user === "string" ? params.user : null;
+
   const supabase = await createClient();
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
-  const userId = String(claims.claims.sub);
+  const profileId = String(claims.claims.sub);
 
-  const [{ data: accounts }, { data: profile }] = await Promise.all([
+  const { data: profile } = await supabase.from("socialmedia_profiles").select("timezone, workspace_id").eq("id", profileId).maybeSingle();
+  if (!profile?.workspace_id) redirect("/users");
+
+  const { data: users, error: usersError } = await supabase
+    .from("socialmedia_users")
+    .select("id, name")
+    .eq("workspace_id", profile.workspace_id)
+    .order("created_at", { ascending: true });
+  if (usersError) throw new Error(usersError.message);
+  if (!users?.length) redirect("/users");
+
+  const activeUser = users.find((user) => user.id === requestedUser) ?? users[0];
+  const timezone = profile.timezone || "Asia/Kolkata";
+
+  const [{ data: accounts }, { data: attentionAccounts }] = await Promise.all([
     supabase
       .from("socialmedia_social_accounts")
       .select("id, platform, account_name, username, avatar_url, status")
-      .eq("profile_id", userId)
+      .eq("profile_id", profileId)
+      .eq("socialmedia_user_id", activeUser.id)
+      .eq("status", "connected")
       .order("created_at", { ascending: false }),
     supabase
-      .from("socialmedia_profiles")
-      .select("timezone")
-      .eq("id", userId)
-      .maybeSingle(),
+      .from("socialmedia_social_accounts")
+      .select("id, platform, account_name, username, avatar_url, status")
+      .eq("profile_id", profileId)
+      .eq("socialmedia_user_id", activeUser.id)
+      .neq("status", "connected")
+      .order("created_at", { ascending: false }),
   ]);
 
-  const timezone = profile?.timezone || "Asia/Kolkata";
-  const connectedAccounts = (accounts ?? []).filter((account) => account.status === "connected");
-  const attentionAccounts = (accounts ?? []).filter((account) => account.status !== "connected");
+  const connectedAccounts = accounts ?? [];
+  const attention = attentionAccounts ?? [];
 
   return (
     <div className="space-y-8">
@@ -42,32 +63,47 @@ export default async function CreatePostPage() {
             <Badge variant="secondary">
               <Sparkles className="mr-1.5 size-3.5" />Composer
             </Badge>
-            <span className="text-xs text-muted-foreground">Phase 8</span>
+            <span className="text-xs text-muted-foreground">Publishing user</span>
           </div>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Create a post</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Compose once, choose your destinations, and save a draft or prepare a scheduled post.
+            Compose for one publishing user at a time. Only the social accounts connected to that user are available as destinations.
           </p>
         </div>
         <Button asChild variant="outline"><a href="/connect-accounts"><Link2 />Manage accounts</a></Button>
       </section>
+
+      <Card className="border-primary/15 bg-primary/[0.03] shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><UserRound className="size-5" /></div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Publishing user</p>
+              <p className="mt-1 text-lg font-semibold">{activeUser.name}</p>
+            </div>
+          </div>
+          <form action="/create-post" method="get" className="flex items-center gap-2">
+            <select name="user" defaultValue={activeUser.id} aria-label="Select publishing user" className="h-10 min-w-[190px] rounded-xl border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
+              {users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+            </select>
+            <Button type="submit" variant="outline">Switch</Button>
+          </form>
+        </CardContent>
+      </Card>
+
       {connectedAccounts.length > 0 ? (
         <PostComposer accounts={connectedAccounts} timezone={timezone} />
-      ) : attentionAccounts.length > 0 ? (
+      ) : attention.length > 0 ? (
         <Card className="border-destructive/30 shadow-sm">
           <CardContent className="flex flex-col items-center justify-center px-6 py-12 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10">
-              <Link2 className="size-6 text-destructive" />
-            </div>
-            <h2 className="mt-5 text-xl font-semibold">Reconnect your social account</h2>
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10"><Link2 className="size-6 text-destructive" /></div>
+            <h2 className="mt-5 text-xl font-semibold">Reconnect an account for {activeUser.name}</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              Your connected account needs attention before it can be used for publishing. Reconnect it, then return here to create your post.
+              This publishing user has accounts that need attention before they can be used for publishing.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {attentionAccounts.map((account) => (
-                <Button key={account.id} asChild><a href={`/api/social/oauth/start/${account.platform}`}>Reconnect {account.account_name}</a></Button>
-              ))}
-              <Button asChild variant="outline"><a href="/connect-accounts">Manage accounts</a></Button>
+              {attention.map((account) => <Button key={account.id} asChild><a href={`/api/social/oauth/start/${account.platform}?user=${encodeURIComponent(activeUser.id)}`}>Reconnect {account.account_name}</a></Button>)}
+              <Button asChild variant="outline"><a href={`/connect-accounts?user=${encodeURIComponent(activeUser.id)}`}>Manage accounts</a></Button>
             </div>
           </CardContent>
         </Card>
@@ -75,15 +111,18 @@ export default async function CreatePostPage() {
         <Card className="border-dashed shadow-sm">
           <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-muted"><Link2 className="size-6" /></div>
-            <h2 className="mt-5 text-xl font-semibold">Connect an account first</h2>
+            <h2 className="mt-5 text-xl font-semibold">Connect an account for {activeUser.name}</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              Your composer needs at least one connected destination. Connect a Facebook, Instagram, Threads, LinkedIn, X, YouTube, or TikTok account to start.
+              No social destination is connected to this publishing user yet. Connect a platform, then come back here to create the post.
             </p>
-            <Button asChild className="mt-6"><a href="/connect-accounts">Connect social account</a></Button>
+            <Button asChild className="mt-6"><a href={`/connect-accounts?user=${encodeURIComponent(activeUser.id)}`}>Connect social account</a></Button>
           </CardContent>
         </Card>
       )}
+
+      <p className="text-center text-xs text-muted-foreground">
+        Connected destinations are isolated by publishing user. Switch the user above to create content for another user.
+      </p>
     </div>
   );
 }
-

@@ -59,9 +59,24 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   }
 
   const userPathPrefix = `${String(userId)}/`;
-  const selectedAccountRows = await supabase.from("socialmedia_social_accounts").select("id, platform").eq("profile_id", String(userId)).eq("status", "connected").in("id", parsed.data.accountIds);
+  const selectedAccountRows = await supabase
+    .from("socialmedia_social_accounts")
+    .select("id, platform, socialmedia_user_id")
+    .eq("profile_id", String(userId))
+    .eq("status", "connected")
+    .in("id", parsed.data.accountIds);
+
+  if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) {
+    return { ok: false, kind: "error", message: "One or more selected accounts are no longer connected." };
+  }
+
+  const publishingUserIds = [...new Set(selectedAccountRows.data.map((account) => account.socialmedia_user_id).filter(Boolean))];
+  if (publishingUserIds.length !== 1 || selectedAccountRows.data.some((account) => !account.socialmedia_user_id)) {
+    return { ok: false, kind: "error", message: "Select destinations from one publishing user at a time." };
+  }
+  const publishingUserId = publishingUserIds[0]!;
+
   const selectedPlatforms = [...new Set((selectedAccountRows.data ?? []).map((account) => account.platform))];
-  if (selectedAccountRows.error || !selectedAccountRows.data || selectedAccountRows.data.length !== parsed.data.accountIds.length) return { ok: false, kind: "error", message: "One or more selected accounts are no longer connected." };
   if (selectedPlatforms.includes("x")) return { ok: false, kind: "error", message: "X publishing is temporarily disabled in Omnisocial." };
 
   if (parsed.data.mediaPaths.some((path) => !path.startsWith(userPathPrefix) || path.includes(".."))) {
@@ -84,25 +99,31 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (mediaValidationError) return { ok: false, kind: "error", message: mediaValidationError };
   }
 
-
   const mediaPathValidationError = validateMediaSelection(selectedPlatforms, parsed.data.mediaPaths.map(mediaTypeFromPath));
   if (mediaPathValidationError) return { ok: false, kind: "error", message: mediaPathValidationError };
 
   let postId = parsed.data.postId;
   if (postId) {
-    const { data: existingPost, error: existingPostError } = await supabase.from("socialmedia_posts").select("id,status").eq("id", postId).eq("profile_id", String(userId)).maybeSingle();
-    if (existingPostError || !existingPost) return { ok: false, kind: "error", message: "Post not found." };
+    const { data: existingPost, error: existingPostError } = await supabase
+      .from("socialmedia_posts")
+      .select("id,status,socialmedia_user_id")
+      .eq("id", postId)
+      .eq("profile_id", String(userId))
+      .eq("socialmedia_user_id", publishingUserId)
+      .maybeSingle();
+    if (existingPostError || !existingPost) return { ok: false, kind: "error", message: "Post not found for this publishing user." };
     if (existingPost.status === "published" || existingPost.status === "publishing") return { ok: false, kind: "error", message: "Published or currently publishing posts cannot be changed." };
     const { error } = await supabase.from("socialmedia_posts")
-      .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
+      .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths, socialmedia_user_id: publishingUserId })
       .eq("id", postId)
-      .eq("profile_id", String(userId));
+      .eq("profile_id", String(userId))
+      .eq("socialmedia_user_id", publishingUserId);
     if (error) return { ok: false, kind: "error", message: "The draft could not be updated." };
     const { error: deleteError } = await supabase.from("socialmedia_post_platforms").delete().eq("post_id", postId);
     if (deleteError) return { ok: false, kind: "error", message: "The draft changed, but its destinations could not be updated." };
   } else {
     const { data: post, error } = await supabase.from("socialmedia_posts")
-      .insert({ profile_id: String(userId), content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
+      .insert({ profile_id: String(userId), socialmedia_user_id: publishingUserId, content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .select("id")
       .single();
     if (error || !post) return { ok: false, kind: "error", message: "The draft could not be saved." };
@@ -110,7 +131,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   }
 
   const { error: linksError } = await supabase.from("socialmedia_post_platforms").insert(
-    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
+    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, socialmedia_user_id: publishingUserId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
   );
   if (linksError) return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
 
