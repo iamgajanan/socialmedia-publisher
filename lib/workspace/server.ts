@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 export type WorkspacePlan = {
   id: string;
-  code: "starter" | "pro" | "premium";
+  code: "free" | "starter" | "pro" | "premium";
   name: string;
   monthly_price_inr: number;
   monthly_price_usd: number;
