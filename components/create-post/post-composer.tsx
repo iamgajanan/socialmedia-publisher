@@ -133,7 +133,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
 
           {selectedPlatforms.length > 0 && mediaCapability.minFiles > media.length && (
             <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {selectedPlatforms.join(" + ")} requires {mediaCapability.minFiles === 1 ? "one image or video" : `${mediaCapability.minFiles} media files`} before publishing.
+              {selectedPlatforms.join(" + ")} requires {mediaCapability.minFiles === 1 ? (mediaCapability.imageTypes.length === 0 ? "one video" : "one image or video") : `${mediaCapability.minFiles} media files`} before publishing.
             </div>
           )}
 
