@@ -36,10 +36,28 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
   switch (platform) {
     case "youtube":
       if (!env("GOOGLE_CLIENT_ID") || !env("GOOGLE_CLIENT_SECRET")) return null;
-      return { clientId: env("GOOGLE_CLIENT_ID"), clientSecret: env("GOOGLE_CLIENT_SECRET"), authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: "https://oauth2.googleapis.com/token", profileUrl: "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", scopes: [env("YOUTUBE_OAUTH_SCOPES") || "https://www.googleapis.com/auth/youtube.upload"], redirectUri };
+      return {
+        clientId: env("GOOGLE_CLIENT_ID"),
+        clientSecret: env("GOOGLE_CLIENT_SECRET"),
+        authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+        tokenUrl: "https://oauth2.googleapis.com/token",
+        profileUrl: "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+        // youtube.readonly is needed to read the authenticated channel after OAuth;
+        // youtube.upload authorizes video publishing.
+        scopes: (env("YOUTUBE_OAUTH_SCOPES") || "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly").split(" ").filter(Boolean),
+        redirectUri,
+      };
     case "linkedin":
       if (!env("LINKEDIN_CLIENT_ID") || !env("LINKEDIN_CLIENT_SECRET")) return null;
-      return { clientId: env("LINKEDIN_CLIENT_ID"), clientSecret: env("LINKEDIN_CLIENT_SECRET"), authorizationUrl: "https://www.linkedin.com/oauth/v2/authorization", tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken", profileUrl: "https://api.linkedin.com/v2/userinfo", scopes: [env("LINKEDIN_OAUTH_SCOPES") || "openid profile email w_member_social"], redirectUri };
+      return {
+        clientId: env("LINKEDIN_CLIENT_ID"),
+        clientSecret: env("LINKEDIN_CLIENT_SECRET"),
+        authorizationUrl: "https://www.linkedin.com/oauth/v2/authorization",
+        tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
+        profileUrl: "https://api.linkedin.com/v2/userinfo",
+        scopes: (env("LINKEDIN_OAUTH_SCOPES") || "openid profile email w_member_social").split(" ").filter(Boolean),
+        redirectUri,
+      };
     case "x":
       if (!env("X_CLIENT_ID") || !env("X_CLIENT_SECRET")) return null;
       return { clientId: env("X_CLIENT_ID"), clientSecret: env("X_CLIENT_SECRET"), authorizationUrl: "https://x.com/i/oauth2/authorize", tokenUrl: "https://api.x.com/2/oauth2/token", profileUrl: "https://api.x.com/2/users/me?user.fields=profile_image_url,name,username", scopes: (env("X_OAUTH_SCOPES") || "users.read tweet.read tweet.write offline.access").split(" ").filter(Boolean), redirectUri, usePkce: true, clientSecretInBasicAuth: true };
