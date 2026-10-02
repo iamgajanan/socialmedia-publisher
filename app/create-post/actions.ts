@@ -148,7 +148,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (createdNewPost && postId) {
       const admin = createAdminClient();
       await admin.from("socialmedia_posts").delete().eq("id", postId).eq("profile_id", String(userId));
-      await admin.from("socialmedia_workspaces").update({ post_usage_count: admin.rpc ? undefined : undefined }).eq("id", workspaceId);
+      await admin.rpc("socialmedia_release_post_usage", { p_workspace_id: workspaceId });
     }
     return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
   }
