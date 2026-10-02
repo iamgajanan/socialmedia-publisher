@@ -2,13 +2,17 @@ export type MediaKind = "image" | "video";
 export type MediaCapability = { minFiles: number; maxFiles: number; imageTypes: string[]; videoTypes: string[] };
 const ALL_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"];
 const ALL_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
+const LINKEDIN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const LINKEDIN_VIDEO_TYPES = ["video/mp4", "video/quicktime"];
+
 export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   facebook: { minFiles: 0, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES },
   instagram: { minFiles: 1, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ["video/mp4", "video/quicktime"] },
   threads: { minFiles: 0, maxFiles: 1, imageTypes: ["image/jpeg", "image/png"], videoTypes: ["video/mp4", "video/quicktime"] },
   youtube: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ALL_VIDEO_TYPES },
   tiktok: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ["video/mp4", "video/quicktime"] },
-  linkedin: { minFiles: 0, maxFiles: 0, imageTypes: [], videoTypes: [] },
+  // LinkedIn supports text-only posts as well as image/video shares.
+  linkedin: { minFiles: 0, maxFiles: 1, imageTypes: LINKEDIN_IMAGE_TYPES, videoTypes: LINKEDIN_VIDEO_TYPES },
   x: { minFiles: 0, maxFiles: 0, imageTypes: [], videoTypes: [] },
 };
 const DEFAULT_CAPABILITY: MediaCapability = { minFiles: 0, maxFiles: 20, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES };
@@ -35,7 +39,10 @@ export function mediaTypeFromPath(path: string): string {
 }
 export function validateMediaSelection(platforms: string[], mediaTypes: string[]): string | null {
   const capability = getMediaCapability(platforms);
-  if (mediaTypes.length < capability.minFiles) return `${platforms.join(" and ")} requires at least ${capability.minFiles} image or video.`;
+  if (mediaTypes.length < capability.minFiles) {
+    const needsVideo = capability.videoTypes.length > 0 && capability.imageTypes.length === 0;
+    return `${platforms.join(" and ")} requires at least ${capability.minFiles} ${needsVideo ? "video" : "image or video"}.`;
+  }
   if (mediaTypes.length > capability.maxFiles) return `${platforms.join(" and ")} supports at most ${capability.maxFiles} media file${capability.maxFiles === 1 ? "" : "s"} per post.`;
   for (const type of mediaTypes) if (!capability.imageTypes.includes(type) && !capability.videoTypes.includes(type)) return `${type} is not supported by the selected destination${platforms.length === 1 ? "" : "s"}.`;
   return null;
