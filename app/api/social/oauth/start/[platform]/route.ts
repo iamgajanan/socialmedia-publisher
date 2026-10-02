@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
 
   const [{ data: workspace }, { data: existingAccount }, { count: connectedCount }] = await Promise.all([
     supabase.from("socialmedia_workspaces").select("plan_id").eq("id", profile.workspace_id).single(),
-    supabase.from("socialmedia_social_accounts").select("id").eq("workspace_id", profile.workspace_id).eq("socialmedia_user_id", selectedUser.id).eq("platform", platform).maybeSingle(),
+    supabase.from("socialmedia_social_accounts").select("id").eq("workspace_id", profile.workspace_id).eq("socialmedia_user_id", selectedUser.id).eq("platform", platform).limit(1).maybeSingle(),
     supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("status", "connected"),
   ]);
   if (!workspace) return NextResponse.redirect(new URL("/users?error=workspace", request.url));
