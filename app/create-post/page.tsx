@@ -21,12 +21,14 @@ export default async function CreatePostPage({ searchParams }: { searchParams: P
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
   const profileId = String(claims.claims.sub);
 
-  const [{ data: profile }, { data: users, error: usersError }] = await Promise.all([
-    supabase.from("socialmedia_profiles").select("timezone, workspace_id").eq("id", profileId).maybeSingle(),
-    supabase.from("socialmedia_users").select("id, name").order("created_at", { ascending: true }),
-  ]);
-
+  const { data: profile } = await supabase.from("socialmedia_profiles").select("timezone, workspace_id").eq("id", profileId).maybeSingle();
   if (!profile?.workspace_id) redirect("/users");
+
+  const { data: users, error: usersError } = await supabase
+    .from("socialmedia_users")
+    .select("id, name")
+    .eq("workspace_id", profile.workspace_id)
+    .order("created_at", { ascending: true });
   if (usersError) throw new Error(usersError.message);
   if (!users?.length) redirect("/users");
 
@@ -52,7 +54,6 @@ export default async function CreatePostPage({ searchParams }: { searchParams: P
 
   const connectedAccounts = accounts ?? [];
   const attention = attentionAccounts ?? [];
-  const switchHref = (userId: string) => `/create-post?user=${encodeURIComponent(userId)}`;
 
   return (
     <div className="space-y-8">
