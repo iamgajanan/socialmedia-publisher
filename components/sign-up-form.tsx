@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast-provider";
 
 const initialState = { error: null };
 const plans = [
+  { code: "free", name: "Free", price: "₹0 / $0", users: "1 publishing user", accounts: "10 social accounts", description: "Try OmniSocial with 10 posts every rolling month" },
   { code: "starter", name: "Starter", price: "₹999 / $9", users: "5 publishing users", accounts: "10 social accounts", description: "For individuals and small businesses" },
   { code: "pro", name: "Pro", price: "₹1,999 / $19", users: "20 publishing users", accounts: "30 social accounts", description: "For growing publishing workflows" },
   { code: "premium", name: "Premium", price: "₹2,999 / $29", users: "50 publishing users", accounts: "100 social accounts", description: "For larger publishing operations" },
@@ -28,7 +29,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Create your workspace</CardTitle>
-          <CardDescription>Choose your starting plan. You can activate Stripe billing from Billing after your workspace is created.</CardDescription>
+          <CardDescription>Start free with 10 posts per rolling month and one publishing user. Upgrade later when you need more.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction}>
@@ -42,10 +43,10 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                 <div className="grid gap-3">
                   {plans.map((plan) => (
                     <label key={plan.code} className="group cursor-pointer">
-                      <input type="radio" name="plan" value={plan.code} defaultChecked={plan.code === "starter"} className="peer sr-only" />
+                      <input type="radio" name="plan" value={plan.code} defaultChecked={plan.code === "free"} className="peer sr-only" />
                       <div className="rounded-2xl border p-4 transition group-hover:border-primary/30 peer-checked:border-primary peer-checked:bg-primary/[0.05] peer-checked:ring-1 peer-checked:ring-primary/20">
                         <div className="flex items-start justify-between gap-3">
-                          <div><div className="flex items-center gap-2"><p className="font-semibold">{plan.name}</p>{plan.code === "pro" && <Badge variant="secondary">Popular</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{plan.description} · {plan.users} · {plan.accounts} · unlimited publishing</p></div>
+                          <div><div className="flex items-center gap-2"><p className="font-semibold">{plan.name}</p>{plan.code === "free" && <Badge variant="secondary">Free</Badge>}{plan.code === "pro" && <Badge variant="secondary">Popular</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{plan.description} · {plan.users} · {plan.accounts}{plan.code === "free" ? "" : " · unlimited publishing"}</p></div>
                           <p className="shrink-0 text-sm font-semibold">{plan.price}<span className="font-normal text-muted-foreground">/mo</span></p>
                         </div>
                       </div>

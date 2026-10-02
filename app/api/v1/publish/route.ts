@@ -70,6 +70,13 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const requestHash = hashRequestBody(rawBody);
+  const { data: profileWorkspace } = await admin
+    .from("socialmedia_profiles")
+    .select("workspace_id")
+    .eq("id", authentication.profileId)
+    .maybeSingle();
+  const workspaceId = profileWorkspace?.workspace_id ? String(profileWorkspace.workspace_id) : null;
+  if (!workspaceId) return apiJson({ error: "Your workspace has not been initialized yet." }, 500, requestId);
 
   if (idempotencyKey) {
     const now = new Date().toISOString();
@@ -221,6 +228,7 @@ export async function POST(request: Request) {
     .from("socialmedia_posts")
     .insert({
       profile_id: authentication.profileId,
+      workspace_id: workspaceId,
       content: text,
       status: "scheduled",
       scheduled_at: scheduledAt,
@@ -237,6 +245,12 @@ export async function POST(request: Request) {
       message: postError?.message,
     });
     if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
+    if (postError?.message === "POST_LIMIT_REACHED") {
+      return apiJson({
+        error: "Your Free plan allows 10 posts per rolling month. The limit resets one month after the first post in your current usage period. Upgrade your plan to publish more.",
+        code: "post_limit_reached",
+      }, 403, requestId);
+    }
     return apiJson({ error: "Unable to create the post." }, 500, requestId);
   }
 
@@ -279,6 +293,7 @@ export async function POST(request: Request) {
       message: destinationError.message,
     });
     await admin.from("socialmedia_posts").delete().eq("id", post.id).eq("profile_id", authentication.profileId);
+    await admin.rpc("socialmedia_release_post_usage", { p_workspace_id: workspaceId });
     if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
     return apiJson({ error: "Unable to create publishing destinations." }, 500, requestId);
   }

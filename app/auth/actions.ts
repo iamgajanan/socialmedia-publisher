@@ -7,7 +7,7 @@ import { consumeRateLimit, requestFingerprint } from "@/lib/security/rate-limit"
 import { z } from "zod";
 
 type AuthState = { error: string | null };
-const planSchema = z.enum(["starter", "pro", "premium"]);
+const planSchema = z.enum(["free", "starter", "pro", "premium"]);
 
 async function getOrigin() {
   const configured = process.env.SITE_URL?.trim();
@@ -40,7 +40,7 @@ export async function signUp(_previousState: AuthState, formData: FormData): Pro
   const password = String(formData.get("password") ?? "");
   const repeatPassword = String(formData.get("repeatPassword") ?? "");
   const displayName = String(formData.get("displayName") ?? "").trim();
-  const selectedPlan = String(formData.get("plan") ?? "starter");
+  const selectedPlan = String(formData.get("plan") ?? "free");
   if (!planSchema.safeParse(selectedPlan).success) return { error: "Choose a valid OmniSocial plan." };
   if (!email || !password) return { error: "Email and password are required." };
   if (password !== repeatPassword) return { error: "Passwords do not match." };

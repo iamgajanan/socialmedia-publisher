@@ -25,6 +25,12 @@ const draftSchema = z.object({
 
 export type SaveDraftState = { ok: boolean; message: string; postId?: string; kind?: "success" | "error" | "scheduled" };
 
+const POST_LIMIT_MESSAGE = "Your Free plan allows 10 posts per rolling month. The limit resets one month after the first post in your current usage period. Upgrade your plan to publish more.";
+
+function isPostLimitError(error: { message?: string | null } | null | undefined) {
+  return error?.message === "POST_LIMIT_REACHED";
+}
+
 export async function saveDraft(_previous: SaveDraftState, formData: FormData): Promise<SaveDraftState> {
   const rawAccountIds = formData.getAll("accountIds").filter((value): value is string => typeof value === "string");
   const rawMediaPaths = formData.getAll("mediaPaths").filter((value): value is string => typeof value === "string");
@@ -44,8 +50,10 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   const { data: claims, error: claimsError } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;
   if (claimsError || !userId) redirect("/auth/login");
-  const { data: profile } = await supabase.from("socialmedia_profiles").select("timezone").eq("id", String(userId)).maybeSingle();
+  const { data: profile } = await supabase.from("socialmedia_profiles").select("timezone, workspace_id").eq("id", String(userId)).maybeSingle();
   const timezone = normalizeTimeZone(profile?.timezone);
+  const workspaceId = profile?.workspace_id ? String(profile.workspace_id) : null;
+  if (!workspaceId) return { ok: false, kind: "error", message: "Your workspace has not been initialized yet." };
   let scheduledAt: string | null = null;
 
   if (parsed.data.intent === "publish") {
@@ -103,6 +111,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   if (mediaPathValidationError) return { ok: false, kind: "error", message: mediaPathValidationError };
 
   let postId = parsed.data.postId;
+  let createdNewPost = false;
   if (postId) {
     const { data: existingPost, error: existingPostError } = await supabase
       .from("socialmedia_posts")
@@ -114,7 +123,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (existingPostError || !existingPost) return { ok: false, kind: "error", message: "Post not found for this publishing user." };
     if (existingPost.status === "published" || existingPost.status === "publishing") return { ok: false, kind: "error", message: "Published or currently publishing posts cannot be changed." };
     const { error } = await supabase.from("socialmedia_posts")
-      .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths, socialmedia_user_id: publishingUserId })
+      .update({ content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths, socialmedia_user_id: publishingUserId, workspace_id: workspaceId })
       .eq("id", postId)
       .eq("profile_id", String(userId))
       .eq("socialmedia_user_id", publishingUserId);
@@ -123,17 +132,26 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     if (deleteError) return { ok: false, kind: "error", message: "The draft changed, but its destinations could not be updated." };
   } else {
     const { data: post, error } = await supabase.from("socialmedia_posts")
-      .insert({ profile_id: String(userId), socialmedia_user_id: publishingUserId, content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
+      .insert({ profile_id: String(userId), workspace_id: workspaceId, socialmedia_user_id: publishingUserId, content: parsed.data.content, status: parsed.data.mode === "schedule" ? "scheduled" : "draft", scheduled_at: scheduledAt, media_urls: parsed.data.mediaPaths })
       .select("id")
       .single();
+    if (isPostLimitError(error)) return { ok: false, kind: "error", message: POST_LIMIT_MESSAGE };
     if (error || !post) return { ok: false, kind: "error", message: "The draft could not be saved." };
     postId = post.id;
+    createdNewPost = true;
   }
 
   const { error: linksError } = await supabase.from("socialmedia_post_platforms").insert(
-    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, socialmedia_user_id: publishingUserId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
+    parsed.data.accountIds.map((socialAccountId) => ({ post_id: postId, social_account_id: socialAccountId, socialmedia_user_id: publishingUserId, workspace_id: workspaceId, status: parsed.data.mode === "schedule" ? "scheduled" : "pending", scheduled_at: scheduledAt, idempotency_key: buildIdempotencyKey(postId!, socialAccountId) })),
   );
-  if (linksError) return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
+  if (linksError) {
+    if (createdNewPost && postId) {
+      const admin = createAdminClient();
+      await admin.from("socialmedia_posts").delete().eq("id", postId).eq("profile_id", String(userId));
+      await admin.rpc("socialmedia_release_post_usage", { p_workspace_id: workspaceId });
+    }
+    return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
+  }
 
   if (parsed.data.mode === "schedule" && scheduledAt) {
     const platforms = [...new Set(selectedAccountRows.data.map((account) => account.platform))];
