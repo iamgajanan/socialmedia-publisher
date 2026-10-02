@@ -12,7 +12,10 @@ export async function createPublishingUser(formData: FormData) {
     name,
   });
   if (error) {
-    if (error.message.includes("USER_LIMIT_REACHED")) throw new Error(`Your ${context.plan.name} plan allows up to ${context.plan.max_users} users.`);
+    if (error.message.includes("USER_LIMIT_REACHED")) {
+      const limit = context.plan.max_users;
+      throw new Error(`Your ${context.plan.name} plan allows up to ${limit} publishing user${limit === 1 ? "" : "s"}. Upgrade your plan to add more.`);
+    }
     throw new Error(error.message);
   }
   revalidatePath("/users");
