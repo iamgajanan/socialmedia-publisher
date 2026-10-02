@@ -42,8 +42,6 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
         authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth",
         tokenUrl: "https://oauth2.googleapis.com/token",
         profileUrl: "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
-        // youtube.readonly is needed to read the authenticated channel after OAuth;
-        // youtube.upload authorizes video publishing.
         scopes: (env("YOUTUBE_OAUTH_SCOPES") || "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly").split(" ").filter(Boolean),
         redirectUri,
       };
@@ -55,7 +53,9 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
         authorizationUrl: "https://www.linkedin.com/oauth/v2/authorization",
         tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
         profileUrl: "https://api.linkedin.com/v2/userinfo",
-        scopes: (env("LINKEDIN_OAUTH_SCOPES") || "openid profile email w_member_social").split(" ").filter(Boolean),
+        // Personal publishing uses w_member_social. Company Page discovery uses
+        // r_organization_admin, while actual Page publishing uses w_organization_social.
+        scopes: (env("LINKEDIN_OAUTH_SCOPES") || "openid profile email w_member_social w_organization_social r_organization_admin").split(" ").filter(Boolean),
         redirectUri,
       };
     case "x":
