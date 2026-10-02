@@ -1,10 +1,10 @@
-import { Check, Crown, Users } from "lucide-react";
+import { Check, Crown, Sparkles, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { WorkspacePlan } from "@/lib/workspace/server";
 
-const icons = { starter: Users, pro: Crown, premium: Crown } as const;
+const icons = { free: Sparkles, starter: Users, pro: Crown, premium: Crown } as const;
 
 export function WorkspacePlanCard({ plan, memberCount }: { plan: WorkspacePlan; memberCount: number }) {
   const Icon = icons[plan.code];
@@ -33,7 +33,7 @@ export function WorkspacePlanCard({ plan, memberCount }: { plan: WorkspacePlan; 
         </div>
         <div className="space-y-2 text-xs text-muted-foreground">
           <p className="flex items-center gap-2"><Check className="size-3.5 text-primary" />{plan.max_social_accounts} connected accounts</p>
-          <p className="flex items-center gap-2"><Check className="size-3.5 text-primary" />{plan.unlimited_publishing ? "Unlimited publishing" : `${plan.monthly_post_limit.toLocaleString("en-IN")} posts/month`}</p>
+          <p className="flex items-center gap-2"><Check className="size-3.5 text-primary" />{plan.unlimited_publishing ? "Unlimited publishing" : `${plan.monthly_post_limit.toLocaleString("en-IN")} posts/rolling month`}</p>
         </div>
       </CardContent>
     </Card>
