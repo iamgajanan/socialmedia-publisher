@@ -9,9 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/components/ui/toast-provider";
 
 const plans = [
-  { code: "starter", name: "Starter", usd: "$9", users: 5, accounts: 10, description: "A simple publishing workspace for individuals and small businesses.", popular: false },
-  { code: "pro", name: "Pro", usd: "$19", users: 20, accounts: 30, description: "More publishing users and destinations for growing workflows.", popular: true },
-  { code: "premium", name: "Premium", usd: "$29", users: 50, accounts: 100, description: "Built for larger publishing operations with many destinations.", popular: false },
+  { code: "free", name: "Free", usd: "$0", users: 1, accounts: 10, posts: "10 posts / rolling month", description: "Try OmniSocial with one publishing user.", popular: false },
+  { code: "starter", name: "Starter", usd: "$9", users: 5, accounts: 10, posts: "Unlimited posts", description: "A simple publishing workspace for individuals and small businesses.", popular: false },
+  { code: "pro", name: "Pro", usd: "$19", users: 20, accounts: 30, posts: "Unlimited posts", description: "More publishing users and destinations for growing workflows.", popular: true },
+  { code: "premium", name: "Premium", usd: "$29", users: 50, accounts: 100, posts: "Unlimited posts", description: "Built for larger publishing operations with many destinations.", popular: false },
 ] as const;
 
 type BillingPageProps = {
@@ -33,7 +34,7 @@ export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, 
     if (checkoutResult === "cancelled") toast({ title: "Checkout cancelled", message: "No subscription changes were made.", variant: "error" });
   }, [checkoutResult, toast]);
 
-  async function startCheckout(plan: (typeof plans)[number]["code"]) {
+  async function startCheckout(plan: Exclude<(typeof plans)[number]["code"], "free">) {
     setLoadingPlan(plan);
     try {
       const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }) });
@@ -59,14 +60,14 @@ export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, 
     }
   }
 
-  const statusLabel = subscriptionStatus === "active" ? "Active" : subscriptionStatus === "past_due" ? "Payment issue" : subscriptionStatus === "cancelled" ? "Cancelled" : "Not activated";
+  const statusLabel = subscriptionStatus === "active" ? "Active" : subscriptionStatus === "past_due" ? "Payment issue" : subscriptionStatus === "cancelled" ? "Cancelled" : currentPlan === "free" ? "Free" : "Not activated";
 
   return (
     <div className="space-y-8">
       <div>
         <Badge variant="secondary" className="rounded-full px-3 py-1"><CreditCard className="mr-1.5 size-3.5" />Billing</Badge>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Choose your publishing plan.</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Unlimited publishing on every paid plan. Your plan controls publishing users and connected social accounts, while platform limits still apply.</p>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">The Free plan includes 10 posts per rolling month and one publishing user. Paid plans unlock unlimited publishing and larger workspace limits.</p>
       </div>
 
       {checkoutResult === "success" && <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm"><Check className="mt-0.5 size-4 text-emerald-600" /><div><p className="font-medium">Payment completed.</p><p className="mt-1 text-muted-foreground">We are waiting for Stripe to confirm the subscription webhook. Refresh this page in a moment if the status has not updated.</p></div></div>}
@@ -76,7 +77,12 @@ export function BillingPage({ currentPlan, currentPlanName, subscriptionStatus, 
 
       {!stripeConfigured && <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">Stripe checkout is not configured on this deployment yet. The pricing UI is live, but checkout will remain disabled until the Stripe server key and three USD recurring price IDs are added to the server environment.</div>}
 
-      <div className="grid gap-5 lg:grid-cols-3">{plans.map((plan) => { const selected = currentPlan === plan.code; const loading = loadingPlan === plan.code; return <Card key={plan.code} className={`relative overflow-hidden transition hover:-translate-y-1 hover:shadow-lg ${plan.popular ? "border-primary/45 shadow-primary/10" : ""}`}>{plan.popular && <div className="absolute right-5 top-5 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">Popular</div>}<CardHeader><CardTitle>{plan.name}</CardTitle><CardDescription className="min-h-12">{plan.description}</CardDescription></CardHeader><CardContent><div className="flex items-end gap-1"><span className="text-4xl font-semibold tracking-tight">{plan.usd}</span><span className="pb-1 text-sm text-muted-foreground">/ month</span></div><div className="my-6 h-px bg-border" /><ul className="space-y-3 text-sm"><li className="flex items-center gap-2"><Check className="size-4 text-primary" />Unlimited publishing</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />{plan.users} publishing users</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />{plan.accounts} social accounts</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />Scheduling & post history</li></ul><Button className="mt-7 w-full" variant={selected ? "outline" : plan.popular ? "default" : "outline"} disabled={loading || !stripeConfigured || selected} onClick={() => startCheckout(plan.code)}>{loading ? <><Loader2 className="animate-spin" />Opening checkout...</> : selected ? "Current plan" : <><Sparkles />Choose {plan.name}</>}</Button></CardContent></Card>; })}</div>
+      <div className="grid gap-5 lg:grid-cols-4">{plans.map((plan) => {
+        const selected = currentPlan === plan.code;
+        const loading = loadingPlan === plan.code;
+        const isFree = plan.code === "free";
+        return <Card key={plan.code} className={`relative overflow-hidden transition hover:-translate-y-1 hover:shadow-lg ${plan.popular ? "border-primary/45 shadow-primary/10" : ""}`}>{plan.popular && <div className="absolute right-5 top-5 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">Popular</div>}<CardHeader><CardTitle>{plan.name}</CardTitle><CardDescription className="min-h-12">{plan.description}</CardDescription></CardHeader><CardContent><div className="flex items-end gap-1"><span className="text-4xl font-semibold tracking-tight">{plan.usd}</span><span className="pb-1 text-sm text-muted-foreground">/ month</span></div><div className="my-6 h-px bg-border" /><ul className="space-y-3 text-sm"><li className="flex items-center gap-2"><Check className="size-4 text-primary" />{plan.posts}</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />{plan.users} publishing user{plan.users === 1 ? "" : "s"}</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />{plan.accounts} social accounts</li><li className="flex items-center gap-2"><Check className="size-4 text-primary" />Scheduling & post history</li></ul><Button className="mt-7 w-full" variant={selected ? "outline" : plan.popular ? "default" : "outline"} disabled={loading || selected || isFree || !stripeConfigured} onClick={() => !isFree && startCheckout(plan.code as Exclude<(typeof plans)[number]["code"], "free">)}>{loading ? <><Loader2 className="animate-spin" />Opening checkout...</> : selected ? "Current plan" : isFree ? "Included" : <><Sparkles />Choose {plan.name}</>}</Button></CardContent></Card>;
+      })}</div>
 
       <p className="text-center text-xs leading-5 text-muted-foreground">Prices are shown in USD. Checkout is hosted by Stripe. OmniSocial never handles or stores card details. Indian payment methods can be added later with Razorpay.</p>
     </div>
