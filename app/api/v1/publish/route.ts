@@ -237,6 +237,12 @@ export async function POST(request: Request) {
       message: postError?.message,
     });
     if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
+    if (postError?.message === "POST_LIMIT_REACHED") {
+      return apiJson({
+        error: "Your Free plan allows 10 posts per rolling month. The limit resets one month after the first post in your current usage period. Upgrade your plan to publish more.",
+        code: "post_limit_reached",
+      }, 403, requestId);
+    }
     return apiJson({ error: "Unable to create the post." }, 500, requestId);
   }
 
@@ -279,6 +285,7 @@ export async function POST(request: Request) {
       message: destinationError.message,
     });
     await admin.from("socialmedia_posts").delete().eq("id", post.id).eq("profile_id", authentication.profileId);
+    await admin.rpc("socialmedia_release_post_usage", { p_workspace_id: authentication.profileId });
     if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
     return apiJson({ error: "Unable to create publishing destinations." }, 500, requestId);
   }
