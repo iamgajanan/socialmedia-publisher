@@ -116,6 +116,16 @@ export function ToastMessage({
     if (fired.current) return;
     fired.current = true;
     toast({ title, message, variant });
+
+    // OAuth result messages are delivered through query parameters. Remove
+    // them after the toast is emitted so a browser refresh does not replay
+    // the previous success/error notification.
+    const url = new URL(window.location.href);
+    const hadToastParams = ["connected", "disconnected", "error", "platform"].some((key) => url.searchParams.has(key));
+    if (hadToastParams) {
+      ["connected", "disconnected", "error", "platform"].forEach((key) => url.searchParams.delete(key));
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }, [message, title, toast, variant]);
 
   return null;

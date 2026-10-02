@@ -45,19 +45,29 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
         scopes: (env("YOUTUBE_OAUTH_SCOPES") || "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly").split(" ").filter(Boolean),
         redirectUri,
       };
-    case "linkedin":
+    case "linkedin": {
       if (!env("LINKEDIN_CLIENT_ID") || !env("LINKEDIN_CLIENT_SECRET")) return null;
+      const organizationAccessEnabled = env("LINKEDIN_ORGANIZATION_ACCESS_ENABLED").toLowerCase() === "true";
+      const baseScopes = ["openid", "profile", "email", "w_member_social"];
+      const configuredScopes = (env("LINKEDIN_OAUTH_SCOPES") || "").split(" ").filter(Boolean);
+      const requestedScopes = configuredScopes.length ? configuredScopes : baseScopes;
+      const organizationScopes = new Set(["r_organization_admin", "r_organization_social", "w_organization_social"]);
+      const scopes = organizationAccessEnabled
+        ? requestedScopes
+        : requestedScopes.filter((scope) => !organizationScopes.has(scope));
       return {
         clientId: env("LINKEDIN_CLIENT_ID"),
         clientSecret: env("LINKEDIN_CLIENT_SECRET"),
         authorizationUrl: "https://www.linkedin.com/oauth/v2/authorization",
         tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
         profileUrl: "https://api.linkedin.com/v2/userinfo",
-        // Personal publishing uses w_member_social. Company Page discovery uses
-        // r_organization_admin, while actual Page publishing uses w_organization_social.
-        scopes: (env("LINKEDIN_OAUTH_SCOPES") || "openid profile email w_member_social w_organization_social r_organization_admin").split(" ").filter(Boolean),
+        // Personal publishing is available through Share on LinkedIn.
+        // Organization scopes are requested only after Community Management API
+        // access has been approved for the LinkedIn developer application.
+        scopes,
         redirectUri,
       };
+    }
     case "x":
       if (!env("X_CLIENT_ID") || !env("X_CLIENT_SECRET")) return null;
       return { clientId: env("X_CLIENT_ID"), clientSecret: env("X_CLIENT_SECRET"), authorizationUrl: "https://x.com/i/oauth2/authorize", tokenUrl: "https://api.x.com/2/oauth2/token", profileUrl: "https://api.x.com/2/users/me?user.fields=profile_image_url,name,username", scopes: (env("X_OAUTH_SCOPES") || "users.read tweet.read tweet.write offline.access").split(" ").filter(Boolean), redirectUri, usePkce: true, clientSecretInBasicAuth: true };
