@@ -90,50 +90,53 @@ test("media paths are classified from persisted extensions", async () => {
   assert.equal(mediaTypeFromPath("user/clip.mov"), "video/quicktime");
 });
 
+const testMedia = (mimeType: string) => ({
+  url: "https://example.com/media",
+  path: "test/media",
+  size: 1024,
+  mimeType,
+});
+
+const testAccount = { external_account_id: "test-account", metadata: {} } as never;
+const testIdempotencyKey = "phase16-test-idempotency";
+
 test("LinkedIn validation accepts text, JPEG/PNG images, and MP4/MOV videos", async () => {
   const { linkedinPublisher } = await import("../../lib/publishing/providers/linkedin.ts");
-  const account = { external_account_id: "member-1", metadata: {} } as never;
 
-  linkedinPublisher.validate({ content: "hello", media: [], account });
-  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.png", mimeType: "image/png" }], account });
-  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.mp4", mimeType: "video/mp4" }], account });
-  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.mov", mimeType: "video/quicktime" }], account });
+  linkedinPublisher.validate({ content: "hello", media: [], account: testAccount, idempotencyKey: testIdempotencyKey });
+  linkedinPublisher.validate({ content: "hello", media: [testMedia("image/png")], account: testAccount, idempotencyKey: testIdempotencyKey });
+  linkedinPublisher.validate({ content: "hello", media: [testMedia("image/jpeg")], account: testAccount, idempotencyKey: testIdempotencyKey });
+  linkedinPublisher.validate({ content: "hello", media: [testMedia("video/mp4")], account: testAccount, idempotencyKey: testIdempotencyKey });
+  linkedinPublisher.validate({ content: "hello", media: [testMedia("video/quicktime")], account: testAccount, idempotencyKey: testIdempotencyKey });
 
   assert.throws(
-    () => linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.webp", mimeType: "image/webp" }], account }),
+    () => linkedinPublisher.validate({ content: "hello", media: [testMedia("image/webp")], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /JPEG\/PNG images and MP4\/MOV videos/,
   );
   assert.throws(
-    () => linkedinPublisher.validate({ content: "hello", media: [
-      { url: "https://example.com/a.png", mimeType: "image/png" },
-      { url: "https://example.com/b.png", mimeType: "image/png" },
-    ], account }),
+    () => linkedinPublisher.validate({ content: "hello", media: [testMedia("image/png"), testMedia("image/png")], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /one image or video/,
   );
   assert.throws(
-    () => linkedinPublisher.validate({ content: "x".repeat(3001), media: [], account }),
+    () => linkedinPublisher.validate({ content: "x".repeat(3001), media: [], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /3,000 character limit/,
   );
 });
 
 test("YouTube validation requires exactly one video and enforces description length", async () => {
   const { youtubePublisher } = await import("../../lib/publishing/providers/youtube.ts");
-  const account = { external_account_id: "channel-1", metadata: {} } as never;
 
-  youtubePublisher.validate({ content: "description", media: [{ url: "https://example.com/video.mp4", mimeType: "video/mp4" }], account });
+  youtubePublisher.validate({ content: "description", media: [testMedia("video/mp4")], account: testAccount, idempotencyKey: testIdempotencyKey });
   assert.throws(
-    () => youtubePublisher.validate({ content: "description", media: [], account }),
+    () => youtubePublisher.validate({ content: "description", media: [], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /exactly one video/,
   );
   assert.throws(
-    () => youtubePublisher.validate({ content: "description", media: [
-      { url: "https://example.com/a.mp4", mimeType: "video/mp4" },
-      { url: "https://example.com/b.mp4", mimeType: "video/mp4" },
-    ], account }),
+    () => youtubePublisher.validate({ content: "description", media: [testMedia("video/mp4"), testMedia("video/mp4")], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /exactly one video/,
   );
   assert.throws(
-    () => youtubePublisher.validate({ content: "x".repeat(5001), media: [{ url: "https://example.com/video.mp4", mimeType: "video/mp4" }], account }),
+    () => youtubePublisher.validate({ content: "x".repeat(5001), media: [testMedia("video/mp4")], account: testAccount, idempotencyKey: testIdempotencyKey }),
     /5,000 characters/,
   );
 });
