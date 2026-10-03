@@ -2,7 +2,7 @@ import "server-only";
 import { providerFetch } from "./http";
 import { PublisherError, type MediaAsset, type Publisher } from "./types";
 
-const LINKEDIN_VERSION = process.env.LINKEDIN_VERSION?.trim() || "202603";
+const LINKEDIN_VERSION = process.env.LINKEDIN_VERSION?.trim() || "202609";
 const LINKEDIN_IMAGE_TYPES = new Set(["image/jpeg", "image/png"]);
 const LINKEDIN_VIDEO_TYPES = new Set(["video/mp4", "video/quicktime"]);
 const VIDEO_CHUNK_SIZE = 4 * 1024 * 1024;
