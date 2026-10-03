@@ -89,3 +89,51 @@ test("media paths are classified from persisted extensions", async () => {
   assert.equal(mediaTypeFromPath("user/photo.bmp"), "image/bmp");
   assert.equal(mediaTypeFromPath("user/clip.mov"), "video/quicktime");
 });
+
+test("LinkedIn validation accepts text, JPEG/PNG images, and MP4/MOV videos", async () => {
+  const { linkedinPublisher } = await import("../../lib/publishing/providers/linkedin.ts");
+  const account = { external_account_id: "member-1", metadata: {} } as never;
+
+  linkedinPublisher.validate({ content: "hello", media: [], account });
+  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.png", mimeType: "image/png" }], account });
+  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.mp4", mimeType: "video/mp4" }], account });
+  linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.mov", mimeType: "video/quicktime" }], account });
+
+  assert.throws(
+    () => linkedinPublisher.validate({ content: "hello", media: [{ url: "https://example.com/a.webp", mimeType: "image/webp" }], account }),
+    /JPEG\/PNG images and MP4\/MOV videos/,
+  );
+  assert.throws(
+    () => linkedinPublisher.validate({ content: "hello", media: [
+      { url: "https://example.com/a.png", mimeType: "image/png" },
+      { url: "https://example.com/b.png", mimeType: "image/png" },
+    ], account }),
+    /one image or video/,
+  );
+  assert.throws(
+    () => linkedinPublisher.validate({ content: "x".repeat(3001), media: [], account }),
+    /3,000 character limit/,
+  );
+});
+
+test("YouTube validation requires exactly one video and enforces description length", async () => {
+  const { youtubePublisher } = await import("../../lib/publishing/providers/youtube.ts");
+  const account = { external_account_id: "channel-1", metadata: {} } as never;
+
+  youtubePublisher.validate({ content: "description", media: [{ url: "https://example.com/video.mp4", mimeType: "video/mp4" }], account });
+  assert.throws(
+    () => youtubePublisher.validate({ content: "description", media: [], account }),
+    /exactly one video/,
+  );
+  assert.throws(
+    () => youtubePublisher.validate({ content: "description", media: [
+      { url: "https://example.com/a.mp4", mimeType: "video/mp4" },
+      { url: "https://example.com/b.mp4", mimeType: "video/mp4" },
+    ], account }),
+    /exactly one video/,
+  );
+  assert.throws(
+    () => youtubePublisher.validate({ content: "x".repeat(5001), media: [{ url: "https://example.com/video.mp4", mimeType: "video/mp4" }], account }),
+    /5,000 characters/,
+  );
+});
