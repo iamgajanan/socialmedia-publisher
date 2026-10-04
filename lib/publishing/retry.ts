@@ -9,15 +9,27 @@ export function getRetryDelaySeconds(retryCount: number): number {
   return Math.min(2 ** normalizedCount * 60, MAX_RETRY_DELAY_SECONDS);
 }
 
-export function getNextRetryAt(retryCount: number, now = new Date()): Date {
-  return new Date(now.getTime() + getRetryDelaySeconds(retryCount) * 1000);
+export function getNextRetryAt(retryCount: number, now = new Date(), retryAfterSeconds?: number | null): Date {
+  const fallbackDelay = getRetryDelaySeconds(retryCount);
+  const requestedDelay = typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds)
+    ? Math.max(0, Math.ceil(retryAfterSeconds))
+    : fallbackDelay;
+  const delay = Math.min(requestedDelay, MAX_RETRY_DELAY_SECONDS);
+  return new Date(now.getTime() + delay * 1000);
 }
 
-export function getRetrySchedule(retryCount: number, maxRetries: number, now = new Date()) {
+export function getRetrySchedule(
+  retryCount: number,
+  maxRetries: number,
+  now = new Date(),
+  retryAfterSeconds?: number | null,
+) {
   return {
     retryCount,
     maxRetries,
     canRetry: canRetry(retryCount, maxRetries),
-    nextRetryAt: canRetry(retryCount, maxRetries) ? getNextRetryAt(retryCount, now).toISOString() : null,
+    nextRetryAt: canRetry(retryCount, maxRetries)
+      ? getNextRetryAt(retryCount, now, retryAfterSeconds).toISOString()
+      : null,
   };
 }
