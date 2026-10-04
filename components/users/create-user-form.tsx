@@ -38,7 +38,14 @@ export function CreateUserForm({ action }: { action: (formData: FormData) => voi
   return (
     <form action={action} className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Input name="name" required placeholder="e.g. OmniSocial, Gajanan, Client A" className="sm:max-w-md" />
+        <Input
+          name="name"
+          required
+          placeholder="e.g. OmniSocial, Gajanan, Client A"
+          aria-label="Publishing user name"
+          autoComplete="organization"
+          className="sm:max-w-md"
+        />
         <CreateButton />
       </div>
       <PendingFeedback />
