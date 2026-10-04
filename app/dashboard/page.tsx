@@ -10,6 +10,7 @@ import {
   Send,
   Sparkles,
   Timer,
+  UserRound,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -82,6 +83,13 @@ export default async function DashboardPage() {
   }
 
   const profileId = String(claims.claims.sub);
+  const { data: profile } = await supabase
+    .from("socialmedia_profiles")
+    .select("workspace_id")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  const workspaceId = profile?.workspace_id ?? "";
 
   const [
     accountsResult,
@@ -92,6 +100,7 @@ export default async function DashboardPage() {
     failedResult,
     upcomingResult,
     recentResult,
+    usersResult,
   ] = await Promise.all([
     supabase
       .from("socialmedia_social_accounts")
@@ -139,6 +148,11 @@ export default async function DashboardPage() {
       .eq("profile_id", profileId)
       .order("created_at", { ascending: false })
       .limit(6),
+    supabase
+      .from("socialmedia_users")
+      .select("id, name")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: true }),
   ]);
 
   const stats = [
@@ -158,7 +172,13 @@ export default async function DashboardPage() {
     failedResult.error,
     upcomingResult.error,
     recentResult.error,
+    usersResult.error,
   ].some(Boolean);
+
+  const hasPublishingUser = (usersResult.data?.length ?? 0) > 0;
+  const hasConnectedAccount = (accountsResult.count ?? 0) > 0;
+  const hasFirstPost = (publishedResult.count ?? 0) > 0;
+  const onboardingComplete = hasPublishingUser && hasConnectedAccount && hasFirstPost;
 
   return (
     <div className="space-y-8">
@@ -183,6 +203,63 @@ export default async function DashboardPage() {
           </Button>
         </div>
       </section>
+
+      {!onboardingComplete && !hasDataError && (
+        <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm">
+          <CardHeader className="border-b bg-background/60">
+            <Badge variant="secondary" className="w-fit rounded-full border-primary/15 bg-primary/10 text-primary-foreground">
+              <Sparkles className="mr-1.5 size-3.5" />Get started
+            </Badge>
+            <CardTitle className="mt-2 text-xl">Set up your publishing workflow</CardTitle>
+            <CardDescription>
+              Complete these steps to go from a new workspace to your first successful post.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 sm:p-5 lg:grid-cols-3">
+            {[
+              {
+                done: hasPublishingUser,
+                icon: UserRound,
+                title: "Create a publishing user",
+                description: hasPublishingUser ? "Your publishing identity is ready." : "Create the identity you will publish as.",
+                href: "/users",
+                action: "Create user",
+              },
+              {
+                done: hasConnectedAccount,
+                icon: Link2,
+                title: "Connect a social account",
+                description: hasConnectedAccount ? "A social destination is connected." : "Connect the platform where you want to publish.",
+                href: "/connect-accounts",
+                action: "Connect account",
+              },
+              {
+                done: hasFirstPost,
+                icon: Send,
+                title: "Publish your first post",
+                description: hasFirstPost ? "Your first post was published successfully." : "Create a post and publish it when you're ready.",
+                href: "/create-post",
+                action: "Create post",
+              },
+            ].map((step) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.title} className={`rounded-2xl border p-4 transition ${step.done ? "border-primary/20 bg-background" : "bg-background hover:border-primary/30 hover:shadow-sm"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className={`flex size-10 items-center justify-center rounded-xl ${step.done ? "bg-primary/10 text-primary" : "bg-muted"}`}>
+                      {step.done ? <CheckCircle2 className="size-5" /> : <Icon className="size-5" />}
+                    </div>
+                    {step.done && <Badge variant="outline" className="text-primary">Complete</Badge>}
+                  </div>
+                  <h3 className="mt-4 text-sm font-semibold">{step.title}</h3>
+                  <p className="mt-1 min-h-10 text-xs leading-5 text-muted-foreground">{step.description}</p>
+                  {!step.done && <Button asChild size="sm" className="mt-4 w-full"><Link href={step.href}>{step.action}<ArrowUpRight /></Link></Button>}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {hasDataError && (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
