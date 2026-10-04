@@ -20,7 +20,8 @@ export async function POST(request: Request) {
     const result = await runPublishingWorker();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Publishing worker failed." }, { status: 500 });
+    console.error("cron_publish_worker_failed", error instanceof Error ? error.message : error);
+    return NextResponse.json({ ok: false, error: "Publishing worker failed." }, { status: 500 });
   }
 }
 export async function GET(request: Request) { return POST(request); }
