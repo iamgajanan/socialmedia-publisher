@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeTimeZone, zonedDateTimeToUtc } from "@/lib/scheduling/timezone";
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
+import { runPublishingWorker } from "@/lib/publishing/worker";
 import { enqueueNotification } from "@/lib/notifications";
 import { getPostTitle } from "@/lib/notifications/email";
 import { mediaTypeFromPath, validateMediaSelection } from "@/lib/publishing/media-capabilities";
@@ -57,7 +58,9 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
   let scheduledAt: string | null = null;
 
   if (parsed.data.intent === "publish") {
-    scheduledAt = new Date(Date.now() + 60_000).toISOString();
+    // Immediate publishing must enter the publishing worker now. The worker
+    // remains the single publishing path; cron is reserved for scheduled posts.
+    scheduledAt = new Date().toISOString();
   } else if (parsed.data.mode === "schedule") {
     if (!parsed.data.scheduledAtLocal) return { ok: false, kind: "error", message: "Choose a date and time for the scheduled post." };
     const scheduledDate = zonedDateTimeToUtc(parsed.data.scheduledAtLocal, timezone);
@@ -153,7 +156,7 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     return { ok: false, kind: "error", message: "The draft was saved, but its destinations could not be saved." };
   }
 
-  if (parsed.data.mode === "schedule" && scheduledAt) {
+  if (parsed.data.mode === "schedule" && scheduledAt && parsed.data.intent !== "publish") {
     const platforms = [...new Set(selectedAccountRows.data.map((account) => account.platform))];
     await enqueueNotification({
       profileId: String(userId),
@@ -170,9 +173,29 @@ export async function saveDraft(_previous: SaveDraftState, formData: FormData): 
     });
   }
 
+  // Immediate Publish: invoke the existing publishing worker directly instead
+  // of waiting for the minute-based cron poll. Scheduled posts never take this
+  // path and remain cron-driven.
+  if (parsed.data.intent === "publish") {
+    try {
+      await runPublishingWorker();
+    } catch (error) {
+      console.error("immediate_publish_worker_failed", {
+        postId,
+        userId: String(userId),
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      return { ok: false, kind: "error", message: "The post was created, but publishing could not be started. Please retry from Post History." };
+    }
+  }
+
   revalidatePath("/create-post");
   revalidatePath("/dashboard");
-  if (parsed.data.intent === "publish") return { ok: true, kind: "success", message: "Your post will publish soon.", postId };
+  revalidatePath("/post-history");
+
+  if (parsed.data.intent === "publish") {
+    return { ok: true, kind: "success", message: "Your post is publishing now.", postId };
+  }
   return parsed.data.mode === "schedule"
     ? { ok: true, kind: "scheduled", message: `Your post is scheduled for ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(scheduledAt!))} (${timezone}).`, postId }
     : { ok: true, kind: "success", message: "Your draft has been saved.", postId };
