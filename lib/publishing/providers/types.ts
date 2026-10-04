@@ -18,8 +18,15 @@ export type Publisher = {
   disconnect?(accessToken: string, account: PublisherAccount): Promise<void>;
 };
 export class PublisherError extends Error {
-  readonly retryable: boolean; readonly code: string;
-  constructor(message: string, options: { retryable?: boolean; code?: string } = {}) {
-    super(message); this.name = "PublisherError"; this.retryable = options.retryable ?? false; this.code = options.code ?? "provider_error";
+  readonly retryable: boolean;
+  readonly code: string;
+  readonly retryAfterSeconds: number | null;
+
+  constructor(message: string, options: { retryable?: boolean; code?: string; retryAfterSeconds?: number | null } = {}) {
+    super(message);
+    this.name = "PublisherError";
+    this.retryable = options.retryable ?? false;
+    this.code = options.code ?? "provider_error";
+    this.retryAfterSeconds = options.retryAfterSeconds ?? null;
   }
 }
