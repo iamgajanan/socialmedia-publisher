@@ -7,7 +7,7 @@ const LINKEDIN_VIDEO_TYPES = ["video/mp4", "video/quicktime"];
 
 export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   facebook: { minFiles: 0, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES },
-  instagram: { minFiles: 1, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ["video/mp4", "video/quicktime"] },
+  instagram: { minFiles: 1, maxFiles: 10, imageTypes: ALL_IMAGE_TYPES, videoTypes: ["video/mp4", "video/quicktime"] },
   threads: { minFiles: 0, maxFiles: 1, imageTypes: ["image/jpeg", "image/png"], videoTypes: ["video/mp4", "video/quicktime"] },
   youtube: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ALL_VIDEO_TYPES },
   tiktok: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ["video/mp4", "video/quicktime"] },
