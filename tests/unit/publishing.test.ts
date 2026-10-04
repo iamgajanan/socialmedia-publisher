@@ -64,7 +64,7 @@ test("media capability matrix enforces selected destination requirements", async
   const { getMediaCapability, validateMediaSelection } = await import("../../lib/publishing/media-capabilities.ts");
   const instagram = getMediaCapability(["instagram"]);
   assert.equal(instagram.minFiles, 1);
-  assert.equal(instagram.maxFiles, 1);
+  assert.equal(instagram.maxFiles, 10);
   assert.deepEqual(instagram.imageTypes, ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"]);
   assert.deepEqual(instagram.videoTypes, ["video/mp4", "video/quicktime"]);
   assert.equal(validateMediaSelection(["instagram"], []), "instagram requires at least 1 image or video.");
