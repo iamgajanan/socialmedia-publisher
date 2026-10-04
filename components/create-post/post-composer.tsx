@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MediaUploader, type UploadedMedia } from "@/components/create-post/media-uploader";
 import { cn } from "@/lib/utils";
 import { formatTimeZoneName } from "@/lib/scheduling/timezone";
-import { getMediaCapability } from "@/lib/publishing/media-capabilities";
+import { getPlatformMediaIssues, getUploadMediaCapability, mediaTypeFromPath } from "@/lib/publishing/media-capabilities";
 import { useToast } from "@/components/ui/toast-provider";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
@@ -25,7 +25,6 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
 };
 
 const PUBLISHING_DISABLED_PLATFORMS = new Set(["x"]);
-
 const initialState: SaveDraftState = { ok: false, message: "" };
 
 export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost }: { accounts: Account[]; timezone?: string; initialPost?: { id: string; content: string; accountIds: string[]; mediaPaths: string[]; mode: "draft" | "schedule"; scheduledAt: string | null } }) {
@@ -43,14 +42,12 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
 
   useEffect(() => {
     if (!state.message) return;
-
     const scheduled = state.ok && state.kind === "scheduled";
     toast({
       title: state.ok ? (scheduled ? "Post scheduled" : "Success") : "Post not saved",
       message: state.message,
       variant: state.ok ? (scheduled ? "scheduled" : "success") : "error",
     });
-
     if (state.ok) {
       setContent("");
       setMedia([]);
@@ -61,11 +58,14 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
 
   const selectedAccounts = accounts.filter((account) => selected.includes(account.id));
   const selectedPlatforms = useMemo(() => [...new Set(selectedAccounts.map((account) => account.platform))], [selectedAccounts]);
-  const mediaCapability = useMemo(() => getMediaCapability(selectedPlatforms), [selectedPlatforms]);
+  const uploadCapability = useMemo(() => getUploadMediaCapability(selectedPlatforms), [selectedPlatforms]);
+  const mediaTypes = useMemo(() => media.map((item) => item.type || mediaTypeFromPath(item.path)).filter(Boolean), [media]);
+  const mediaIssues = useMemo(() => getPlatformMediaIssues(selectedPlatforms, mediaTypes), [selectedPlatforms, mediaTypes]);
   const previewAccount = selectedAccounts.find((account) => account.platform === previewPlatform) ?? selectedAccounts[0];
   const selectedMeta = previewPlatform ? meta[previewPlatform] : null;
   const overLimit = selectedMeta ? content.length > selectedMeta.limit : false;
   const canSave = content.trim().length > 0 && selected.length > 0 && !overLimit && (mode === "draft" || Boolean(scheduledAtLocal));
+  const canPublish = canSave && mediaIssues.length === 0;
 
   const limits = useMemo(
     () => selectedPlatforms.map((platform) => ({ platform, ...meta[platform], over: content.length > meta[platform].limit })),
@@ -76,8 +76,12 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
+  function removePlatform(platform: string) {
+    setSelected((current) => current.filter((id) => accounts.find((account) => account.id === id)?.platform !== platform));
+  }
+
   function confirmPublish(event: React.MouseEvent<HTMLButtonElement>) {
-    if (!window.confirm("Publish this post now? It will be queued for publishing and sent to the selected destinations.")) event.preventDefault();
+    if (!window.confirm("Publish this post now? It will be sent to the selected destinations.")) event.preventDefault();
   }
 
   return <form action={formAction} className="space-y-6">
@@ -103,7 +107,27 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
             {selectedMeta && <span className={cn(overLimit && "font-medium text-destructive")}>{content.length.toLocaleString()} / {selectedMeta.limit.toLocaleString()} for {selectedMeta.name}</span>}
           </div>
 
-          <MediaUploader uploaded={media} onUploaded={setMedia} allowedTypes={[...mediaCapability.imageTypes, ...mediaCapability.videoTypes]} maxFiles={mediaCapability.maxFiles} />
+          <MediaUploader uploaded={media} onUploaded={setMedia} allowedTypes={[...uploadCapability.imageTypes, ...uploadCapability.videoTypes]} maxFiles={uploadCapability.maxFiles} />
+
+          {mediaIssues.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-orange-500/30 bg-orange-500/5 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-orange-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Media compatibility</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Your media is uploaded safely, but one or more selected destinations cannot publish this combination.</p>
+                  <div className="mt-3 space-y-2">
+                    {mediaIssues.map((issue) => (
+                      <div key={`${issue.platform}:${issue.message}`} className="flex flex-col gap-2 rounded-xl border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs leading-5"><span className="font-semibold">{meta[issue.platform]?.name ?? issue.platform}:</span> {issue.message}</p>
+                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => removePlatform(issue.platform)}>Remove {meta[issue.platform]?.name ?? issue.platform}</Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 rounded-2xl border bg-muted/20 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -130,12 +154,6 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
               </div>
             )}
           </div>
-
-          {selectedPlatforms.length > 0 && mediaCapability.minFiles > media.length && (
-            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {selectedPlatforms.join(" + ")} requires {mediaCapability.minFiles === 1 ? (mediaCapability.imageTypes.length === 0 ? "one video" : "one image or video") : `${mediaCapability.minFiles} media files`} before publishing.
-            </div>
-          )}
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled><Sparkles />AI assist</Button>
@@ -164,8 +182,8 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled><ChevronDown />More actions</Button>
             <Button type="submit" name="intent" value="draft" variant="outline" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Saving…" : "Save draft"}</Button>
-            {mode === "schedule" && <Button type="submit" name="intent" value="schedule" disabled={!canSave || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Scheduling…" : "Schedule post"}</Button>}
-            <Button type="submit" name="intent" value="publish" onClick={confirmPublish} disabled={!canSave || pending || media.length < mediaCapability.minFiles}>{pending ? <Loader2 className="animate-spin" /> : <Send />}{pending ? "Publishing…" : "Publish now"}</Button>
+            {mode === "schedule" && <Button type="submit" name="intent" value="schedule" disabled={!canPublish || pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />}{pending ? "Scheduling…" : "Schedule post"}</Button>}
+            <Button type="submit" name="intent" value="publish" onClick={confirmPublish} disabled={!canPublish || pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />}{pending ? "Publishing…" : "Publish now"}</Button>
           </div>
         </CardContent>
       </Card>
