@@ -23,8 +23,9 @@ export async function POST(request: Request) {
       ...(await runFacebookOAuthHealthChecks()),
     });
   } catch (error) {
+    console.error("cron_oauth_health_failed", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "OAuth health worker failed." },
+      { ok: false, error: "OAuth health worker failed." },
       { status: 500 },
     );
   }
