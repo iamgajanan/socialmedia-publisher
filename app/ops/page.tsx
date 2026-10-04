@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
-import { Activity, AlertTriangle, CheckCircle2, Clock3, RefreshCw, ServerCog, Users, Video } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Clock3, RefreshCw, ServerCog, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireOpsAdmin } from "@/lib/ops/access";
+
+type OpsQuery = ReturnType<ReturnType<typeof createAdminClient>["from"]>;
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
@@ -16,7 +18,7 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-async function countRows(table: string, filters?: (query: any) => any) {
+async function countRows(table: string, filters?: (query: OpsQuery) => OpsQuery) {
   const admin = createAdminClient();
   let query = admin.from(table).select("id", { count: "exact", head: true });
   if (filters) query = filters(query);
@@ -34,21 +36,7 @@ export default async function OpsPage() {
   const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [
-    signups,
-    publishingUsers,
-    connectedAccounts,
-    successfulPosts,
-    failedPosts,
-    scheduledPosts,
-    publishingPosts,
-    failedDestinations24h,
-    oauthFailures24h,
-    tokenRefreshFailures24h,
-    notificationFailures24h,
-    billingFailures,
-    workerFailures24h,
-  ] = await Promise.all([
+  const [signups, publishingUsers, connectedAccounts, successfulPosts, failedPosts, scheduledPosts, publishingPosts, failedDestinations24h, oauthFailures24h, tokenRefreshFailures24h, notificationFailures24h, billingFailures, workerFailures24h] = await Promise.all([
     countRows("socialmedia_profiles"),
     countRows("socialmedia_users"),
     countRows("socialmedia_social_accounts", (query) => query.eq("status", "connected")),
