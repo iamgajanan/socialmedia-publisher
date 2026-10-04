@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runPublishingWorker } from "@/lib/publishing/worker";
+import { finishWorkerRun, startWorkerRun } from "@/lib/ops/worker-runs";
 
 export const maxDuration = 300;
 
@@ -16,12 +17,18 @@ function isAuthorized(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  const runId = await startWorkerRun("publish");
   try {
     const result = await runPublishingWorker();
+    await finishWorkerRun(runId, "succeeded", result);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    console.error("cron_publish_worker_failed", error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : "Publishing worker failed.";
+    console.error("cron_publish_worker_failed", message);
+    await finishWorkerRun(runId, "failed", {}, message);
     return NextResponse.json({ ok: false, error: "Publishing worker failed." }, { status: 500 });
   }
 }
+
 export async function GET(request: Request) { return POST(request); }
