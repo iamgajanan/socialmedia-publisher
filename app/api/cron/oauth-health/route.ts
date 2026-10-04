@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runFacebookOAuthHealthChecks } from "@/lib/social/oauth-health";
+import { finishWorkerRun, startWorkerRun } from "@/lib/ops/worker-runs";
 
 export const maxDuration = 60;
 
@@ -17,13 +18,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const runId = await startWorkerRun("oauth_health");
   try {
-    return NextResponse.json({
-      ok: true,
-      ...(await runFacebookOAuthHealthChecks()),
-    });
+    const result = await runFacebookOAuthHealthChecks();
+    await finishWorkerRun(runId, "succeeded", result);
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    console.error("cron_oauth_health_failed", error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : "OAuth health worker failed.";
+    console.error("cron_oauth_health_failed", message);
+    await finishWorkerRun(runId, "failed", {}, message);
     return NextResponse.json(
       { ok: false, error: "OAuth health worker failed." },
       { status: 500 },
