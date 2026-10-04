@@ -7,8 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireOpsAdmin } from "@/lib/ops/access";
 
-type OpsQuery = ReturnType<ReturnType<typeof createAdminClient>["from"]>;
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-IN").format(value);
 }
@@ -16,15 +14,6 @@ function formatNumber(value: number) {
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-async function countRows(table: string, filters?: (query: OpsQuery) => OpsQuery) {
-  const admin = createAdminClient();
-  let query = admin.from(table).select("id", { count: "exact", head: true });
-  if (filters) query = filters(query);
-  const { count, error } = await query;
-  if (error) throw error;
-  return count ?? 0;
 }
 
 export default async function OpsPage() {
@@ -36,21 +25,54 @@ export default async function OpsPage() {
   const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [signups, publishingUsers, connectedAccounts, successfulPosts, failedPosts, scheduledPosts, publishingPosts, failedDestinations24h, oauthFailures24h, tokenRefreshFailures24h, notificationFailures24h, billingFailures, workerFailures24h] = await Promise.all([
-    countRows("socialmedia_profiles"),
-    countRows("socialmedia_users"),
-    countRows("socialmedia_social_accounts", (query) => query.eq("status", "connected")),
-    countRows("socialmedia_posts", (query) => query.eq("status", "published")),
-    countRows("socialmedia_posts", (query) => query.eq("status", "failed")),
-    countRows("socialmedia_posts", (query) => query.eq("status", "scheduled")),
-    countRows("socialmedia_posts", (query) => query.eq("status", "publishing")),
-    countRows("socialmedia_post_platforms", (query) => query.eq("status", "failed").gte("updated_at", dayAgo)),
-    countRows("socialmedia_oauth_health_checks", (query) => query.in("status", ["invalid", "error"]).gte("checked_at", dayAgo)),
-    countRows("socialmedia_notification_logs", (query) => query.eq("event_type", "token_expired").gte("created_at", dayAgo)),
-    countRows("socialmedia_notification_logs", (query) => query.eq("status", "failed").gte("updated_at", dayAgo)),
-    countRows("socialmedia_workspaces", (query) => query.in("subscription_status", ["past_due", "incomplete"])),
-    countRows("socialmedia_worker_runs", (query) => query.eq("status", "failed").gte("started_at", dayAgo)),
+  const [
+    signupsResult,
+    publishingUsersResult,
+    connectedAccountsResult,
+    successfulPostsResult,
+    failedPostsResult,
+    scheduledPostsResult,
+    publishingPostsResult,
+    failedDestinationsResult,
+    oauthFailuresResult,
+    tokenRefreshFailuresResult,
+    notificationFailuresResult,
+    billingFailuresResult,
+    workerFailuresResult,
+  ] = await Promise.all([
+    admin.from("socialmedia_profiles").select("id", { count: "exact", head: true }),
+    admin.from("socialmedia_users").select("id", { count: "exact", head: true }),
+    admin.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("status", "connected"),
+    admin.from("socialmedia_posts").select("id", { count: "exact", head: true }).eq("status", "published"),
+    admin.from("socialmedia_posts").select("id", { count: "exact", head: true }).eq("status", "failed"),
+    admin.from("socialmedia_posts").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
+    admin.from("socialmedia_posts").select("id", { count: "exact", head: true }).eq("status", "publishing"),
+    admin.from("socialmedia_post_platforms").select("id", { count: "exact", head: true }).eq("status", "failed").gte("updated_at", dayAgo),
+    admin.from("socialmedia_oauth_health_checks").select("id", { count: "exact", head: true }).in("status", ["invalid", "error"]).gte("checked_at", dayAgo),
+    admin.from("socialmedia_notification_logs").select("id", { count: "exact", head: true }).eq("event_type", "token_expired").gte("created_at", dayAgo),
+    admin.from("socialmedia_notification_logs").select("id", { count: "exact", head: true }).eq("status", "failed").gte("updated_at", dayAgo),
+    admin.from("socialmedia_workspaces").select("id", { count: "exact", head: true }).in("subscription_status", ["past_due", "incomplete"]),
+    admin.from("socialmedia_worker_runs").select("id", { count: "exact", head: true }).eq("status", "failed").gte("started_at", dayAgo),
   ]);
+
+  const countOrThrow = (result: { count: number | null; error: { message: string } | null }) => {
+    if (result.error) throw new Error(result.error.message);
+    return result.count ?? 0;
+  };
+
+  const signups = countOrThrow(signupsResult);
+  const publishingUsers = countOrThrow(publishingUsersResult);
+  const connectedAccounts = countOrThrow(connectedAccountsResult);
+  const successfulPosts = countOrThrow(successfulPostsResult);
+  const failedPosts = countOrThrow(failedPostsResult);
+  const scheduledPosts = countOrThrow(scheduledPostsResult);
+  const publishingPosts = countOrThrow(publishingPostsResult);
+  const failedDestinations24h = countOrThrow(failedDestinationsResult);
+  const oauthFailures24h = countOrThrow(oauthFailuresResult);
+  const tokenRefreshFailures24h = countOrThrow(tokenRefreshFailuresResult);
+  const notificationFailures24h = countOrThrow(notificationFailuresResult);
+  const billingFailures = countOrThrow(billingFailuresResult);
+  const workerFailures24h = countOrThrow(workerFailuresResult);
 
   const [{ data: recentPostActivity }, { data: recentAccountActivity }] = await Promise.all([
     admin.from("socialmedia_posts").select("profile_id").gte("updated_at", monthAgo).limit(10000),
