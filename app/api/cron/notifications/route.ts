@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json({ ok: true, ...(await runNotificationWorker()) });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Notification worker failed." }, { status: 500 });
+    console.error("cron_notification_worker_failed", error instanceof Error ? error.message : error);
+    return NextResponse.json({ ok: false, error: "Notification worker failed." }, { status: 500 });
   }
 }
 
