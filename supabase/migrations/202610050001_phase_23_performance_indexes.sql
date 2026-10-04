@@ -1,6 +1,9 @@
 -- Phase 23: performance indexes for scheduled/retry worker scans and platform-filtered history.
 -- These indexes keep high-frequency worker queries bounded as post volume grows.
 
+create index if not exists socialmedia_posts_profile_created_idx
+  on public.socialmedia_posts(profile_id, created_at desc);
+
 create index if not exists socialmedia_posts_status_scheduled_idx
   on public.socialmedia_posts(status, scheduled_at)
   where scheduled_at is not null;
