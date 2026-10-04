@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runNotificationWorker } from "@/lib/notifications/worker";
+import { finishWorkerRun, startWorkerRun } from "@/lib/ops/worker-runs";
 
 export const maxDuration = 60;
 
@@ -14,10 +15,16 @@ function isAuthorized(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  const runId = await startWorkerRun("notifications");
   try {
-    return NextResponse.json({ ok: true, ...(await runNotificationWorker()) });
+    const result = await runNotificationWorker();
+    await finishWorkerRun(runId, "succeeded", result);
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    console.error("cron_notification_worker_failed", error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : "Notification worker failed.";
+    console.error("cron_notification_worker_failed", message);
+    await finishWorkerRun(runId, "failed", {}, message);
     return NextResponse.json({ ok: false, error: "Notification worker failed." }, { status: 500 });
   }
 }
