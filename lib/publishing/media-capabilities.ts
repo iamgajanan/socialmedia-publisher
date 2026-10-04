@@ -1,5 +1,7 @@
 export type MediaKind = "image" | "video";
 export type MediaCapability = { minFiles: number; maxFiles: number; imageTypes: string[]; videoTypes: string[] };
+export type PlatformMediaIssue = { platform: string; message: string };
+
 const ALL_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"];
 const ALL_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
 const LINKEDIN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -15,13 +17,49 @@ export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   linkedin: { minFiles: 0, maxFiles: 1, imageTypes: LINKEDIN_IMAGE_TYPES, videoTypes: LINKEDIN_VIDEO_TYPES },
   x: { minFiles: 0, maxFiles: 0, imageTypes: [], videoTypes: [] },
 };
+
 const DEFAULT_CAPABILITY: MediaCapability = { minFiles: 0, maxFiles: 20, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES };
-function intersect(values: string[][]): string[] { return values.length ? values.reduce((current, next) => current.filter((value) => next.includes(value))) : []; }
+
+function intersect(values: string[][]): string[] {
+  return values.length ? values.reduce((current, next) => current.filter((value) => next.includes(value))) : [];
+}
+
+function union(values: string[][]): string[] {
+  return [...new Set(values.flat())];
+}
+
+/**
+ * Publishing validation uses the intersection of provider capabilities. The
+ * composer uploader is intentionally more permissive: media can be uploaded
+ * once and then validated per destination at publish time.
+ */
 export function getMediaCapability(platforms: string[]): MediaCapability {
   const capabilities = platforms.map((platform) => PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY);
   if (!capabilities.length) return DEFAULT_CAPABILITY;
-  return { minFiles: Math.max(...capabilities.map((c) => c.minFiles)), maxFiles: Math.min(...capabilities.map((c) => c.maxFiles)), imageTypes: intersect(capabilities.map((c) => c.imageTypes)), videoTypes: intersect(capabilities.map((c) => c.videoTypes)) };
+  return {
+    minFiles: Math.max(...capabilities.map((c) => c.minFiles)),
+    maxFiles: Math.min(...capabilities.map((c) => c.maxFiles)),
+    imageTypes: intersect(capabilities.map((c) => c.imageTypes)),
+    videoTypes: intersect(capabilities.map((c) => c.videoTypes)),
+  };
 }
+
+/**
+ * Upload validation is platform-agnostic. This prevents one restrictive
+ * destination (for example YouTube video-only publishing) from preventing a
+ * user from uploading media that another selected destination supports.
+ */
+export function getUploadMediaCapability(platforms: string[]): MediaCapability {
+  const capabilities = platforms.map((platform) => PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY);
+  if (!capabilities.length) return DEFAULT_CAPABILITY;
+  return {
+    minFiles: 0,
+    maxFiles: Math.max(...capabilities.map((c) => c.maxFiles)),
+    imageTypes: union(capabilities.map((c) => c.imageTypes)),
+    videoTypes: union(capabilities.map((c) => c.videoTypes)),
+  };
+}
+
 export function mediaTypeFromPath(path: string): string {
   const lower = path.toLowerCase();
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
@@ -37,6 +75,62 @@ export function mediaTypeFromPath(path: string): string {
   if (lower.endsWith(".mkv")) return "video/x-matroska";
   return "application/octet-stream";
 }
+
+export function getPlatformMediaIssues(platforms: string[], mediaTypes: string[]): PlatformMediaIssue[] {
+  if (!platforms.length || !mediaTypes.length) {
+    return platforms.flatMap((platform) => {
+      const capability = PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY;
+      if (capability.minFiles === 0) return [];
+      return [{ platform, message: `${platform} requires media before publishing.` }];
+    });
+  }
+
+  return platforms.flatMap((platform) => {
+    const capability = PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY;
+    const issues: PlatformMediaIssue[] = [];
+
+    if (mediaTypes.length > capability.maxFiles) {
+      issues.push({
+        platform,
+        message: `${platform} supports at most ${capability.maxFiles} media file${capability.maxFiles === 1 ? "" : "s"} per post. Remove extra media or deselect ${platform}.`,
+      });
+      return issues;
+    }
+
+    if (platform === "youtube" && mediaTypes.some((type) => type.startsWith("image/"))) {
+      issues.push({
+        platform,
+        message: "OmniSocial's current YouTube publishing integration supports video uploads only. Remove YouTube to publish this image post.",
+      });
+      return issues;
+    }
+
+    if (platform === "instagram" && mediaTypes.length > 1) {
+      const hasImage = mediaTypes.some((type) => type.startsWith("image/"));
+      const hasVideo = mediaTypes.some((type) => type.startsWith("video/"));
+      if (hasImage && hasVideo) {
+        issues.push({
+          platform,
+          message: "Instagram carousels cannot mix images and videos in the current publishing flow. Use only images or deselect Instagram.",
+        });
+        return issues;
+      }
+    }
+
+    const unsupported = mediaTypes.find(
+      (type) => !capability.imageTypes.includes(type) && !capability.videoTypes.includes(type),
+    );
+    if (unsupported) {
+      issues.push({
+        platform,
+        message: `${unsupported} is not supported by ${platform}. Remove that media or deselect ${platform}.`,
+      });
+    }
+
+    return issues;
+  });
+}
+
 export function validateMediaSelection(platforms: string[], mediaTypes: string[]): string | null {
   const capability = getMediaCapability(platforms);
   if (mediaTypes.length < capability.minFiles) {
