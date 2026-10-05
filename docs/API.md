@@ -10,6 +10,8 @@ All API endpoints use a profile-scoped Bearer API key.
 
 The API key resolves the Omnisocial profile and the API only uses that profile's connected accounts. Provider OAuth tokens are never returned. Keep API keys server-side and store them in an automation platform's secret/credential storage.
 
+Every `/api/v1/*` response includes `X-Request-Id`. Supply an `X-Request-Id` header when you need to correlate an automation request with server logs; otherwise OmniSocial generates one.
+
 ## Supported platforms
 
 Accounts: facebook, instagram, threads, linkedin, x, youtube, tiktok.
@@ -21,7 +23,7 @@ Publishing: facebook, instagram, threads, linkedin, youtube, tiktok.
 
 Lists connected accounts owned by the authenticated profile. Optional query: platforms=instagram,facebook.
 
-    curl -s "https://socialmedia-publisher-gules.vercel.app/api/v1/accounts?platforms=instagram,facebook" -H "Authorization: Bearer $API_KEY"
+    curl -s "https://socialmedia-publisher-gules.vercel.app/api/v1/accounts?platforms=instagram,facebook" -H "Authorization: Bearer $API_KEY" -H "X-Request-Id: accounts-check-001"
 
 Response contains account metadata only, never provider secrets.
 
@@ -35,9 +37,19 @@ Use the returned media_path when publishing.
 
 ### POST /api/v1/publish
 
-Creates an immediate queued post or a future scheduled post.
+Creates an immediate publish or a future scheduled post.
+
+For an immediate publish, omit `scheduled_at`. OmniSocial creates the post and then invokes the existing production publishing worker immediately. It does not wait for the next cron poll. Scheduled posts remain cron/worker driven and are not published early.
 
 Request:
+
+    {
+      "platforms": ["instagram", "facebook"],
+      "text": "Hello from Omnisocial",
+      "media_paths": ["<profile-id>/...-photo.jpg"]
+    }
+
+Scheduled request:
 
     {
       "platforms": ["instagram", "facebook"],
@@ -76,15 +88,21 @@ Draft posts are deleted; scheduled posts are cancelled. Posts already publishing
 
     curl -i -X DELETE "https://socialmedia-publisher-gules.vercel.app/api/v1/posts/POST_ID" -H "Authorization: Bearer $API_KEY"
 
-## Limits and errors
+## Errors
 
-Publish JSON requests are limited to 1 MB. Media uploads are limited to 100 MB. API rate limit is 120 requests/minute per API key; HTTP 429 includes Retry-After. Common statuses: 400 invalid request, 401 authentication, 404 not found, 409 conflict, 413 too large, 415 unsupported media, 429 rate limited, 503 protection unavailable.
+API errors use an `error` message and, where the condition is machine-actionable, a stable `code`. Examples include `invalid_publish_request`, `account_not_connected`, `media_platform_incompatible`, `idempotency_key_reused`, `post_limit_reached`, and `post_not_editable`.
 
-Publishing responses include X-Request-Id and Cache-Control: no-store.
+Common statuses: 400 invalid request, 401 authentication, 404 not found, 409 conflict, 413 too large, 415 unsupported media, 429 rate limited, 503 protection unavailable. HTTP 429 includes `Retry-After`.
+
+## Limits
+
+Publish JSON requests are limited to 1 MB. Media uploads are limited to 100 MB. API rate limit is 120 requests/minute per API key.
 
 ## n8n integration
 
 Recommended flow: n8n → POST /api/v1/media when media is needed → POST /api/v1/publish → GET /api/v1/posts/{post_id} when status is needed. Store the API key in an n8n credential/secret. For scheduled posts, send scheduled_at to Omnisocial unless the workflow intentionally owns scheduling.
+
+For immediate publishing, omit `scheduled_at`; OmniSocial starts the existing worker immediately. Do not implement a second n8n-specific publishing path.
 
 ## OpenAPI
 
