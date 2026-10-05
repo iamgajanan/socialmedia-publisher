@@ -1,6 +1,6 @@
 import "server-only";
 
-export const SOCIAL_PLATFORMS = ["facebook","instagram","threads","linkedin","x","youtube","tiktok"] as const;
+export const SOCIAL_PLATFORMS = ["facebook","instagram","threads","linkedin","x","youtube","tiktok","pinterest"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 export type ProviderConfig = {
@@ -61,9 +61,6 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
         authorizationUrl: "https://www.linkedin.com/oauth/v2/authorization",
         tokenUrl: "https://www.linkedin.com/oauth/v2/accessToken",
         profileUrl: "https://api.linkedin.com/v2/userinfo",
-        // Personal publishing is available through Share on LinkedIn.
-        // Organization scopes are requested only after Community Management API
-        // access has been approved for the LinkedIn developer application.
         scopes,
         redirectUri,
       };
@@ -85,6 +82,17 @@ export function getProviderConfig(platform: SocialPlatform): ProviderConfig | nu
     case "tiktok":
       if (!env("TIKTOK_CLIENT_KEY") || !env("TIKTOK_CLIENT_SECRET")) return null;
       return { clientId: env("TIKTOK_CLIENT_KEY"), clientSecret: env("TIKTOK_CLIENT_SECRET"), authorizationUrl: "https://www.tiktok.com/v2/auth/authorize/", tokenUrl: "https://open.tiktokapis.com/v2/oauth/token/", profileUrl: "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,profile_deep_link", scopes: (env("TIKTOK_OAUTH_SCOPES") || "user.info.basic,video.publish").split(",").map((v) => v.trim()).filter(Boolean), redirectUri, tokenClientKey: "client_key" };
+    case "pinterest":
+      if (!env("PINTEREST_CLIENT_ID") || !env("PINTEREST_CLIENT_SECRET")) return null;
+      return {
+        clientId: env("PINTEREST_CLIENT_ID"),
+        clientSecret: env("PINTEREST_CLIENT_SECRET"),
+        authorizationUrl: "https://www.pinterest.com/oauth/",
+        tokenUrl: "https://api.pinterest.com/v5/oauth/token",
+        profileUrl: "https://api.pinterest.com/v5/user_account",
+        scopes: (env("PINTEREST_OAUTH_SCOPES") || "user_accounts:read boards:read boards:write pins:read pins:write").split(/[ ,]+/).filter(Boolean),
+        redirectUri,
+      };
     case "facebook": {
       const version = env("META_GRAPH_VERSION");
       if (!env("META_APP_ID") || !env("META_APP_SECRET") || !version) return null;
