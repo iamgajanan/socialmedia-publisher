@@ -6,82 +6,19 @@ import { createHash, randomBytes } from "node:crypto";
 import { encryptToken } from "@/lib/social/token-crypto";
 import { createDpopKey, createPkce, discoverBlueskyAuthServer, postDpopForm, serializeJwk } from "@/lib/social/bluesky-oauth";
 import { SOCIAL_PLATFORMS, getPkceVerifierCookieName, getProviderConfig, type SocialPlatform } from "@/lib/social/oauth";
-
 function isPlatform(value: string): value is SocialPlatform { return SOCIAL_PLATFORMS.includes(value as SocialPlatform); }
 function createVerifier() { return randomBytes(48).toString("base64url"); }
 function createChallenge(verifier: string) { return createHash("sha256").update(verifier).digest("base64url"); }
-
 export async function GET(request: Request, { params }: { params: Promise<{ platform: string }> }) {
-  const { platform } = await params;
-  if (!isPlatform(platform)) return NextResponse.redirect(new URL("/connect-accounts?error=unsupported", request.url));
-
-  const supabase = await createClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  const userId = claims?.claims?.sub;
-  if (!userId) return NextResponse.redirect(new URL("/auth/login", request.url));
+  const { platform } = await params; if (!isPlatform(platform)) return NextResponse.redirect(new URL("/connect-accounts?error=unsupported", request.url));
+  const supabase = await createClient(); const { data: claims } = await supabase.auth.getClaims(); const userId = claims?.claims?.sub; if (!userId) return NextResponse.redirect(new URL("/auth/login", request.url));
   if (!(await consumeRateLimit(`oauth-start:user:${String(userId)}`, 10, 600)) || !(await consumeRateLimit(`oauth-start:ip:${await requestFingerprint()}`, 20, 600))) return NextResponse.redirect(new URL(`/connect-accounts?error=rate_limit&platform=${platform}`, request.url));
-
-  const config = getProviderConfig(platform);
-  if (!config) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
-
-  const workspaceUserId = new URL(request.url).searchParams.get("user");
-  const { data: profile } = await supabase.from("socialmedia_profiles").select("workspace_id").eq("id", String(userId)).maybeSingle();
-  if (!profile?.workspace_id) return NextResponse.redirect(new URL("/users?error=workspace", request.url));
-  const { data: selectedUser } = await supabase.from("socialmedia_users").select("id").eq("id", workspaceUserId ?? "").eq("workspace_id", profile.workspace_id).maybeSingle();
-  if (!selectedUser) return NextResponse.redirect(new URL("/connect-accounts?error=user_required", request.url));
-
-  const [{ data: workspace }, { data: existingAccount }, { count: connectedCount }] = await Promise.all([
-    supabase.from("socialmedia_workspaces").select("plan_id").eq("id", profile.workspace_id).single(),
-    supabase.from("socialmedia_social_accounts").select("id").eq("workspace_id", profile.workspace_id).eq("socialmedia_user_id", selectedUser.id).eq("platform", platform).limit(1).maybeSingle(),
-    supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("status", "connected"),
-  ]);
-  if (!workspace) return NextResponse.redirect(new URL("/users?error=workspace", request.url));
-  const { data: plan } = await supabase.from("socialmedia_plans").select("max_social_accounts").eq("id", workspace.plan_id).single();
-  if (!plan) return NextResponse.redirect(new URL("/users?error=plan", request.url));
-  if (!existingAccount && (connectedCount ?? 0) >= plan.max_social_accounts) return NextResponse.redirect(new URL(`/connect-accounts?error=account_limit&platform=${platform}&user=${selectedUser.id}`, request.url));
-
-  const state = randomBytes(32).toString("base64url");
-  const store = await cookies();
-  const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, maxAge: 600, path: "/" };
-  store.set("social_oauth_state", state, cookieOptions);
-  store.set("social_oauth_platform", platform, cookieOptions);
-  store.set("social_oauth_user", selectedUser.id, cookieOptions);
-
-  if (platform === "bluesky") {
-    try {
-      const pdsUrl = process.env.BLUESKY_PDS_URL?.trim() || "https://bsky.social";
-      const { issuer, metadata } = await discoverBlueskyAuthServer(pdsUrl);
-      const dpop = createDpopKey();
-      const pkce = createPkce();
-      store.set("social_oauth_bluesky_issuer", encryptToken(issuer), cookieOptions);
-      store.set("social_oauth_bluesky_private_jwk", encryptToken(serializeJwk(dpop.privateJwk)), cookieOptions);
-      store.set("social_oauth_bluesky_public_jwk", encryptToken(JSON.stringify(dpop.publicJwk)), cookieOptions);
-      store.set(getPkceVerifierCookieName(), pkce.verifier, cookieOptions);
-      const form = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, scope: config.scopes.join(" "), state, code_challenge: pkce.challenge, code_challenge_method: "S256", dpop_jkt: dpop.thumbprint });
-      if (!metadata.pushed_authorization_request_endpoint) throw new Error("Bluesky authorization server does not support PAR.");
-      const parResponse = await postDpopForm(metadata.pushed_authorization_request_endpoint, form, dpop.privateJwk, dpop.publicJwk);
-      if (!parResponse.ok) throw new Error("Bluesky authorization request was rejected.");
-      const par = await parResponse.json() as { request_uri?: string };
-      if (!par.request_uri) throw new Error("Bluesky did not return a request URI.");
-      const authorizeUrl = new URL(metadata.authorization_endpoint);
-      authorizeUrl.searchParams.set("client_id", config.clientId);
-      authorizeUrl.searchParams.set("request_uri", par.request_uri);
-      return NextResponse.redirect(authorizeUrl);
-    } catch {
-      return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=bluesky&user=${selectedUser.id}`, request.url));
-    }
-  }
-
-  const url = new URL(config.authorizationUrl);
-  url.searchParams.set("client_id", config.clientId);
-  url.searchParams.set("redirect_uri", config.redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("state", state);
-  if (config.configId) url.searchParams.set("config_id", config.configId);
-  else url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
-  if (platform === "reddit") { url.searchParams.set("duration", "permanent"); url.searchParams.set("prompt", "login"); }
-  if (config.instagramLogin) { url.searchParams.set("enable_fb_login", "0"); url.searchParams.set("force_authentication", "1"); }
-  if (platform === "youtube") { url.searchParams.set("access_type", "offline"); url.searchParams.set("include_granted_scopes", "true"); url.searchParams.set("prompt", "select_account consent"); }
-  if (config.usePkce) { const verifier = createVerifier(); store.set(getPkceVerifierCookieName(), verifier, cookieOptions); url.searchParams.set("code_challenge", createChallenge(verifier)); url.searchParams.set("code_challenge_method", "S256"); }
-  return NextResponse.redirect(url);
+  const config = getProviderConfig(platform); if (!config) return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=${platform}`, request.url));
+  const workspaceUserId = new URL(request.url).searchParams.get("user"); const { data: profile } = await supabase.from("socialmedia_profiles").select("workspace_id").eq("id", String(userId)).maybeSingle(); if (!profile?.workspace_id) return NextResponse.redirect(new URL("/users?error=workspace", request.url));
+  const { data: selectedUser } = await supabase.from("socialmedia_users").select("id").eq("id", workspaceUserId ?? "").eq("workspace_id", profile.workspace_id).maybeSingle(); if (!selectedUser) return NextResponse.redirect(new URL("/connect-accounts?error=user_required", request.url));
+  const [{ data: workspace }, { data: existingAccount }, { count: connectedCount }] = await Promise.all([supabase.from("socialmedia_workspaces").select("plan_id").eq("id", profile.workspace_id).single(), supabase.from("socialmedia_social_accounts").select("id").eq("workspace_id", profile.workspace_id).eq("socialmedia_user_id", selectedUser.id).eq("platform", platform).limit(1).maybeSingle(), supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("status", "connected")]);
+  if (!workspace) return NextResponse.redirect(new URL("/users?error=workspace", request.url)); const { data: plan } = await supabase.from("socialmedia_plans").select("max_social_accounts").eq("id", workspace.plan_id).single(); if (!plan) return NextResponse.redirect(new URL("/users?error=plan", request.url)); if (!existingAccount && (connectedCount ?? 0) >= plan.max_social_accounts) return NextResponse.redirect(new URL(`/connect-accounts?error=account_limit&platform=${platform}&user=${selectedUser.id}`, request.url));
+  const state = randomBytes(32).toString("base64url"); const store = await cookies(); const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, maxAge: 600, path: "/" }; store.set("social_oauth_state", state, cookieOptions); store.set("social_oauth_platform", platform, cookieOptions); store.set("social_oauth_user", selectedUser.id, cookieOptions);
+  if (platform === "bluesky") { try { const pdsUrl = process.env.BLUESKY_PDS_URL?.trim() || "https://bsky.social"; const { issuer, metadata } = await discoverBlueskyAuthServer(pdsUrl); const dpop = createDpopKey(); const pkce = createPkce(); store.set("social_oauth_bluesky_issuer", encryptToken(issuer), cookieOptions); store.set("social_oauth_bluesky_private_jwk", encryptToken(serializeJwk(dpop.privateJwk)), cookieOptions); store.set("social_oauth_bluesky_public_jwk", encryptToken(JSON.stringify(dpop.publicJwk)), cookieOptions); store.set(getPkceVerifierCookieName(), pkce.verifier, cookieOptions); const form = new URLSearchParams({ response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, scope: config.scopes.join(" "), state, code_challenge: pkce.challenge, code_challenge_method: "S256", dpop_jkt: dpop.thumbprint }); if (!metadata.pushed_authorization_request_endpoint) throw new Error("Bluesky authorization server does not support PAR."); const parResponse = await postDpopForm(metadata.pushed_authorization_request_endpoint, form, dpop.privateJwk, dpop.publicJwk); if (!parResponse.ok) throw new Error("Bluesky authorization request was rejected."); const par = await parResponse.json() as { request_uri?: string }; if (!par.request_uri) throw new Error("Bluesky did not return a request URI."); const authorizeUrl = new URL(metadata.authorization_endpoint); authorizeUrl.searchParams.set("client_id", config.clientId); authorizeUrl.searchParams.set("request_uri", par.request_uri); return NextResponse.redirect(authorizeUrl); } catch { return NextResponse.redirect(new URL(`/connect-accounts?error=setup&platform=bluesky&user=${selectedUser.id}`, request.url)); } }
+  const url = new URL(config.authorizationUrl); url.searchParams.set("client_id", config.clientId); url.searchParams.set("redirect_uri", config.redirectUri); url.searchParams.set("response_type", "code"); url.searchParams.set("state", state); if (config.configId) url.searchParams.set("config_id", config.configId); else url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " ")); if (platform === "reddit") { url.searchParams.set("duration", "permanent"); url.searchParams.set("prompt", "login"); } if (platform === "google_business_profile") { url.searchParams.set("access_type", "offline"); url.searchParams.set("include_granted_scopes", "true"); url.searchParams.set("prompt", "select_account consent"); } if (config.instagramLogin) { url.searchParams.set("enable_fb_login", "0"); url.searchParams.set("force_authentication", "1"); } if (platform === "youtube") { url.searchParams.set("access_type", "offline"); url.searchParams.set("include_granted_scopes", "true"); url.searchParams.set("prompt", "select_account consent"); } if (config.usePkce) { const verifier = createVerifier(); store.set(getPkceVerifierCookieName(), verifier, cookieOptions); url.searchParams.set("code_challenge", createChallenge(verifier)); url.searchParams.set("code_challenge_method", "S256"); } return NextResponse.redirect(url);
 }
