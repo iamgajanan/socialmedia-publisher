@@ -1,3 +1,4 @@
+// Phase 27: Bluesky account health uses the persisted DID from the encrypted OAuth session.
 import { PublisherError, type MediaAsset, type Publisher, type PublisherAccount, type PublishInput, type PublishResult } from "./types";
 import { dpopFetch, parseJwk } from "@/lib/social/bluesky-oauth";
 type Session = { accessToken: string; privateJwk: Record<string, string>; publicJwk: Record<string, string>; pdsUrl: string; issuer: string; did?: string };
