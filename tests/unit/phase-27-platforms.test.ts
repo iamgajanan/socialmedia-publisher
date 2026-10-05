@@ -5,7 +5,7 @@ import { getMediaCapability, getPlatformMediaIssues } from "../../lib/publishing
 test("Phase 27 media capabilities cover the new platforms", () => {
   assert.equal(getMediaCapability(["bluesky"]).maxFiles, 4);
   assert.equal(getMediaCapability(["google_business_profile"]).maxFiles, 1);
-  assert.equal(getMediaCapability(["reddit"]).maxFiles, 0);
+  assert.equal(getMediaCapability(["reddit"]).maxFiles, 20);
 });
 
 test("Phase 27 media warnings are platform specific", () => {
