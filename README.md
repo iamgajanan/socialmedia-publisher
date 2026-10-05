@@ -6,6 +6,7 @@ OmniSocial is a SaaS social-media publishing platform built with Next.js, TypeSc
 
 - **[User Guide](docs/USER_GUIDE.md)** — Getting started, Publishing Users, creating posts, scheduling, Media Library, platform behavior, troubleshooting and FAQ.
 - **[Setup & Social Provider Guide](docs/SETUP.md)** — Local/production environment setup plus step-by-step OAuth configuration for Facebook, Instagram, Threads, LinkedIn, YouTube and X, including Client IDs, Client Secrets, redirect URI, scopes and provider flows.
+- **[Pinterest Integration Guide](docs/PINTEREST.md)** — Pinterest OAuth setup, account connection, board handling, image Pin publishing, token refresh and production testing.
 - **[API documentation](docs/API.md)** — REST API endpoints and automation integration.
 - **[OpenAPI specification](docs/openapi.yaml)** — Machine-readable API specification.
 - **[Security guide](docs/SECURITY.md)** — Production API security model and release checklist.

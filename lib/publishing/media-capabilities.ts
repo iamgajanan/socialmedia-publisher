@@ -6,6 +6,7 @@ const ALL_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "
 const ALL_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
 const LINKEDIN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const LINKEDIN_VIDEO_TYPES = ["video/mp4", "video/quicktime"];
+const PINTEREST_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   facebook: { minFiles: 0, maxFiles: 1, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES },
@@ -13,9 +14,12 @@ export const PLATFORM_MEDIA_CAPABILITIES: Record<string, MediaCapability> = {
   threads: { minFiles: 0, maxFiles: 1, imageTypes: ["image/jpeg", "image/png"], videoTypes: ["video/mp4", "video/quicktime"] },
   youtube: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ALL_VIDEO_TYPES },
   tiktok: { minFiles: 1, maxFiles: 1, imageTypes: [], videoTypes: ["video/mp4", "video/quicktime"] },
-  // LinkedIn supports text-only posts as well as image/video shares.
   linkedin: { minFiles: 0, maxFiles: 1, imageTypes: LINKEDIN_IMAGE_TYPES, videoTypes: LINKEDIN_VIDEO_TYPES },
   x: { minFiles: 0, maxFiles: 0, imageTypes: [], videoTypes: [] },
+  // The first Pinterest integration supports one standard image Pin. Video Pins
+  // require Pinterest's asynchronous media-upload + cover-image flow and remain
+  // intentionally unsupported until that flow is added.
+  pinterest: { minFiles: 1, maxFiles: 1, imageTypes: PINTEREST_IMAGE_TYPES, videoTypes: [] },
 };
 
 const DEFAULT_CAPABILITY: MediaCapability = { minFiles: 0, maxFiles: 20, imageTypes: ALL_IMAGE_TYPES, videoTypes: ALL_VIDEO_TYPES };
@@ -28,11 +32,6 @@ function union(values: string[][]): string[] {
   return [...new Set(values.flat())];
 }
 
-/**
- * Publishing validation uses the intersection of provider capabilities. The
- * composer uploader is intentionally more permissive: media can be uploaded
- * once and then validated per destination at publish time.
- */
 export function getMediaCapability(platforms: string[]): MediaCapability {
   const capabilities = platforms.map((platform) => PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY);
   if (!capabilities.length) return DEFAULT_CAPABILITY;
@@ -44,11 +43,6 @@ export function getMediaCapability(platforms: string[]): MediaCapability {
   };
 }
 
-/**
- * Upload validation is platform-agnostic. This prevents one restrictive
- * destination (for example YouTube video-only publishing) from preventing a
- * user from uploading media that another selected destination supports.
- */
 export function getUploadMediaCapability(platforms: string[]): MediaCapability {
   const capabilities = platforms.map((platform) => PLATFORM_MEDIA_CAPABILITIES[platform] ?? DEFAULT_CAPABILITY);
   if (!capabilities.length) return DEFAULT_CAPABILITY;
@@ -115,6 +109,14 @@ export function getPlatformMediaIssues(platforms: string[], mediaTypes: string[]
         });
         return issues;
       }
+    }
+
+    if (platform === "pinterest" && mediaTypes.some((type) => type.startsWith("video/"))) {
+      issues.push({
+        platform,
+        message: "OmniSocial's current Pinterest integration supports image Pins only. Remove the video or deselect Pinterest.",
+      });
+      return issues;
     }
 
     const unsupported = mediaTypes.find(
