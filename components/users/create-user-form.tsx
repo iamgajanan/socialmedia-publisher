@@ -1,10 +1,16 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
+import type { CreatePublishingUserState } from "@/app/users/actions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const initialState: CreatePublishingUserState = {};
 
 function PendingFeedback() {
   const { pending } = useFormStatus();
@@ -34,9 +40,35 @@ function CreateButton() {
   );
 }
 
-export function CreateUserForm({ action }: { action: (formData: FormData) => void | Promise<void> }) {
+function FormFeedback({ state }: { state: CreatePublishingUserState }) {
+  if (!state.error) return null;
+
   return (
-    <form action={action} className="space-y-4">
+    <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4" role="alert">
+      <div className="flex items-start gap-3">
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-destructive" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">{state.limitReached ? "Publishing user limit reached" : "Unable to create publishing user"}</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{state.error}</p>
+          {state.limitReached ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button asChild size="sm">
+                <Link href="/billing">View plans</Link>
+              </Button>
+              <Badge variant="secondary">Current plan: {state.planName}</Badge>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CreateUserForm({ action }: { action: (previousState: CreatePublishingUserState, formData: FormData) => Promise<CreatePublishingUserState> }) {
+  const [state, formAction] = useActionState(action, initialState);
+
+  return (
+    <form action={formAction} className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row">
         <Input
           name="name"
@@ -48,6 +80,7 @@ export function CreateUserForm({ action }: { action: (formData: FormData) => voi
         />
         <CreateButton />
       </div>
+      <FormFeedback state={state} />
       <PendingFeedback />
     </form>
   );
