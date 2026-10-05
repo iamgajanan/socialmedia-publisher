@@ -55,7 +55,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ plat
   if (config.configId) url.searchParams.set("config_id", config.configId);
   else url.searchParams.set("scope", config.scopes.join(platform === "tiktok" || platform === "facebook" || platform === "instagram" || platform === "threads" ? "," : " "));
   if (config.instagramLogin) { url.searchParams.set("enable_fb_login", "0"); url.searchParams.set("force_authentication", "1"); }
-  if (platform === "youtube") { url.searchParams.set("access_type", "offline"); url.searchParams.set("include_granted_scopes", "true"); url.searchParams.set("prompt", "consent"); }
+  if (platform === "youtube") {
+    // Always let the user choose which Google account authorizes this publishing user.
+    // This is important when one OmniSocial login manages multiple YouTube identities.
+    url.searchParams.set("access_type", "offline");
+    url.searchParams.set("include_granted_scopes", "true");
+    url.searchParams.set("prompt", "select_account consent");
+  }
   if (config.usePkce) { const verifier = createVerifier(); store.set(getPkceVerifierCookieName(), verifier, cookieOptions); url.searchParams.set("code_challenge", createChallenge(verifier)); url.searchParams.set("code_challenge_method", "S256"); }
 
   return NextResponse.redirect(url);

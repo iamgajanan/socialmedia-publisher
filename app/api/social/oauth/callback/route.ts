@@ -12,6 +12,25 @@ type TokenResponse = { access_token?: string; refresh_token?: string; expires_in
 function record(value: unknown): JsonRecord { return value && typeof value === "object" ? value as JsonRecord : {}; }
 function stringValue(value: unknown) { return typeof value === "string" ? value : undefined; }
 
+async function checkExistingAssignment(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  platform: SocialPlatform,
+  externalAccountId: string,
+  workspaceUserId: string,
+) {
+  const { data, error } = await admin
+    .from("socialmedia_social_accounts")
+    .select("id, socialmedia_user_id")
+    .eq("workspace_id", workspaceId)
+    .eq("platform", platform)
+    .eq("external_account_id", externalAccountId)
+    .maybeSingle();
+
+  if (error) return { error: true, alreadyAssigned: false };
+  return { error: false, alreadyAssigned: Boolean(data?.socialmedia_user_id && data.socialmedia_user_id !== workspaceUserId) };
+}
+
 function profileValues(platform: SocialPlatform, payload: unknown) {
   const root = record(payload);
   if (platform === "youtube") { const items = Array.isArray(root.items) ? root.items : []; const item = record(items[0]); const snippet = record(item.snippet); const thumbnails = record(snippet.thumbnails); const thumbnail = record(thumbnails.default); const id = stringValue(item.id); return { id, name: stringValue(snippet.title), username: stringValue(snippet.customUrl), avatar: stringValue(thumbnail.url), url: id ? `https://youtube.com/channel/${id}` : undefined }; }
@@ -78,6 +97,9 @@ export async function GET(request: Request) {
     const profile = record(await profileResponse.json()); const externalId = stringValue(profile.user_id) ?? stringValue(profile.id);
     if (!externalId) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
     const admin = createAdminClient();
+    const assignment = await checkExistingAssignment(admin, ownerProfile.workspace_id, platform, externalId, workspaceUserId);
+    if (assignment.error) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    if (assignment.alreadyAssigned) return NextResponse.redirect(new URL(`/connect-accounts?error=already_connected&platform=${platform}&user=${workspaceUserId}`, request.url));
     const { error: profileError } = await admin.from("socialmedia_profiles").upsert({ id: String(userId) }, { onConflict: "id" });
     if (profileError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
     const username = stringValue(profile.username);
@@ -102,6 +124,9 @@ export async function GET(request: Request) {
     const destinations = pages.filter(canCreatePageContent); if (!destinations.length) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
     const page = destinations[0];
     const externalAccountId = page.id; const metadata = { meta_page_id: page.id, facebook_page_id: page.id, ...(page.instagramBusinessAccountId ? { instagram_business_account_id: page.instagramBusinessAccountId } : {}), meta_page_tasks: page.tasks, meta_connection_type: "facebook" };
+    const assignment = await checkExistingAssignment(admin, ownerProfile.workspace_id, platform, externalAccountId, workspaceUserId);
+    if (assignment.error) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+    if (assignment.alreadyAssigned) return NextResponse.redirect(new URL(`/connect-accounts?error=already_connected&platform=${platform}&user=${workspaceUserId}`, request.url));
     const { data: savedAccount, error: accountError } = await admin.from("socialmedia_social_accounts").upsert({ profile_id: String(userId), workspace_id: ownerProfile.workspace_id, socialmedia_user_id: workspaceUserId, platform, account_name: page.name, external_account_id: externalAccountId, username: null, avatar_url: null, status: "connected", metadata, token_expires_at: null, provider_account_url: `https://www.facebook.com/${page.id}`, scopes: grantedScopes }, { onConflict: "profile_id,platform,external_account_id" }).select("id").single();
     if (accountError || !savedAccount?.id) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
     const { error: secretError } = await admin.from("socialmedia_account_secrets").upsert({ social_account_id: savedAccount.id, access_token_ciphertext: encryptToken(page.accessToken), refresh_token_ciphertext: null }, { onConflict: "social_account_id" });
@@ -115,6 +140,9 @@ export async function GET(request: Request) {
   const values = profileValues(platform, profilePayload); const externalId = String(values.id || tokens.open_id || "");
   if (!externalId) return NextResponse.redirect(new URL(`/connect-accounts?error=profile&platform=${platform}`, request.url));
   const admin = createAdminClient();
+  const assignment = await checkExistingAssignment(admin, ownerProfile.workspace_id, platform, externalId, workspaceUserId);
+  if (assignment.error) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
+  if (assignment.alreadyAssigned) return NextResponse.redirect(new URL(`/connect-accounts?error=already_connected&platform=${platform}&user=${workspaceUserId}`, request.url));
   const { error: profileError } = await admin.from("socialmedia_profiles").upsert({ id: String(userId) }, { onConflict: "id" });
   if (profileError) return NextResponse.redirect(new URL(`/connect-accounts?error=save&platform=${platform}`, request.url));
   const { data: savedAccount, error: accountError } = await admin.from("socialmedia_social_accounts").upsert({ profile_id: String(userId), workspace_id: ownerProfile.workspace_id, socialmedia_user_id: workspaceUserId, platform, account_name: String(values.name || values.username || platform), external_account_id: externalId, username: values.username ? String(values.username) : null, avatar_url: values.avatar ? String(values.avatar) : null, status: "connected", token_expires_at: typeof expiresIn === "number" ? new Date(Date.now() + expiresIn * 1000).toISOString() : null, refresh_token_expires_at: typeof tokens.refresh_expires_in === "number" ? new Date(Date.now() + tokens.refresh_expires_in * 1000).toISOString() : null, provider_account_url: values.url ? String(values.url) : null, scopes: tokens.scope ? tokens.scope.split(/[ ,]+/).filter(Boolean) : config.scopes }, { onConflict: "profile_id,platform,external_account_id" }).select("id").single();
