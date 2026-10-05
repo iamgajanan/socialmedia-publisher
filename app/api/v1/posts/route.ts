@@ -1,17 +1,22 @@
-import { NextResponse } from "next/server";
-
 import { authenticateApiRequest } from "@/lib/api/api-auth";
 import { parsePostListQuery } from "@/lib/api/post-management-core";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { apiJson, getRequestId, withRequestId } from "@/lib/api/api-response";
 
-export async function GET(request: Request) {
+async function GETImpl(request: Request) {
+  const requestId = getRequestId(request);
   const authentication = await authenticateApiRequest(request);
   if (!authentication.ok) {
-    return NextResponse.json({ error: authentication.error }, { status: authentication.status });
+    return apiJson(
+      { error: authentication.error },
+      authentication.status,
+      requestId,
+      authentication.retryAfterSeconds ? { "Retry-After": String(authentication.retryAfterSeconds) } : undefined,
+    );
   }
 
   const parsed = parsePostListQuery(new URL(request.url).searchParams);
-  if (!parsed.ok) return NextResponse.json({ error: parsed.message }, { status: 400 });
+  if (!parsed.ok) return apiJson({ error: parsed.message, code: "invalid_post_query" }, 400, requestId);
 
   const { status, platform, from, to, limit, offset } = parsed.data;
   const admin = createAdminClient();
@@ -25,18 +30,17 @@ export async function GET(request: Request) {
 
     if (linksError) {
       console.error("api_posts_platform_filter_failed", {
+        requestId,
         profileId: authentication.profileId,
         platform,
         code: linksError.code,
         message: linksError.message,
       });
-      return NextResponse.json({ error: "Unable to filter posts." }, { status: 500 });
+      return apiJson({ error: "Unable to filter posts.", code: "posts_platform_filter_failed" }, 500, requestId);
     }
 
     matchingPostIds = [...new Set((links ?? []).map((link) => String(link.post_id)))];
-    if (!matchingPostIds.length) {
-      return NextResponse.json({ success: true, posts: [], count: 0, limit, offset });
-    }
+    if (!matchingPostIds.length) return apiJson({ success: true, posts: [], count: 0, limit, offset }, 200, requestId);
   }
 
   let query = admin
@@ -54,11 +58,12 @@ export async function GET(request: Request) {
   const { data: posts, error: postsError, count } = await query;
   if (postsError) {
     console.error("api_posts_list_failed", {
+      requestId,
       profileId: authentication.profileId,
       code: postsError.code,
       message: postsError.message,
     });
-    return NextResponse.json({ error: "Unable to load posts." }, { status: 500 });
+    return apiJson({ error: "Unable to load posts.", code: "posts_list_failed" }, 500, requestId);
   }
 
   const postIds = (posts ?? []).map((post) => post.id);
@@ -72,11 +77,12 @@ export async function GET(request: Request) {
 
   if (linksError) {
     console.error("api_posts_destinations_failed", {
+      requestId,
       profileId: authentication.profileId,
       code: linksError.code,
       message: linksError.message,
     });
-    return NextResponse.json({ error: "Unable to load post destinations." }, { status: 500 });
+    return apiJson({ error: "Unable to load post destinations.", code: "post_destinations_lookup_failed" }, 500, requestId);
   }
 
   const accountIds = [...new Set((links ?? []).map((link) => link.social_account_id).filter((id): id is string => Boolean(id)))];
@@ -96,7 +102,7 @@ export async function GET(request: Request) {
     linksByPost.set(link.post_id, current);
   }
 
-  return NextResponse.json({
+  return apiJson({
     success: true,
     posts: (posts ?? []).map((post) => ({
       id: post.id,
@@ -129,5 +135,10 @@ export async function GET(request: Request) {
     count: count ?? 0,
     limit,
     offset,
-  });
+  }, 200, requestId);
+}
+
+export async function GET(request: Request) {
+  const requestId = getRequestId(request);
+  return withRequestId(await GETImpl(request), requestId);
 }
