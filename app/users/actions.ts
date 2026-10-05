@@ -3,23 +3,39 @@
 import { revalidatePath } from "next/cache";
 import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 
-export async function createPublishingUser(formData: FormData) {
+export type CreatePublishingUserState = {
+  error?: string;
+  limitReached?: number;
+  planName?: string;
+};
+
+export async function createPublishingUser(
+  _previousState: CreatePublishingUserState,
+  formData: FormData,
+): Promise<CreatePublishingUserState> {
   const context = await requireWorkspaceAdmin();
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Please enter a user name.");
+  if (!name) return { error: "Please enter a user name." };
+
   const { error } = await context.supabase.from("socialmedia_users").insert({
     workspace_id: context.workspace.id,
     name,
   });
+
   if (error) {
     if (error.message.includes("USER_LIMIT_REACHED")) {
-      const limit = context.plan.max_users;
-      throw new Error(`Your ${context.plan.name} plan allows up to ${limit} publishing user${limit === 1 ? "" : "s"}. Upgrade your plan to add more.`);
+      return {
+        error: `You've reached the ${context.plan.name} plan limit of ${context.plan.max_users} publishing users. Upgrade your plan to add another user.`,
+        limitReached: context.plan.max_users,
+        planName: context.plan.name,
+      };
     }
-    throw new Error(error.message);
+    return { error: "We couldn't create the publishing user. Please try again." };
   }
+
   revalidatePath("/users");
   revalidatePath("/connect-accounts");
+  return {};
 }
 
 export async function renamePublishingUser(formData: FormData) {
