@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/api/api-auth";
 import { getApiConnectedAccounts } from "@/lib/api/connected-accounts";
 import { normalizeConnectedAccount, parsePlatformFilter } from "@/lib/api/connected-accounts-core";
