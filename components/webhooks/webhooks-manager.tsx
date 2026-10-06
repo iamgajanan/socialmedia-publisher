@@ -1,92 +1,22 @@
 "use client";
 
-import { Check, Copy, Link2, Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { Copy, Link2, Loader2, Plus, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
 
-const EVENT_LABELS: Record<string, string> = {
-  "post.created": "Post created", "post.updated": "Post updated", "post.scheduled": "Post scheduled", "post.publishing": "Post publishing", "post.published": "Post published", "post.failed": "Post failed", "post.cancelled": "Post cancelled", "account.connected": "Account connected", "account.disconnected": "Account disconnected", "media.uploaded": "Media uploaded",
-};
-
+const EVENT_LABELS: Record<string, string> = { "post.created": "Post created", "post.updated": "Post updated", "post.scheduled": "Post scheduled", "post.publishing": "Post publishing", "post.published": "Post published", "post.failed": "Post failed", "post.cancelled": "Post cancelled", "account.connected": "Account connected", "account.disconnected": "Account disconnected", "media.uploaded": "Media uploaded" };
 type Webhook = { id: string; url: string; description: string | null; events: string[]; status: string; failure_count?: number; last_delivery_at?: string | null; last_success_at?: string | null; created_at: string };
 
 export default function WebhooksManager() {
-  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
-  const [supportedEvents, setSupportedEvents] = useState<string[]>([]);
-  const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [events, setEvents] = useState<string[]>([]);
-  const [secret, setSecret] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/v1/webhooks", { cache: "no-store" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Unable to load webhooks.");
-      setWebhooks(body.webhooks ?? []);
-      setSupportedEvents(body.supported_events ?? []);
-      if (!events.length) setEvents(body.supported_events ?? []);
-    } catch (error) {
-      toast({ title: "Webhooks could not be loaded", message: error instanceof Error ? error.message : "Unable to load webhooks.", variant: "error" });
-    } finally { setLoading(false); }
-  }, [events.length, toast]);
-
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]); const [supportedEvents, setSupportedEvents] = useState<string[]>([]); const [url, setUrl] = useState(""); const [description, setDescription] = useState(""); const [events, setEvents] = useState<string[]>([]); const [secret, setSecret] = useState<string | null>(null); const [loading, setLoading] = useState(true); const [creating, setCreating] = useState(false); const [busyId, setBusyId] = useState<string | null>(null); const { toast } = useToast();
+  const load = useCallback(async () => { setLoading(true); try { const response = await fetch("/api/v1/webhooks", { cache: "no-store" }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? "Unable to load webhooks."); setWebhooks(body.webhooks ?? []); setSupportedEvents(body.supported_events ?? []); if (!events.length) setEvents(body.supported_events ?? []); } catch (error) { toast({ title: "Webhooks could not be loaded", message: error instanceof Error ? error.message : "Unable to load webhooks.", variant: "error" }); } finally { setLoading(false); } }, [events.length, toast]);
   useEffect(() => { void load(); }, [load]);
-
-  async function createWebhook(event: React.FormEvent) {
-    event.preventDefault();
-    setCreating(true); setSecret(null);
-    try {
-      const response = await fetch("/api/v1/webhooks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, description, events }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Unable to create webhook.");
-      setSecret(body.secret); setUrl(""); setDescription(""); await load();
-      toast({ title: "Webhook created", message: "Copy the signing secret before leaving this page.", variant: "success" });
-    } catch (error) { toast({ title: "Webhook creation failed", message: error instanceof Error ? error.message : "Unable to create webhook.", variant: "error" }); }
-    finally { setCreating(false); }
-  }
-
-  async function testWebhook(id: string) {
-    setBusyId(id);
-    try {
-      const response = await fetch(`/api/v1/webhooks/${id}/test`, { method: "POST" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Unable to queue test webhook.");
-      toast({ title: "Test event queued", message: "The webhook worker will deliver it shortly.", variant: "success" });
-    } catch (error) { toast({ title: "Webhook test failed", message: error instanceof Error ? error.message : "Unable to queue test webhook.", variant: "error" }); }
-    finally { setBusyId(null); }
-  }
-
-  async function removeWebhook(id: string) {
-    if (!window.confirm("Delete this webhook? Existing delivery history will also be removed.")) return;
-    setBusyId(id);
-    try { const response = await fetch(`/api/v1/webhooks/${id}`, { method: "DELETE" }); if (!response.ok) throw new Error("Unable to delete webhook."); await load(); toast({ title: "Webhook deleted", message: "The endpoint will no longer receive events.", variant: "success" }); }
-    catch (error) { toast({ title: "Delete failed", message: error instanceof Error ? error.message : "Unable to delete webhook.", variant: "error" }); }
-    finally { setBusyId(null); }
-  }
-
+  async function createWebhook(event: React.FormEvent) { event.preventDefault(); setCreating(true); setSecret(null); try { const response = await fetch("/api/v1/webhooks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, description, events }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? "Unable to create webhook."); setSecret(body.secret); setUrl(""); setDescription(""); await load(); toast({ title: "Webhook created", message: "Copy the signing secret before leaving this page.", variant: "success" }); } catch (error) { toast({ title: "Webhook creation failed", message: error instanceof Error ? error.message : "Unable to create webhook.", variant: "error" }); } finally { setCreating(false); } }
+  async function testWebhook(id: string) { setBusyId(id); try { const response = await fetch(`/api/v1/webhooks/${id}/test`, { method: "POST" }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? "Unable to queue test webhook."); toast({ title: "Test event queued", message: "The webhook worker will deliver it shortly.", variant: "success" }); } catch (error) { toast({ title: "Webhook test failed", message: error instanceof Error ? error.message : "Unable to queue test webhook.", variant: "error" }); } finally { setBusyId(null); } }
+  async function removeWebhook(id: string) { if (!window.confirm("Delete this webhook? Existing delivery history will also be removed.")) return; setBusyId(id); try { const response = await fetch(`/api/v1/webhooks/${id}`, { method: "DELETE" }); if (!response.ok) throw new Error("Unable to delete webhook."); await load(); toast({ title: "Webhook deleted", message: "The endpoint will no longer receive events.", variant: "success" }); } catch (error) { toast({ title: "Delete failed", message: error instanceof Error ? error.message : "Unable to delete webhook.", variant: "error" }); } finally { setBusyId(null); } }
   async function copySecret() { if (!secret) return; await navigator.clipboard.writeText(secret); toast({ title: "Signing secret copied", message: "Keep it private and verify the X-OmniSocial-Signature header on delivery.", variant: "success" }); }
-
-  return <div className="space-y-8">
-    <div><p className="text-sm font-medium text-muted-foreground">Developer</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Webhooks</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Receive signed, near-real-time OmniSocial events in your SaaS, backend, or n8n automation. Delivery is asynchronous and retried automatically after temporary failures.</p></div>
-
-    {secret ? <div className="rounded-2xl border border-amber-300/60 bg-amber-50/70 p-5 dark:border-amber-500/30 dark:bg-amber-950/20"><div className="flex items-start gap-3"><Link2 className="mt-0.5 size-5" /><div className="min-w-0 flex-1"><h2 className="font-semibold">Copy your signing secret now</h2><p className="mt-1 text-sm text-muted-foreground">This secret is shown only once. Verify the raw request body using HMAC-SHA256 and the timestamp header before processing an event.</p><div className="mt-4 flex gap-2"><Input readOnly value={secret} className="font-mono text-xs" /><Button type="button" variant="outline" onClick={() => void copySecret()}><Copy className="size-4" />Copy</Button></div></div></div></div> : null}
-
-    <form onSubmit={createWebhook} className="rounded-2xl border bg-card p-6 space-y-5">
-      <div><h2 className="font-semibold">Add endpoint</h2><p className="mt-1 text-sm text-muted-foreground">Use an HTTPS endpoint that can accept POST requests.</p></div>
-      <div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><label htmlFor="webhook-url" className="text-sm font-medium">Endpoint URL</label><Input id="webhook-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api.example.com/omnisocial/webhook" required /></div><div className="space-y-2"><label htmlFor="webhook-description" className="text-sm font-medium">Description</label><Input id="webhook-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Production automation" maxLength={160} /></div></div>
-      <div><p className="mb-3 text-sm font-medium">Events</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{supportedEvents.map((eventName) => <label key={eventName} className="flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm hover:bg-accent"><input type="checkbox" checked={events.includes(eventName)} onChange={(e) => setEvents((current) => e.target.checked ? [...current, eventName] : current.filter((item) => item !== eventName))} />{EVENT_LABELS[eventName] ?? eventName}</label>)}</div></div>
-      <Button type="submit" disabled={creating || !url || events.length === 0}>{creating ? <Loader2 className="animate-spin" /> : <Plus />}Create webhook</Button>
-    </form>
-
-    <div className="rounded-2xl border bg-card"><div className="border-b px-6 py-5"><h2 className="font-semibold">Configured endpoints</h2><p className="mt-1 text-sm text-muted-foreground">Secrets are never displayed after creation. Delivery failures are retried by the existing worker.</p></div>{loading ? <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-muted-foreground"><Loader2 className="animate-spin" />Loading webhooks…</div> : webhooks.length === 0 ? <div className="px-6 py-10 text-sm text-muted-foreground">No webhook endpoints configured yet.</div> : <div className="divide-y">{webhooks.map((webhook) => <div key={webhook.id} className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-medium">{webhook.description || webhook.url}</h3><Badge variant={webhook.status === "active" ? "secondary" : "destructive"}>{webhook.status}</Badge></div><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{webhook.url}</p><p className="mt-2 text-xs text-muted-foreground">{webhook.events.length} event types · {webhook.failure_count ?? 0} consecutive failures</p></div><div className="flex shrink-0 gap-2"><Button type="button" variant="outline" onClick={() => void testWebhook(webhook.id)} disabled={busyId === webhook.id}><Send className="size-4" />Test</Button><Button type="button" variant="outline" onClick={() => void removeWebhook(webhook.id)} disabled={busyId === webhook.id}><Trash2 className="size-4" />Delete</Button></div></div>)}</div>}</div>
-  </div>;
+  return <div className="space-y-8"><div><p className="text-sm font-medium text-muted-foreground">Developer</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Webhooks</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Receive signed, near-real-time OmniSocial events in your SaaS, backend, or n8n automation. Delivery is asynchronous and retried automatically after temporary failures.</p></div>{secret ? <div className="rounded-2xl border border-amber-300/60 bg-amber-50/70 p-5 dark:border-amber-500/30 dark:bg-amber-950/20"><div className="flex items-start gap-3"><Link2 className="mt-0.5 size-5" /><div className="min-w-0 flex-1"><h2 className="font-semibold">Copy your signing secret now</h2><p className="mt-1 text-sm text-muted-foreground">This secret is shown only once. Verify the raw request body using HMAC-SHA256 and the timestamp header before processing an event.</p><div className="mt-4 flex gap-2"><Input readOnly value={secret} className="font-mono text-xs" /><Button type="button" variant="outline" onClick={() => void copySecret()}><Copy className="size-4" />Copy</Button></div></div></div></div> : null}<form onSubmit={createWebhook} className="space-y-5 rounded-2xl border bg-card p-6"><div><h2 className="font-semibold">Add endpoint</h2><p className="mt-1 text-sm text-muted-foreground">Use an HTTPS endpoint that can accept POST requests.</p></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><label htmlFor="webhook-url" className="text-sm font-medium">Endpoint URL</label><Input id="webhook-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api.example.com/omnisocial/webhook" required /></div><div className="space-y-2"><label htmlFor="webhook-description" className="text-sm font-medium">Description</label><Input id="webhook-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Production automation" maxLength={160} /></div></div><div><p className="mb-3 text-sm font-medium">Events</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{supportedEvents.map((eventName) => <label key={eventName} className="flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm hover:bg-accent"><input type="checkbox" checked={events.includes(eventName)} onChange={(e) => setEvents((current) => e.target.checked ? [...current, eventName] : current.filter((item) => item !== eventName))} />{EVENT_LABELS[eventName] ?? eventName}</label>)}</div></div><Button type="submit" disabled={creating || !url || events.length === 0}>{creating ? <Loader2 className="animate-spin" /> : <Plus />}Create webhook</Button></form><div className="rounded-2xl border bg-card"><div className="border-b px-6 py-5"><h2 className="font-semibold">Configured endpoints</h2><p className="mt-1 text-sm text-muted-foreground">Secrets are never displayed after creation. Delivery failures are retried by the existing worker.</p></div>{loading ? <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-muted-foreground"><Loader2 className="animate-spin" />Loading webhooks…</div> : webhooks.length === 0 ? <div className="px-6 py-10 text-sm text-muted-foreground">No webhook endpoints configured yet.</div> : <div className="divide-y">{webhooks.map((webhook) => <div key={webhook.id} className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-medium">{webhook.description || webhook.url}</h3><Badge variant={webhook.status === "active" ? "secondary" : "destructive"}>{webhook.status}</Badge></div><p className="mt-1 truncate font-mono text-xs text-muted-foreground">{webhook.url}</p><p className="mt-2 text-xs text-muted-foreground">{webhook.events.length} event types · {webhook.failure_count ?? 0} consecutive failures</p></div><div className="flex shrink-0 gap-2"><Button type="button" variant="outline" onClick={() => void testWebhook(webhook.id)} disabled={busyId === webhook.id}><Send className="size-4" />Test</Button><Button type="button" variant="outline" onClick={() => void removeWebhook(webhook.id)} disabled={busyId === webhook.id}><Trash2 className="size-4" />Delete</Button></div></div>)}</div>}</div></div>;
 }
