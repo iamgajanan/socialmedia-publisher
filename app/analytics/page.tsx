@@ -1,10 +1,12 @@
-import { BarChart3, Eye, Heart, MessageCircle, MousePointerClick, Share2, Users } from "lucide-react";
+import { Eye, Heart, MessageCircle, MousePointerClick, Share2, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { AnalyticsSyncButton } from "@/components/analytics-sync-button";
 
+// Supabase row inference is intentionally kept local to this presentation helper.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sum(rows: any[], key: string) { return rows.reduce((total, row) => total + Number(row[key] ?? 0), 0); }
 function format(value: number) { return new Intl.NumberFormat("en-IN", { notation: value > 9999 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value); }
 
