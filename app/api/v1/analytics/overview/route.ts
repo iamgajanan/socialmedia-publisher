@@ -11,39 +11,42 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { apiJson, getRequestId, withRequestId } from "@/lib/api/api-response";
 
-const POST_ANALYTICS_SELECT = [
-  "post_platform_id",
-  "social_account_id",
-  "platform",
-  "period_start",
-  "period_end",
-  "captured_at",
-  "impressions",
-  "reach",
-  "likes",
-  "comments",
-  "shares",
-  "saves",
-  "clicks",
-  "video_views",
-].join(",");
+const POST_ANALYTICS_SELECT = ["post_platform_id", "social_account_id", "platform", "period_start", "period_end", "captured_at", "impressions", "reach", "likes", "comments", "shares", "saves", "clicks", "video_views"].join(",");
+const ACCOUNT_ANALYTICS_SELECT = ["social_account_id", "platform", "period_start", "period_end", "captured_at", "follower_count", "impressions", "reach", "likes", "comments", "shares", "saves", "clicks", "video_views"].join(",");
 
-const ACCOUNT_ANALYTICS_SELECT = [
-  "social_account_id",
-  "platform",
-  "period_start",
-  "period_end",
-  "captured_at",
-  "follower_count",
-  "impressions",
-  "reach",
-  "likes",
-  "comments",
-  "shares",
-  "saves",
-  "clicks",
-  "video_views",
-].join(",");
+type PostAnalyticsRow = {
+  post_platform_id: string;
+  social_account_id: string;
+  platform: string;
+  period_start: string;
+  period_end: string;
+  captured_at: string;
+  impressions: number | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  clicks: number | null;
+  video_views: number | null;
+};
+
+type AccountAnalyticsRow = {
+  social_account_id: string;
+  platform: string;
+  period_start: string;
+  period_end: string;
+  captured_at: string;
+  follower_count: number | null;
+  impressions: number | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  clicks: number | null;
+  video_views: number | null;
+};
 
 function inPeriod(value: string | null | undefined, from: string, to: string): boolean {
   if (!value) return false;
@@ -56,9 +59,7 @@ function pickLatestByKey<T extends { captured_at: string }>(rows: T[], key: (row
   for (const row of rows) {
     const id = key(row);
     const existing = latest.get(id);
-    if (!existing || new Date(row.captured_at).getTime() > new Date(existing.captured_at).getTime()) {
-      latest.set(id, row);
-    }
+    if (!existing || new Date(row.captured_at).getTime() > new Date(existing.captured_at).getTime()) latest.set(id, row);
   }
   return [...latest.values()];
 }
@@ -67,12 +68,7 @@ async function GETImpl(request: Request) {
   const requestId = getRequestId(request);
   const authentication = await authenticateApiRequest(request);
   if (!authentication.ok) {
-    return apiJson(
-      { error: authentication.error },
-      authentication.status,
-      requestId,
-      authentication.retryAfterSeconds ? { "Retry-After": String(authentication.retryAfterSeconds) } : undefined,
-    );
+    return apiJson({ error: authentication.error }, authentication.status, requestId, authentication.retryAfterSeconds ? { "Retry-After": String(authentication.retryAfterSeconds) } : undefined);
   }
 
   const parsed = parseAnalyticsQuery(new URL(request.url).searchParams);
@@ -88,7 +84,6 @@ async function GETImpl(request: Request) {
     .gte("created_at", from)
     .lt("created_at", to)
     .order("created_at", { ascending: false });
-
   const { data: posts, error: postsError } = await postsQuery;
   if (postsError) {
     console.error("api_analytics_posts_failed", { requestId, profileId: authentication.profileId, code: postsError.code, message: postsError.message });
@@ -97,12 +92,8 @@ async function GETImpl(request: Request) {
 
   const postIds = (posts ?? []).map((post) => post.id);
   const { data: links, error: linksError } = postIds.length
-    ? await admin
-        .from("socialmedia_post_platforms")
-        .select("id,post_id,social_account_id,platform,status,platform_post_id,published_at")
-        .in("post_id", postIds)
+    ? await admin.from("socialmedia_post_platforms").select("id,post_id,social_account_id,platform,status,platform_post_id,published_at").in("post_id", postIds)
     : { data: [], error: null };
-
   if (linksError) {
     console.error("api_analytics_destinations_failed", { requestId, profileId: authentication.profileId, code: linksError.code, message: linksError.message });
     return apiJson({ error: "Unable to load analytics destinations.", code: "analytics_destinations_failed" }, 500, requestId);
@@ -110,13 +101,8 @@ async function GETImpl(request: Request) {
 
   const accountIds = [...new Set((links ?? []).map((link) => link.social_account_id).filter(Boolean))];
   const { data: accounts, error: accountsError } = accountIds.length
-    ? await admin
-        .from("socialmedia_social_accounts")
-        .select("id,platform,account_name,username")
-        .eq("profile_id", authentication.profileId)
-        .in("id", accountIds)
+    ? await admin.from("socialmedia_social_accounts").select("id,platform,account_name,username").eq("profile_id", authentication.profileId).in("id", accountIds)
     : { data: [], error: null };
-
   if (accountsError) {
     console.error("api_analytics_accounts_failed", { requestId, profileId: authentication.profileId, code: accountsError.code, message: accountsError.message });
     return apiJson({ error: "Unable to load analytics accounts.", code: "analytics_accounts_failed" }, 500, requestId);
@@ -128,77 +114,40 @@ async function GETImpl(request: Request) {
   const filteredPosts = (posts ?? []).filter((post) => !allowedPlatforms || filteredPostIds.has(post.id));
   const filteredAccountIds = new Set(filteredLinks.map((link) => link.social_account_id));
 
-  const { data: postAnalytics, error: postAnalyticsError } = postIds.length
-    ? await admin
-        .from("socialmedia_post_analytics")
-        .select(POST_ANALYTICS_SELECT)
-        .eq("profile_id", authentication.profileId)
-        .in("post_id", postIds)
-        .gte("period_start", from)
-        .lte("period_end", to)
-        .order("captured_at", { ascending: false })
+  const { data: postAnalyticsRaw, error: postAnalyticsError } = postIds.length
+    ? await admin.from("socialmedia_post_analytics").select(POST_ANALYTICS_SELECT).eq("profile_id", authentication.profileId).in("post_id", postIds).gte("period_start", from).lte("period_end", to).order("captured_at", { ascending: false })
     : { data: [], error: null };
-
   if (postAnalyticsError && postAnalyticsError.code !== "42P01") {
     console.error("api_analytics_post_metrics_failed", { requestId, profileId: authentication.profileId, code: postAnalyticsError.code, message: postAnalyticsError.message });
     return apiJson({ error: "Unable to load post analytics.", code: "analytics_post_metrics_failed" }, 500, requestId);
   }
 
-  const { data: accountAnalytics, error: accountAnalyticsError } = await admin
-    .from("socialmedia_account_analytics")
-    .select(ACCOUNT_ANALYTICS_SELECT)
-    .eq("profile_id", authentication.profileId)
-    .gte("period_start", from)
-    .lte("period_end", to)
-    .order("captured_at", { ascending: false });
-
+  const { data: accountAnalyticsRaw, error: accountAnalyticsError } = await admin.from("socialmedia_account_analytics").select(ACCOUNT_ANALYTICS_SELECT).eq("profile_id", authentication.profileId).gte("period_start", from).lte("period_end", to).order("captured_at", { ascending: false });
   if (accountAnalyticsError && accountAnalyticsError.code !== "42P01") {
     console.error("api_analytics_account_metrics_failed", { requestId, profileId: authentication.profileId, code: accountAnalyticsError.code, message: accountAnalyticsError.message });
     return apiJson({ error: "Unable to load account analytics.", code: "analytics_account_metrics_failed" }, 500, requestId);
   }
 
-  const latestPostAnalytics = pickLatestByKey(
-    (postAnalytics ?? []).filter((row) => !allowedPlatforms || allowedPlatforms.has(row.platform)),
-    (row) => row.post_platform_id,
-  );
-  const latestAccountAnalytics = pickLatestByKey(
-    (accountAnalytics ?? []).filter((row) => !allowedPlatforms || allowedPlatforms.has(row.platform)),
-    (row) => row.social_account_id,
-  );
+  const postAnalytics = (postAnalyticsRaw ?? []) as unknown as PostAnalyticsRow[];
+  const accountAnalytics = (accountAnalyticsRaw ?? []) as unknown as AccountAnalyticsRow[];
+  const latestPostAnalytics = pickLatestByKey(postAnalytics.filter((row) => !allowedPlatforms || allowedPlatforms.has(row.platform)), (row) => row.post_platform_id);
+  const latestAccountAnalytics = pickLatestByKey(accountAnalytics.filter((row) => !allowedPlatforms || allowedPlatforms.has(row.platform)), (row) => row.social_account_id);
 
   const totals = emptyAnalyticsTotals();
   for (const row of latestPostAnalytics) addAnalyticsTotals(totals, row as Partial<Record<AnalyticsMetric, number>>);
 
-  const byPlatform = new Map<string, {
-    platform: string;
-    posts_created: number;
-    destinations: number;
-    published_destinations: number;
-    failed_destinations: number;
-    analytics: ReturnType<typeof emptyAnalyticsTotals>;
-    follower_count: number | null;
-  }>();
-
+  const byPlatform = new Map<string, { platform: string; posts_created: number; destinations: number; published_destinations: number; failed_destinations: number; analytics: ReturnType<typeof emptyAnalyticsTotals>; follower_count: number | null }>();
   for (const post of filteredPosts) {
     const destinationPlatforms = filteredLinks.filter((link) => link.post_id === post.id);
     for (const destination of destinationPlatforms) {
       const platform = String(destination.platform);
-      const current = byPlatform.get(platform) ?? {
-        platform,
-        posts_created: 0,
-        destinations: 0,
-        published_destinations: 0,
-        failed_destinations: 0,
-        analytics: emptyAnalyticsTotals(),
-        follower_count: null,
-      };
+      const current = byPlatform.get(platform) ?? { platform, posts_created: 0, destinations: 0, published_destinations: 0, failed_destinations: 0, analytics: emptyAnalyticsTotals(), follower_count: null };
       current.destinations += 1;
       if (destination.status === "published") current.published_destinations += 1;
       if (destination.status === "failed") current.failed_destinations += 1;
       byPlatform.set(platform, current);
     }
   }
-
   for (const post of filteredPosts) {
     const platformsForPost = new Set(filteredLinks.filter((link) => link.post_id === post.id).map((link) => String(link.platform)));
     for (const platform of platformsForPost) {
@@ -206,20 +155,14 @@ async function GETImpl(request: Request) {
       if (current) current.posts_created += 1;
     }
   }
-
   for (const row of latestPostAnalytics) {
     const current = byPlatform.get(row.platform);
-    if (!current) continue;
-    addAnalyticsTotals(current.analytics, row as Partial<Record<AnalyticsMetric, number>>);
+    if (current) addAnalyticsTotals(current.analytics, row as Partial<Record<AnalyticsMetric, number>>);
   }
-
   for (const row of latestAccountAnalytics) {
     if (!filteredAccountIds.has(row.social_account_id)) continue;
     const current = byPlatform.get(row.platform);
-    if (!current) continue;
-    if (row.follower_count !== null && row.follower_count !== undefined) {
-      current.follower_count = toSafeNumber(row.follower_count);
-    }
+    if (current && row.follower_count !== null && row.follower_count !== undefined) current.follower_count = toSafeNumber(row.follower_count);
   }
 
   const publishedPosts = filteredPosts.filter((post) => post.status === "published").length;
@@ -227,22 +170,12 @@ async function GETImpl(request: Request) {
   const scheduledPosts = filteredPosts.filter((post) => post.status === "scheduled").length;
   const publishedDestinations = filteredLinks.filter((link) => link.status === "published" && inPeriod(link.published_at, from, to)).length;
   const failedDestinations = filteredLinks.filter((link) => link.status === "failed").length;
-
-  const platformRows = [...byPlatform.values()].map((row) => ({
-    ...row,
-    analytics: row.analytics,
-    interactions: interactionCount(row.analytics),
-    engagement_rate: engagementRate(row.analytics),
-  })).sort((a, b) => b.analytics.impressions - a.analytics.impressions || a.platform.localeCompare(b.platform));
+  const platformRows = [...byPlatform.values()].map((row) => ({ ...row, interactions: interactionCount(row.analytics), engagement_rate: engagementRate(row.analytics) })).sort((a, b) => b.analytics.impressions - a.analytics.impressions || a.platform.localeCompare(b.platform));
 
   return apiJson({
     success: true,
     period: { from, to },
-    scope: {
-      platforms: platforms ?? null,
-      posts_created: filteredPosts.length,
-      destinations: filteredLinks.length,
-    },
+    scope: { platforms: platforms ?? null, posts_created: filteredPosts.length, destinations: filteredLinks.length },
     publishing: {
       posts_created: filteredPosts.length,
       published_posts: publishedPosts,
@@ -250,28 +183,14 @@ async function GETImpl(request: Request) {
       failed_posts: failedPosts,
       published_destinations: publishedDestinations,
       failed_destinations: failedDestinations,
-      delivery_success_rate: filteredLinks.length
-        ? Number(((publishedDestinations / filteredLinks.length) * 100).toFixed(2))
-        : null,
+      delivery_success_rate: filteredLinks.length ? Number(((publishedDestinations / filteredLinks.length) * 100).toFixed(2)) : null,
     },
-    metrics: {
-      ...totals,
-      interactions: interactionCount(totals),
-      engagement_rate: engagementRate(totals),
-    },
+    metrics: { ...totals, interactions: interactionCount(totals), engagement_rate: engagementRate(totals) },
     platforms: platformRows,
-    accounts: (accounts ?? [])
-      .filter((account) => filteredAccountIds.has(account.id))
-      .map((account) => {
-        const latest = latestAccountAnalytics.find((row) => row.social_account_id === account.id);
-        return {
-          id: account.id,
-          platform: account.platform,
-          account_name: account.account_name,
-          username: account.username,
-          follower_count: latest?.follower_count ?? null,
-        };
-      }),
+    accounts: (accounts ?? []).filter((account) => filteredAccountIds.has(account.id)).map((account) => {
+      const latest = latestAccountAnalytics.find((row) => row.social_account_id === account.id);
+      return { id: account.id, platform: account.platform, account_name: account.account_name, username: account.username, follower_count: latest?.follower_count ?? null };
+    }),
     metric_source: latestPostAnalytics.length || latestAccountAnalytics.length ? "provider_snapshots" : "publishing_data_only",
   }, 200, requestId);
 }
