@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type WorkerType = "publish" | "oauth_health" | "notifications";
+type WorkerType = "publish" | "oauth_health" | "notifications" | "webhooks";
 
 type WorkerRunResult = Record<string, unknown>;
 
