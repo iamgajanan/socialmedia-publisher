@@ -1,10 +1,11 @@
 import "server-only";
 
-import { decryptToken } from "@/lib/social/token-crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getUsableAccessToken } from "@/lib/publishing/refresh";
+import type { PublisherAccount } from "@/lib/publishing/providers/types";
 
 export type SyncResult = { accountId: string; platform: string; postsScanned: number; metricsWritten: number; ok: boolean; error?: string };
-type Account = { id: string; profile_id: string; platform: string; external_account_id: string; metadata: Record<string, unknown> | null; access_token_ciphertext: string | null };
+type Account = { id: string; profile_id: string; platform: string; external_account_id: string; account_name: string; username: string | null; metadata: Record<string, unknown> | null; token_expires_at: string | null };
 type Metrics = { impressions?: number; reach?: number; likes?: number; comments?: number; shares?: number; saves?: number; clicks?: number; video_views?: number; engagement_rate?: number | null; follower_count?: number; raw_metrics?: Record<string, unknown> };
 function n(value: unknown): number { const parsed = Number(value ?? 0); return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0; }
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -69,14 +70,18 @@ async function fetchAccountMetrics(account: Account, token: string): Promise<Met
 
 export async function syncAnalyticsForProfile(profileId: string, runId?: string): Promise<{ results: SyncResult[] }> {
   const admin = createAdminClient();
-  const { data: accounts, error } = await admin.from("socialmedia_social_accounts").select("id,profile_id,platform,external_account_id,metadata,access_token_ciphertext").eq("profile_id", profileId).eq("status", "connected");
-  if (error) throw new Error("Unable to load connected social accounts.");
+  const { data: accounts, error } = await admin.from("socialmedia_social_accounts").select("id,profile_id,platform,external_account_id,account_name,username,metadata,token_expires_at").eq("profile_id", profileId).eq("status", "connected");
+  if (error) {
+    console.error("analytics_connected_accounts_lookup_failed", { profileId, code: error.code, message: error.message });
+    throw new Error("Unable to load connected social accounts.");
+  }
   const results: SyncResult[] = [];
   for (const account of (accounts ?? []) as Account[]) {
     const result: SyncResult = { accountId: account.id, platform: account.platform, postsScanned: 0, metricsWritten: 0, ok: false };
     try {
-      if (!account.access_token_ciphertext) throw new Error("Account has no server-side access token.");
-      const token = decryptToken(account.access_token_ciphertext); const now = new Date(); const from = new Date(now.getTime() - 30 * 86400000);
+      const publisherAccount: PublisherAccount = { id: account.id, platform: account.platform, external_account_id: account.external_account_id, account_name: account.account_name, username: account.username, metadata: account.metadata ?? {}, token_expires_at: account.token_expires_at };
+      const token = await getUsableAccessToken(publisherAccount);
+      const now = new Date(); const from = new Date(now.getTime() - 30 * 86400000);
       const { data: postPlatforms, error: postsError } = await admin.from("socialmedia_post_platforms").select("id,post_id,platform_post_id,platform,status,published_at").eq("social_account_id", account.id).eq("status", "published").not("platform_post_id", "is", null).gte("published_at", from.toISOString()).order("published_at", { ascending: false }).limit(50);
       if (postsError) throw new Error("Unable to load published destinations.");
       result.postsScanned = postPlatforms?.length ?? 0;
@@ -85,10 +90,12 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
           const metrics = await fetchPostMetrics(account.platform.toLowerCase(), String(destination.platform_post_id), token); const periodStart = destination.published_at ?? from.toISOString();
           const { error: writeError } = await admin.from("socialmedia_post_analytics").upsert({ profile_id: profileId, post_id: destination.post_id, post_platform_id: destination.id, social_account_id: account.id, platform: account.platform, platform_post_id: destination.platform_post_id, period_start: periodStart, period_end: now.toISOString(), impressions: Math.round(n(metrics.impressions)), reach: Math.round(n(metrics.reach)), likes: Math.round(n(metrics.likes)), comments: Math.round(n(metrics.comments)), shares: Math.round(n(metrics.shares)), saves: Math.round(n(metrics.saves)), clicks: Math.round(n(metrics.clicks)), video_views: Math.round(n(metrics.video_views)), engagement_rate: metrics.engagement_rate ?? null, raw_metrics: metrics.raw_metrics ?? {}, source: "provider", captured_at: now.toISOString() }, { onConflict: "post_platform_id,period_start,period_end,source" });
           if (!writeError) result.metricsWritten += 1;
+          else console.warn("analytics_post_metrics_write_failed", { accountId: account.id, platform: account.platform, code: writeError.code, message: writeError.message });
         } catch (postError) { console.warn("analytics_post_sync_failed", account.platform, destination.platform_post_id, postError instanceof Error ? postError.message : postError); }
       }
       const accountMetrics = await fetchAccountMetrics(account, token);
-      await admin.from("socialmedia_account_analytics").upsert({ profile_id: profileId, social_account_id: account.id, platform: account.platform, period_start: from.toISOString(), period_end: now.toISOString(), follower_count: accountMetrics.follower_count == null ? null : Math.round(accountMetrics.follower_count), impressions: Math.round(n(accountMetrics.impressions)), reach: Math.round(n(accountMetrics.reach)), likes: Math.round(n(accountMetrics.likes)), comments: Math.round(n(accountMetrics.comments)), shares: Math.round(n(accountMetrics.shares)), saves: Math.round(n(accountMetrics.saves)), clicks: Math.round(n(accountMetrics.clicks)), video_views: Math.round(n(accountMetrics.video_views)), engagement_rate: accountMetrics.engagement_rate ?? null, raw_metrics: accountMetrics.raw_metrics ?? {}, source: "provider", captured_at: now.toISOString() }, { onConflict: "social_account_id,period_start,period_end,source" });
+      const { error: accountWriteError } = await admin.from("socialmedia_account_analytics").upsert({ profile_id: profileId, social_account_id: account.id, platform: account.platform, period_start: from.toISOString(), period_end: now.toISOString(), follower_count: accountMetrics.follower_count == null ? null : Math.round(accountMetrics.follower_count), impressions: Math.round(n(accountMetrics.impressions)), reach: Math.round(n(accountMetrics.reach)), likes: Math.round(n(accountMetrics.likes)), comments: Math.round(n(accountMetrics.comments)), shares: Math.round(n(accountMetrics.shares)), saves: Math.round(n(accountMetrics.saves)), clicks: Math.round(n(accountMetrics.clicks)), video_views: Math.round(n(accountMetrics.video_views)), engagement_rate: accountMetrics.engagement_rate ?? null, raw_metrics: accountMetrics.raw_metrics ?? {}, source: "provider", captured_at: now.toISOString() }, { onConflict: "social_account_id,period_start,period_end,source" });
+      if (accountWriteError) throw new Error(`Unable to write account analytics: ${accountWriteError.message}`);
       result.ok = true;
     } catch (accountError) { result.error = accountError instanceof Error ? accountError.message : "Analytics sync failed."; }
     results.push(result);
