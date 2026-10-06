@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/media-upload-core";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { apiJson, getRequestId, withRequestId } from "@/lib/api/api-response";
+import { emitWebhookEvent } from "@/lib/webhooks/dispatch";
 
 const BUCKET = "social-media-assets";
 
@@ -45,6 +46,23 @@ async function POSTImpl(request: Request) {
   if (error) {
     console.error("api_media_upload_failed", { requestId, profileId: authentication.profileId, contentType, size: fileValue.size, message: error.message });
     return apiJson({ error: "The media upload failed.", code: "media_upload_failed" }, 500, requestId);
+  }
+
+  // Media upload is a best-effort webhook side effect. The asset is already persisted,
+  // so a temporary webhook failure must not turn a successful upload into a 5xx response.
+  try {
+    await emitWebhookEvent(authentication.profileId, "media.uploaded", {
+      media_path: path,
+      filename: safeFilename,
+      content_type: contentType,
+      size: fileValue.size,
+    });
+  } catch (webhookError) {
+    console.error("api_media_webhook_emit_failed", {
+      requestId,
+      profileId: authentication.profileId,
+      message: webhookError instanceof Error ? webhookError.message : "Unknown webhook error",
+    });
   }
 
   return apiJson({ success: true, media_path: path, filename: safeFilename, content_type: contentType, size: fileValue.size }, 201, requestId);
