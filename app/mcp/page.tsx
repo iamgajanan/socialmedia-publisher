@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+export const instant = false;
+
 const tools = [
   ["list_connected_accounts", "Read-only account discovery"],
   ["publish_post", "Immediate publishing; confirm=true required"],
