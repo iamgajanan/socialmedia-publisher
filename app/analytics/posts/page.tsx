@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { AnalyticsSyncButton } from "@/components/analytics-sync-button";
 
+export const instant = false;
+
 function n(value: unknown) { return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value ?? 0)); }
 
 export default async function AnalyticsPostsPage() {
