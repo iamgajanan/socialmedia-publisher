@@ -81,7 +81,7 @@ async function GETImpl(request: Request) {
   const { from, to, platforms } = parsed.data;
   const admin = createAdminClient();
 
-  let postsQuery = admin
+  const postsQuery = admin
     .from("socialmedia_posts")
     .select("id,status,created_at,published_at,scheduled_at")
     .eq("profile_id", authentication.profileId)
