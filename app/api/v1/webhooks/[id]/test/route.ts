@@ -29,7 +29,6 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     .insert({
       profile_id: user.id,
       event_type: "post.created",
-      aggregate_type: "test",
       payload: {
         test: true,
         message: "OmniSocial webhook test event",
@@ -40,6 +39,12 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     .single();
 
   if (eventError || !event) {
+    console.error("webhook_test_event_queue_failed", {
+      webhookId: id,
+      profileId: user.id,
+      code: eventError?.code,
+      message: eventError?.message,
+    });
     return NextResponse.json({ error: "Unable to queue webhook test." }, { status: 500 });
   }
 
@@ -48,6 +53,12 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     .insert({ webhook_id: id, event_id: event.id });
 
   if (deliveryError) {
+    console.error("webhook_test_delivery_queue_failed", {
+      webhookId: id,
+      eventId: event.id,
+      code: deliveryError.code,
+      message: deliveryError.message,
+    });
     await admin.from("socialmedia_webhook_events").delete().eq("id", event.id);
     return NextResponse.json({ error: "Unable to queue webhook test delivery." }, { status: 500 });
   }
