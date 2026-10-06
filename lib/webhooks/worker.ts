@@ -4,8 +4,6 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 const MAX_ATTEMPTS = 6;
 const RETRIES_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
 
-type Delivery = { id: string; attempt: number; event_id: string; webhook_id: string; url: string; secret: string; event_type: string; payload: Record<string, unknown> };
-
 function admin() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
