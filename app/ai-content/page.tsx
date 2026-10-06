@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { AiContentStudio } from "@/components/ai-content/ai-content-studio";
 import { createClient } from "@/lib/supabase/server";
 
-export const dynamic = "force-dynamic";
-
 export default async function AiContentPage() {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
