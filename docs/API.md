@@ -23,76 +23,98 @@ Publishing: facebook, instagram, threads, linkedin, youtube, tiktok.
 
 Lists connected accounts owned by the authenticated profile. Optional query: platforms=instagram,facebook.
 
-    curl -s "https://socialmedia-publisher-gules.vercel.app/api/v1/accounts?platforms=instagram,facebook" -H "Authorization: Bearer $API_KEY" -H "X-Request-Id: accounts-check-001"
-
-Response contains account metadata only, never provider secrets.
-
 ### POST /api/v1/media
 
-Uploads one image/video using multipart/form-data. Field name: file. Maximum upload: 100 MB.
-
-    curl -i -X POST "https://socialmedia-publisher-gules.vercel.app/api/v1/media" -H "Authorization: Bearer $API_KEY" -F "file=@./photo.jpg;type=image/jpeg"
-
-Use the returned media_path when publishing.
+Uploads one image/video using multipart/form-data. Field name: file. Maximum upload: 100 MB. Use the returned `media_path` when publishing.
 
 ### POST /api/v1/publish
 
-Creates an immediate publish or a future scheduled post.
-
-For an immediate publish, omit `scheduled_at`. OmniSocial creates the post and then invokes the existing production publishing worker immediately. It does not wait for the next cron poll. Scheduled posts remain cron/worker driven and are not published early.
-
-Request:
-
-    {
-      "platforms": ["instagram", "facebook"],
-      "text": "Hello from Omnisocial",
-      "media_paths": ["<profile-id>/...-photo.jpg"]
-    }
-
-Scheduled request:
-
-    {
-      "platforms": ["instagram", "facebook"],
-      "text": "Hello from Omnisocial",
-      "media_paths": ["<profile-id>/...-photo.jpg"],
-      "scheduled_at": "2026-10-01T12:00:00.000Z"
-    }
+Creates an immediate publish or a future scheduled post. Immediate requests omit `scheduled_at`; scheduled requests must use a future timestamp. Existing worker behavior remains the single publishing path.
 
 Rules: platforms 1–6 unique values; text max 5,000 characters; media_paths max 20; at least text or one media file; scheduled_at must be future when supplied. Media must belong to the authenticated profile and platform/media capability rules are validated.
-
-    curl -i -X POST "https://socialmedia-publisher-gules.vercel.app/api/v1/publish" -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" -H "Idempotency-Key: publish-$(date +%s)" -d '{"platforms":["instagram"],"text":"Hello from Omnisocial"}'
-
-Idempotency-Key is optional, 1–128 characters. Reusing it with the same request body safely returns the stored successful response. Reusing it with a different body returns HTTP 409.
 
 ### GET /api/v1/posts
 
 Lists profile-owned posts. Query parameters: status, platform, from, to, limit (1–50, default 20), offset (0–10000, default 0).
 
-    curl -s "https://socialmedia-publisher-gules.vercel.app/api/v1/posts?status=scheduled&platform=instagram&limit=20" -H "Authorization: Bearer $API_KEY"
-
 ### GET /api/v1/posts/{postId}
 
 Returns one profile-owned post and destination publishing results.
 
-    curl -s "https://socialmedia-publisher-gules.vercel.app/api/v1/posts/POST_ID" -H "Authorization: Bearer $API_KEY"
-
 ### PATCH /api/v1/posts/{postId}
 
-Only draft and scheduled posts are editable. Fields: content, media_paths, scheduled_at. scheduled_at must be future.
-
-    curl -i -X PATCH "https://socialmedia-publisher-gules.vercel.app/api/v1/posts/POST_ID" -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" -d '{"content":"Updated post","scheduled_at":"2026-10-02T12:00:00.000Z"}'
+Only draft and scheduled posts are editable. Fields: content, media_paths, scheduled_at.
 
 ### DELETE /api/v1/posts/{postId}
 
-Draft posts are deleted; scheduled posts are cancelled. Posts already publishing cannot be cancelled. Cancellation preserves destination history and marks pending/scheduled destinations as skipped with reason cancelled.
+Draft posts are deleted; scheduled posts are cancelled. Posts already publishing cannot be cancelled.
 
-    curl -i -X DELETE "https://socialmedia-publisher-gules.vercel.app/api/v1/posts/POST_ID" -H "Authorization: Bearer $API_KEY"
+## Phase 29 analytics
+
+### GET /api/v1/analytics/overview
+### GET /api/v1/analytics/posts
+### GET /api/v1/analytics/accounts
+### GET /api/v1/analytics/reports
+
+These endpoints expose profile-scoped analytics snapshots captured by the Phase 29 provider sync layer. They are read-only and can be consumed by n8n, MCP tools, or other automation clients.
+
+## Phase 31 AI content engine
+
+### POST /api/v1/ai/content
+
+Transforms master content into platform-native variants for `instagram`, `linkedin`, `x`, `facebook`, `threads`, `tiktok`, and `youtube`.
+
+Request:
+
+    {
+      "master_content": "New product launch next Friday.",
+      "platforms": ["instagram", "linkedin", "x"],
+      "brand_voice": "confident and friendly",
+      "instructions": "Use a direct CTA and do not invent facts.",
+      "variations": 2,
+      "require_approval": true
+    }
+
+Each variant includes caption, optional title, hashtags, CTA, media recommendations, character count, character limit, and validation warnings. The generation and variants are persisted to the profile. `OPENAI_API_KEY` is required server-side; the model is configurable with `OPENAI_CONTENT_MODEL` and defaults to `gpt-6-luna`.
+
+### GET /api/v1/ai/content
+
+Lists recent AI generations for the authenticated profile.
+
+### GET /api/v1/ai/content/{id}
+
+Returns one generation and all platform variants.
+
+### POST /api/v1/ai/content/{id}
+
+Use `{ "action": "approve" }` to mark a generation and its variants approved. Approval never publishes content by itself.
+
+## Phase 30 MCP server
+
+### POST /api/mcp
+
+OmniSocial exposes a stateless authenticated MCP endpoint. The modern MCP `2026-07-28` request model is supported through `server/discover`, `tools/list`, and `tools/call`; legacy `initialize` clients are also accepted for compatibility. The endpoint does not create MCP sessions.
+
+Authenticate with the same profile-scoped API key:
+
+    Authorization: Bearer $API_KEY
+
+Available tools:
+
+- `list_connected_accounts` — read-only connected-account discovery.
+- `publish_post` — immediate publishing; requires `confirm=true`.
+- `schedule_post` — future publishing; requires `confirm=true`.
+- `get_post_status` — read publishing status.
+- `get_analytics` — read Phase 29 analytics overview/posts/accounts/reports.
+- `generate_platform_content` — call the Phase 31 content engine.
+
+There is intentionally no MCP tool for deleting posts or disconnecting social accounts. Every MCP tool call is audited against the caller's profile and API key without storing provider OAuth secrets.
+
+High-impact actions use an explicit confirmation argument. A client that omits `confirm=true` receives a machine-readable `confirmation_required` response and must ask the user before retrying.
 
 ## Errors
 
-API errors use an `error` message and, where the condition is machine-actionable, a stable `code`. Examples include `invalid_publish_request`, `account_not_connected`, `media_platform_incompatible`, `idempotency_key_reused`, `post_limit_reached`, and `post_not_editable`.
-
-Common statuses: 400 invalid request, 401 authentication, 404 not found, 409 conflict, 413 too large, 415 unsupported media, 429 rate limited, 503 protection unavailable. HTTP 429 includes `Retry-After`.
+API errors use an `error` message and, where the condition is machine-actionable, a stable `code`. Common statuses: 400 invalid request, 401 authentication, 404 not found, 409 conflict, 413 too large, 415 unsupported media, 429 rate limited, 503 protection unavailable. HTTP 429 includes `Retry-After`.
 
 ## Limits
 
@@ -100,9 +122,7 @@ Publish JSON requests are limited to 1 MB. Media uploads are limited to 100 MB. 
 
 ## n8n integration
 
-Recommended flow: n8n → POST /api/v1/media when media is needed → POST /api/v1/publish → GET /api/v1/posts/{post_id} when status is needed. Store the API key in an n8n credential/secret. For scheduled posts, send scheduled_at to Omnisocial unless the workflow intentionally owns scheduling.
-
-For immediate publishing, omit `scheduled_at`; OmniSocial starts the existing worker immediately. Do not implement a second n8n-specific publishing path.
+Recommended flow: n8n → POST `/api/v1/media` when media is needed → POST `/api/v1/publish` → GET `/api/v1/posts/{post_id}` when status is needed. For AI workflows, n8n can call POST `/api/v1/ai/content` before publishing. Store the API key in an n8n credential/secret.
 
 ## OpenAPI
 
