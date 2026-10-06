@@ -4,6 +4,8 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type SyncResponse = { ok?: boolean; error?: string; results?: Array<{ metricsWritten?: number }> };
+
 export function AnalyticsSyncButton() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -13,9 +15,9 @@ export function AnalyticsSyncButton() {
     setMessage("");
     try {
       const response = await fetch("/api/analytics/sync", { method: "POST" });
-      const body = await response.json();
+      const body = (await response.json()) as SyncResponse;
       if (!response.ok || !body.ok) throw new Error(body.error ?? "Sync failed.");
-      const written = (body.results ?? []).reduce((sum: number, item: any) => sum + (item.metricsWritten ?? 0), 0);
+      const written = (body.results ?? []).reduce((total, item) => total + (item.metricsWritten ?? 0), 0);
       setMessage(`Synced successfully · ${written} metric snapshots updated`);
       window.location.reload();
     } catch (error) {
