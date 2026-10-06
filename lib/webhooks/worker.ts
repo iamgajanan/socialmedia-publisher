@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 const MAX_ATTEMPTS = 6;
 const RETRIES_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
+const CLAIM_MS = 120_000;
 
 function admin() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,12 +20,9 @@ export async function runWebhookWorker(limit = 50) {
   const supabase = admin();
   const now = new Date().toISOString();
 
-  // Query deliveries without relying on Supabase's embedded-resource relationship
-  // resolution. Production has had more than one webhook schema shape during the
-  // Phase 28 rollout, while the delivery rows themselves are stable. Fetching the
-  // referenced webhook/event explicitly makes the worker independent of PostgREST
-  // relationship metadata and also lets us report malformed rows instead of silently
-  // skipping them.
+  // Fetch only due deliveries. Each row is atomically claimed below before the
+  // outbound request so two overlapping cron invocations cannot deliver the same
+  // webhook row concurrently.
   const { data: deliveries, error: deliveryQueryError } = await supabase
     .from("socialmedia_webhook_deliveries")
     .select("id,attempt,event_id,webhook_id,status,next_attempt_at")
@@ -40,6 +38,21 @@ export async function runWebhookWorker(limit = 50) {
   let skipped = 0;
 
   for (const row of deliveries ?? []) {
+    const claimUntil = new Date(Date.now() + CLAIM_MS).toISOString();
+    const { data: claimed, error: claimError } = await supabase
+      .from("socialmedia_webhook_deliveries")
+      .update({ next_attempt_at: claimUntil })
+      .eq("id", row.id)
+      .eq("status", "pending")
+      .or(`next_attempt_at.is.null,next_attempt_at.lte.${now}`)
+      .select("id")
+      .maybeSingle();
+
+    if (claimError || !claimed) {
+      skipped++;
+      continue;
+    }
+
     const { data: webhook, error: webhookError } = await supabase
       .from("socialmedia_webhooks")
       .select("id,url,secret,status")
@@ -48,7 +61,7 @@ export async function runWebhookWorker(limit = 50) {
 
     const { data: event, error: eventError } = await supabase
       .from("socialmedia_webhook_events")
-      .select("id,event_type,payload")
+      .select("id,event_type,payload,created_at")
       .eq("id", row.event_id)
       .maybeSingle();
 
@@ -74,15 +87,26 @@ export async function runWebhookWorker(limit = 50) {
     }
 
     if (webhook.status !== "active" && webhook.status !== "failing") {
+      await supabase
+        .from("socialmedia_webhook_deliveries")
+        .update({ status: "pending", next_attempt_at: new Date(Date.now() + CLAIM_MS).toISOString() })
+        .eq("id", row.id)
+        .eq("status", "pending");
       skipped++;
       continue;
     }
 
+    const attempt = (row.attempt ?? 0) + 1;
     const payload = JSON.stringify({
       id: row.event_id,
       type: event.event_type,
-      created_at: new Date().toISOString(),
+      created_at: event.created_at,
       data: event.payload,
+      delivery: {
+        id: row.id,
+        webhook_id: row.webhook_id,
+        attempt,
+      },
     });
     const timestamp = Math.floor(Date.now() / 1000).toString();
 
@@ -102,7 +126,6 @@ export async function runWebhookWorker(limit = 50) {
       });
 
       const text = (await response.text()).slice(0, 4000);
-      const attempt = (row.attempt ?? 0) + 1;
 
       if (response.ok) {
         const { error: markDeliveredError } = await supabase
@@ -113,8 +136,10 @@ export async function runWebhookWorker(limit = 50) {
             response_body: text,
             delivered_at: new Date().toISOString(),
             attempt,
+            next_attempt_at: new Date().toISOString(),
           })
-          .eq("id", row.id);
+          .eq("id", row.id)
+          .eq("status", "pending");
 
         if (markDeliveredError) throw markDeliveredError;
 
@@ -133,7 +158,6 @@ export async function runWebhookWorker(limit = 50) {
         throw new Error(`HTTP ${response.status}: ${text}`);
       }
     } catch (error) {
-      const attempt = (row.attempt ?? 0) + 1;
       const terminal = attempt >= MAX_ATTEMPTS;
       const message = error instanceof Error ? error.message : "Webhook delivery failed";
 
@@ -147,7 +171,8 @@ export async function runWebhookWorker(limit = 50) {
             Date.now() + (RETRIES_MS[Math.min(attempt - 1, RETRIES_MS.length - 1)] ?? 21_600_000),
           ).toISOString(),
         })
-        .eq("id", row.id);
+        .eq("id", row.id)
+        .eq("status", "pending");
 
       await supabase
         .from("socialmedia_webhooks")
