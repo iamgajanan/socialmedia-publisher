@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { AnalyticsSyncButton } from "@/components/analytics-sync-button";
 
+export const instant = false;
+
 // Supabase row inference is intentionally kept local to this presentation helper.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sum(rows: any[], key: string) { return rows.reduce((total, row) => total + Number(row[key] ?? 0), 0); }
