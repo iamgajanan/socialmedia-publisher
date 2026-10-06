@@ -14,7 +14,7 @@ security definer
 set search_path = public
 as $$
 declare
-  event_id uuid;
+  v_event_id uuid;
 begin
   if p_event_type not in (
     'post.created','post.updated','post.scheduled','post.publishing',
@@ -26,17 +26,17 @@ begin
 
   insert into public.socialmedia_webhook_events(profile_id, event_type, payload)
   values (p_profile_id, p_event_type, coalesce(p_payload, '{}'::jsonb))
-  returning id into event_id;
+  returning id into v_event_id;
 
   insert into public.socialmedia_webhook_deliveries(webhook_id, event_id)
-  select w.id, event_id
+  select w.id, v_event_id
   from public.socialmedia_webhooks w
   where w.profile_id = p_profile_id
     and w.status in ('active','failing')
     and (cardinality(w.events) = 0 or p_event_type = any(w.events))
   on conflict (webhook_id, event_id) do nothing;
 
-  return event_id;
+  return v_event_id;
 end;
 $$;
 
