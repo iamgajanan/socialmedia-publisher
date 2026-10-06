@@ -1,0 +1,96 @@
+import "server-only";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export const MCP_PROTOCOL_VERSION = "2026-07-28";
+
+export type McpContext = {
+  profileId: string;
+  apiKeyId: string;
+  bearerToken: string;
+  origin: string;
+  requestId: string;
+};
+
+type Tool = { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations: Record<string, unknown> };
+
+const platformEnum = ["facebook", "instagram", "threads", "linkedin", "x", "youtube", "tiktok"];
+const aiPlatformEnum = ["instagram", "linkedin", "x", "facebook", "threads", "tiktok", "youtube"];
+
+export const MCP_TOOLS: Tool[] = [
+  { name: "list_connected_accounts", title: "List connected accounts", description: "List the caller's connected social accounts. Read-only.", inputSchema: { type: "object", properties: { platforms: { type: "array", items: { type: "string", enum: platformEnum } } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false } },
+  { name: "publish_post", title: "Publish a social post", description: "Publish immediately to one or more connected destinations. High-impact action: confirm=true is required.", inputSchema: { type: "object", required: ["platforms", "text", "confirm"], properties: { platforms: { type: "array", minItems: 1, maxItems: 7, items: { type: "string", enum: platformEnum } }, text: { type: "string", maxLength: 5000 }, media_paths: { type: "array", maxItems: 20, items: { type: "string" } }, confirm: { type: "boolean" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "schedule_post", title: "Schedule a social post", description: "Schedule a future social post. High-impact action: confirm=true is required.", inputSchema: { type: "object", required: ["platforms", "text", "scheduled_at", "confirm"], properties: { platforms: { type: "array", minItems: 1, maxItems: 7, items: { type: "string", enum: platformEnum } }, text: { type: "string", maxLength: 5000 }, media_paths: { type: "array", maxItems: 20, items: { type: "string" } }, scheduled_at: { type: "string" }, confirm: { type: "boolean" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
+  { name: "get_post_status", title: "Get post status", description: "Read a profile-owned post and destination publishing results.", inputSchema: { type: "object", required: ["post_id"], properties: { post_id: { type: "string" } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false } },
+  { name: "get_analytics", title: "Get analytics", description: "Read provider analytics overview, post analytics, account analytics, or reports.", inputSchema: { type: "object", properties: { view: { type: "string", enum: ["overview", "posts", "accounts", "reports"] }, platform: { type: "string", enum: platformEnum }, from: { type: "string" }, to: { type: "string" }, limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false }, annotations: { readOnlyHint: true, destructiveHint: false } },
+  { name: "generate_platform_content", title: "Generate platform-aware content", description: "Transform master content into platform-specific variants with validation, hashtags, CTAs, and media recommendations.", inputSchema: { type: "object", required: ["master_content", "platforms"], properties: { master_content: { type: "string", maxLength: 10000 }, platforms: { type: "array", minItems: 1, items: { type: "string", enum: aiPlatformEnum } }, brand_voice: { type: "string", maxLength: 2000 }, instructions: { type: "string", maxLength: 4000 }, variations: { type: "integer", minimum: 1, maximum: 3 }, require_approval: { type: "boolean" } }, additionalProperties: false }, annotations: { readOnlyHint: false, destructiveHint: false } },
+];
+
+function textResult(value: unknown, isError = false) { return { content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value) }], ...(isError ? { isError: true } : {}) }; }
+
+async function callApi(ctx: McpContext, path: string, method = "GET", body?: unknown) {
+  const response = await fetch(new URL(path, ctx.origin), { method, headers: { Authorization: `Bearer ${ctx.bearerToken}`, ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store" });
+  const data = await response.json().catch(() => ({ error: "Invalid API response." }));
+  if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : `OmniSocial API request failed (${response.status}).`);
+  return data;
+}
+
+async function audit(ctx: McpContext, toolName: string, status: "success" | "error" | "denied" | "input_required", argumentsValue: Record<string, unknown>, errorCode: string | null, durationMs: number) {
+  const admin = createAdminClient();
+  const safeArgs = { ...argumentsValue };
+  if ("media_paths" in safeArgs) safeArgs.media_paths = Array.isArray(safeArgs.media_paths) ? `[${safeArgs.media_paths.length} media path(s)]` : undefined;
+  await admin.from("socialmedia_mcp_audit_logs").insert({ profile_id: ctx.profileId, api_key_id: ctx.apiKeyId, request_id: ctx.requestId, method: "tools/call", tool_name: toolName, status, arguments: safeArgs, error_code: errorCode, duration_ms: durationMs });
+}
+
+export async function executeTool(ctx: McpContext, name: string, args: Record<string, unknown>) {
+  const started = Date.now();
+  try {
+    if (name === "list_connected_accounts") {
+      const platforms = Array.isArray(args.platforms) ? args.platforms.join(",") : "";
+      const data = await callApi(ctx, `/api/v1/accounts${platforms ? `?platforms=${encodeURIComponent(platforms)}` : ""}`);
+      await audit(ctx, name, "success", args, null, Date.now() - started);
+      return textResult(data);
+    }
+    if (name === "publish_post" || name === "schedule_post") {
+      if (args.confirm !== true) {
+        const result = { resultType: "input_required", code: "confirmation_required", message: `${name === "publish_post" ? "Publishing" : "Scheduling"} will create an external social-media action. Retry this tool call with confirm=true after the user approves it.` };
+        await audit(ctx, name, "input_required", args, "confirmation_required", Date.now() - started);
+        return textResult(result, true);
+      }
+      const data = await callApi(ctx, "/api/v1/publish", "POST", { platforms: args.platforms, text: args.text, media_paths: args.media_paths, ...(name === "schedule_post" ? { scheduled_at: args.scheduled_at } : {}) });
+      await audit(ctx, name, "success", args, null, Date.now() - started);
+      return textResult(data);
+    }
+    if (name === "get_post_status") {
+      const data = await callApi(ctx, `/api/v1/posts/${encodeURIComponent(String(args.post_id))}`);
+      await audit(ctx, name, "success", args, null, Date.now() - started);
+      return textResult(data);
+    }
+    if (name === "get_analytics") {
+      const view = String(args.view ?? "overview");
+      const params = new URLSearchParams();
+      if (args.platform) params.set("platform", String(args.platform));
+      if (args.from) params.set("from", String(args.from));
+      if (args.to) params.set("to", String(args.to));
+      if (args.limit) params.set("limit", String(args.limit));
+      const data = await callApi(ctx, `/api/v1/analytics/${view}${params.toString() ? `?${params}` : ""}`);
+      await audit(ctx, name, "success", args, null, Date.now() - started);
+      return textResult(data);
+    }
+    if (name === "generate_platform_content") {
+      const data = await callApi(ctx, "/api/v1/ai/content", "POST", { master_content: args.master_content, platforms: args.platforms, brand_voice: args.brand_voice, instructions: args.instructions, variations: args.variations, require_approval: args.require_approval });
+      await audit(ctx, name, "success", args, null, Date.now() - started);
+      return textResult(data);
+    }
+    await audit(ctx, name, "error", args, "unknown_tool", Date.now() - started);
+    return textResult({ error: "Unknown MCP tool.", code: "unknown_tool" }, true);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "MCP tool execution failed.";
+    await audit(ctx, name, "error", args, "tool_execution_failed", Date.now() - started);
+    return textResult({ error: message, code: "tool_execution_failed" }, true);
+  }
+}
+
+export function discoveryResult() {
+  return { protocolVersion: MCP_PROTOCOL_VERSION, serverInfo: { name: "OmniSocial MCP", version: "1.0.0" }, capabilities: { tools: {} } };
+}
