@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BarChart3, FileText, LayoutDashboard, Users, LineChart } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 const items = [
   { href: "/analytics", label: "Overview", icon: LayoutDashboard },
   { href: "/analytics/posts", label: "Posts", icon: FileText },
