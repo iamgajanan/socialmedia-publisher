@@ -6,7 +6,14 @@ begin
   if tg_op = 'INSERT' then
     event_name := 'post.created';
   elsif new.status is distinct from old.status then
-    event_name := case new.status when 'scheduled' then 'post.scheduled' when 'publishing' then 'post.publishing' when 'published' then 'post.published' when 'failed' then 'post.failed' else null end;
+    event_name := case new.status
+      when 'scheduled' then 'post.scheduled'
+      when 'publishing' then 'post.publishing'
+      when 'published' then 'post.published'
+      when 'failed' then 'post.failed'
+      when 'cancelled' then 'post.cancelled'
+      else null
+    end;
   elsif new.content is distinct from old.content or new.media_urls is distinct from old.media_urls then
     event_name := 'post.updated';
   end if;
