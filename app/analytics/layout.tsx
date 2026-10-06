@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BarChart3, FileText, LayoutDashboard, Users, LineChart } from "lucide-react";
 
-export const dynamic = "force-dynamic";
 export const instant = false;
 
 const items = [
