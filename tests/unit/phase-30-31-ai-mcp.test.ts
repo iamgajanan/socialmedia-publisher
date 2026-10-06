@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AI_PLATFORMS } from "../../lib/ai/content-engine.ts";
 import { MCP_TOOLS } from "../../lib/mcp/server.ts";
 
 test("Phase 31 supports every required platform", () => {
-  assert.deepEqual([...AI_PLATFORMS], ["instagram", "linkedin", "x", "facebook", "threads", "tiktok", "youtube"]);
+  const aiTool = MCP_TOOLS.find((tool) => tool.name === "generate_platform_content");
+  assert.ok(aiTool);
+  const properties = aiTool.inputSchema.properties as { platforms: { items: { enum: string[] } } };
+  assert.deepEqual(properties.platforms.items.enum, ["instagram", "linkedin", "x", "facebook", "threads", "tiktok", "youtube"]);
 });
 
 test("Phase 30 exposes only the approved MCP tools", () => {
