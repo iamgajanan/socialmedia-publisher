@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
+export const instant = false;
+
 type DailyPoint = { day: string; impressions: number; reach: number; likes: number; comments: number; shares: number; saves: number; clicks: number; video_views: number };
 function n(value: number) { return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value); }
 function day(value: string) { return value.slice(0, 10); }
