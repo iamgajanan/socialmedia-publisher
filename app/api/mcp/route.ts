@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { authenticateApiRequest, getBearerToken } from "@/lib/api/api-auth";
+import { authenticateApiRequest } from "@/lib/api/api-auth";
+import { getBearerToken } from "@/lib/api/api-key-auth";
 import { discoveryResult, executeTool, MCP_PROTOCOL_VERSION, MCP_TOOLS } from "@/lib/mcp/server";
 
 export const dynamic = "force-dynamic";
