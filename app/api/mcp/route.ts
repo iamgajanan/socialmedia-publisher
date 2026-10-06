@@ -4,8 +4,6 @@ import { authenticateApiRequest } from "@/lib/api/api-auth";
 import { getBearerToken } from "@/lib/api/api-key-auth";
 import { discoveryResult, executeTool, MCP_PROTOCOL_VERSION, MCP_TOOLS } from "@/lib/mcp/server";
 
-export const dynamic = "force-dynamic";
-
 function rpc(id: unknown, result: unknown, status = 200) {
   return NextResponse.json({ jsonrpc: "2.0", id: id ?? null, result }, { status, headers: { "Cache-Control": "no-store", "MCP-Protocol-Version": MCP_PROTOCOL_VERSION } });
 }
