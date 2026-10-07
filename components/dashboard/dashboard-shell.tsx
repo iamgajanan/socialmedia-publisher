@@ -74,7 +74,7 @@ function Navigation({ onNavigate, mobile = false }: { onNavigate?: () => void; m
         <span className="flex-1">AI & Automation</span><ChevronDown className={cn("size-3.5 transition-transform", aiActive && "rotate-180")} />
       </Link>
       <div className={cn("ml-6 mt-1 border-l pl-3", !aiActive && "hidden")}>
-        {aiNavigation.map((item) => { const active = pathname === item.href || pathname.startsWith(`${item.href}/`); return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors", active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/70 hover:text-foreground")}><span>{item.label}</span>{item.href === "/ai-content/approvals" ? <ClipboardCheck className="ml-auto size-3.5" /> : null}</Link>; })}
+        {aiNavigation.map((item) => { const active = pathname === item.href || pathname.startsWith(`${item.href}/`); return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} title={item.label} className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors", active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent/70 hover:text-foreground")}><span>{item.label}</span>{item.href === "/ai-content/approvals" ? <ClipboardCheck className="ml-auto size-3.5" /> : null}</Link>; })}
       </div>
     </div>
     <p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/65">Manage</p>{secondaryNavigation.map(render)}
