@@ -40,8 +40,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to approve generation.", code: "approval_failed" }, { status: 404 });
     }
   }
-  const { data: generation, error } = await admin.from("socialmedia_ai_generations").update({ status: "rejected", updated_at: new Date().toISOString() }).eq("id", generationId).eq("profile_id", id).eq("requires_approval", true).select("id,status,approved_at,approved_by").maybeSingle();
-  if (error || !generation) return NextResponse.json({ error: "Generation not found or already resolved.", code: "rejection_failed" }, { status: 404 });
+  const { data: current, error: currentError } = await admin.from("socialmedia_ai_generations").select("id,status,requires_approval").eq("id", generationId).eq("profile_id", id).maybeSingle();
+  if (currentError) return NextResponse.json({ error: "Unable to load generation for rejection.", code: "rejection_lookup_failed" }, { status: 500 });
+  if (!current || !current.requires_approval) return NextResponse.json({ error: "Generation not found or does not require approval.", code: "rejection_not_available" }, { status: 404 });
+  if (current.status === "approved" || current.status === "rejected") return NextResponse.json({ error: "Generation has already been resolved.", code: "rejection_already_resolved" }, { status: 409 });
+
+  const { data: generation, error } = await admin.from("socialmedia_ai_generations").update({ status: "rejected", updated_at: new Date().toISOString() }).eq("id", generationId).eq("profile_id", id).select("id,status,approved_at,approved_by").single();
+  if (error || !generation) return NextResponse.json({ error: "Unable to reject generation.", code: "rejection_failed" }, { status: 500 });
+
   const { error: variantsError } = await admin.from("socialmedia_ai_content_variants").update({ approval_status: "rejected", updated_at: new Date().toISOString() }).eq("generation_id", generationId).eq("profile_id", id);
   if (variantsError) return NextResponse.json({ error: "Unable to reject generated variants.", code: "rejection_variants_failed" }, { status: 500 });
   return NextResponse.json({ success: true, generation });
