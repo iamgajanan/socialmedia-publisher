@@ -13,6 +13,7 @@ async function loadPost(admin: ReturnType<typeof createAdminClient>, postId: str
     .select("id,profile_id,status,content,media_urls,scheduled_at,published_at,created_at,updated_at")
     .eq("id", postId)
     .eq("profile_id", profileId)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 }
 
@@ -32,6 +33,7 @@ async function loadResults(admin: ReturnType<typeof createAdminClient>, postId: 
         .select("id,platform,account_name,username")
         .in("id", accountIds)
         .eq("profile_id", profileId)
+        .eq("workspace_id", workspaceId)
     : { data: [] };
 
   const accountsById = new Map((accounts ?? []).map((account) => [account.id, account]));
@@ -116,7 +118,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { postId } = await context.params;
   const admin = createAdminClient();
-  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId);
+  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId, authentication.workspaceId);
 
   if (postError) return NextResponse.json({ error: "Unable to load the post." }, { status: 500 });
   if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
@@ -205,6 +207,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .update(update)
     .eq("id", post.id)
     .eq("profile_id", authentication.profileId)
+    .eq("workspace_id", authentication.workspaceId)
     .in("status", ["draft", "scheduled"])
     .select("id,profile_id,status,content,media_urls,scheduled_at,published_at,created_at,updated_at")
     .maybeSingle();
@@ -278,6 +281,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       .delete()
       .eq("id", post.id)
       .eq("profile_id", authentication.profileId)
+      .eq("workspace_id", authentication.workspaceId)
       .eq("status", "draft");
 
     if (error) return NextResponse.json({ error: "Unable to delete the draft." }, { status: 500 });
