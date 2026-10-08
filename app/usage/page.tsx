@@ -19,7 +19,7 @@ function UsageBar({ used, limit }: { used: number; limit: number | null }) {
 export default async function UsagePage() {
   const context = await getCurrentWorkspace();
   const periodStart = monthStart();
-  const [{ data: usage }, { count: teamCount }, { count: accountCount }] = await Promise.all([
+  const [{ data: usage, error: usageError }, { count: teamCount }, { count: accountCount }] = await Promise.all([
     context.supabase.rpc("socialmedia_workspace_usage", { target_workspace_id: context.workspace.id, target_period_start: periodStart }),
     context.supabase.from("socialmedia_workspace_members").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspace.id).in("status", ["active", "invited"]),
     context.supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspace.id).eq("status", "connected"),
