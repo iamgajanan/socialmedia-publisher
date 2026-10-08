@@ -25,7 +25,8 @@ export default async function UsagePage() {
     context.supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspace.id).eq("status", "connected"),
   ]);
 
-  const row = Array.isArray(usage) ? usage[0] : usage;\n  const usageUnavailable = Boolean(usageError);
+  const row = Array.isArray(usage) ? usage[0] : usage;
+  const usageUnavailable = Boolean(usageError);
   const postsCreated = Number(row?.posts_created ?? 0);
   const postsPublished = Number(row?.posts_published ?? 0);
   const aiGenerations = Number(row?.ai_generations ?? 0);
