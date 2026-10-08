@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const parsed = parseAnalyticsQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return apiJson({ error: parsed.message, code: "invalid_analytics_query" }, 400, requestId);
   const admin = createAdminClient();
-  const { data, error } = await admin.from("socialmedia_account_analytics").select("social_account_id,platform,period_start,period_end,captured_at,follower_count,impressions,reach,likes,comments,shares,saves,clicks,video_views,engagement_rate").eq("profile_id", auth.profileId).gte("period_start", parsed.data.from).lte("period_end", parsed.data.to).order("captured_at", { ascending: false }).limit(1000);
+  const { data, error } = await admin.from("socialmedia_account_analytics").select("social_account_id,platform,period_start,period_end,captured_at,follower_count,impressions,reach,likes,comments,shares,saves,clicks,video_views,engagement_rate").eq("profile_id", auth.profileId).in("social_account_id", accountIds).gte("period_start", parsed.data.from).lte("period_end", parsed.data.to).order("captured_at", { ascending: false }).limit(1000);
   if (error && error.code !== "42P01") return apiJson({ error: "Unable to load account analytics.", code: "analytics_accounts_failed" }, 500, requestId);
   const latest = new Map<string, AccountRow>();
   for (const row of (data ?? []) as AccountRow[]) if (!latest.has(row.social_account_id)) latest.set(row.social_account_id, row);
