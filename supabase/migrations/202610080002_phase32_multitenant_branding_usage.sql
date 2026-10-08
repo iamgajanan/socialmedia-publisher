@@ -152,7 +152,7 @@ language sql
 stable
 security invoker
 set search_path = public
-as $$
+as $
   select
     (select count(*) from public.socialmedia_posts p
       where p.workspace_id = target_workspace_id
@@ -170,8 +170,10 @@ as $$
     (select coalesce(u.api_requests, 0) from public.socialmedia_workspace_usage_monthly u
       where u.workspace_id = target_workspace_id
         and u.period_start = target_period_start) as api_requests;
-$$;
+$;
 
+-- Do not expose usage for a workspace the current authenticated user does not belong to.
+-- The counts below therefore remain tenant-scoped even when a caller supplies an arbitrary id.
 revoke all on function public.socialmedia_workspace_usage(uuid, date) from public, anon;
 grant execute on function public.socialmedia_workspace_usage(uuid, date) to authenticated;
 
