@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { updateAccountPassword, deleteAccount, updateEmail, updateProfile, updateWorkspace } from "./actions";
+import { getCurrentWorkspace } from "@/lib/workspace/server";
 
 export const instant = false;
 
@@ -17,6 +18,7 @@ export default async function SettingsPage() {
   if (claimsError || !claims?.claims?.sub) redirect("/auth/login");
 
   const userId = String(claims.claims.sub);
+  const workspaceContext = await getCurrentWorkspace();
   const email = typeof claims.claims.email === "string" ? claims.claims.email : "";
   const { data: profile, error } = await supabase
     .from("socialmedia_profiles")
@@ -47,7 +49,7 @@ export default async function SettingsPage() {
 
           <Card className="shadow-sm">
             <CardHeader><CardTitle className="flex items-center gap-2"><Workflow className="size-5" />Workspace & scheduling</CardTitle><CardDescription>Set the name, timezone, and defaults used by future publishing flows.</CardDescription></CardHeader>
-            <CardContent><WorkspaceForm action={updateWorkspace} workspaceName={profile?.workspace_name ?? "My workspace"} timezone={profile?.timezone ?? "Asia/Kolkata"} autoSaveDrafts={preferences.autoSaveDrafts ?? true} defaultStatus={preferences.defaultStatus ?? "draft"} /></CardContent>
+            <CardContent><WorkspaceForm action={updateWorkspace} workspaceName={workspaceContext.workspace.name} timezone={profile?.timezone ?? "Asia/Kolkata"} autoSaveDrafts={preferences.autoSaveDrafts ?? true} defaultStatus={preferences.defaultStatus ?? "draft"} /></CardContent>
           </Card>
 
           <Card className="overflow-hidden border-primary/20 bg-primary/[0.03] shadow-sm">

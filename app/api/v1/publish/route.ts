@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const connectedResult = await getApiConnectedAccounts(authentication.profileId, platforms);
+  const connectedResult = await getApiConnectedAccounts(authentication.profileId, platforms, authentication.workspaceId);
   if (connectedResult.error) {
     if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
     return apiJson({ error: connectedResult.error, code: "accounts_lookup_failed" }, 500, requestId);

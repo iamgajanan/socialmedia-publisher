@@ -19,7 +19,7 @@ async function GETImpl(request: Request) {
   const filter = parsePlatformFilter(url.searchParams.get("platforms"));
   if (filter.error) return apiJson({ error: filter.error, code: "invalid_platform_filter" }, 400, requestId);
 
-  const result = await getApiConnectedAccounts(authentication.profileId, filter.platforms);
+  const result = await getApiConnectedAccounts(authentication.profileId, filter.platforms, authentication.workspaceId);
   if (result.error) return apiJson({ error: result.error, code: "accounts_lookup_failed" }, 500, requestId);
 
   const accounts = result.accounts

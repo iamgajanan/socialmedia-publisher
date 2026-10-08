@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 import { generateApiKey } from "@/lib/api/api-key-core";
 
 const createApiKeySchema = z.object({
@@ -20,22 +20,13 @@ function publicKey(row: Record<string, unknown>) {
   };
 }
 
-async function getUserId() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-  if (error || !data?.claims?.sub) return null;
-  return String(data.claims.sub);
-}
-
 export async function GET() {
-  const profileId = await getUserId();
-  if (!profileId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-
+  const context = await requireWorkspaceAdmin();
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("socialmedia_api_keys")
     .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
-    .eq("profile_id", profileId)
+    .eq("workspace_id", context.workspace.id)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: "Unable to load API keys." }, { status: 500 });
@@ -44,8 +35,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const profileId = await getUserId();
-  if (!profileId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const context = await requireWorkspaceAdmin();
 
   const parsed = createApiKeySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -58,7 +48,8 @@ export async function POST(request: Request) {
   const { data, error } = await admin
     .from("socialmedia_api_keys")
     .insert({
-      profile_id: profileId,
+      profile_id: context.profileId,
+      workspace_id: context.workspace.id,
       name: parsed.data.name,
       token_prefix: generated.tokenPrefix,
       token_hash: generated.tokenHash,
@@ -67,7 +58,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
-    console.error("api_key_create_failed", { profileId, code: error?.code, message: error?.message });
+    console.error("api_key_create_failed", { profileId: context.profileId, workspaceId: context.workspace.id, code: error?.code, message: error?.message });
     return NextResponse.json({ error: "Unable to create API key." }, { status: 500 });
   }
 

@@ -47,6 +47,7 @@ async function GETImpl(request: Request) {
     .from("socialmedia_posts")
     .select("id,profile_id,status,content,media_urls,scheduled_at,published_at,created_at,updated_at", { count: "exact" })
     .eq("profile_id", authentication.profileId)
+    .eq("workspace_id", authentication.workspaceId)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -92,6 +93,7 @@ async function GETImpl(request: Request) {
         .select("id,platform,account_name,username")
         .in("id", accountIds)
         .eq("profile_id", authentication.profileId)
+        .eq("workspace_id", authentication.workspaceId)
     : { data: [] };
 
   const accountsById = new Map((accounts ?? []).map((account) => [account.id, account]));

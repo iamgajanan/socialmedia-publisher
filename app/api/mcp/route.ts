@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const name = String(params.name ?? "");
     const tool = MCP_TOOLS.find((item) => item.name === name);
     if (!tool) return errorRpc(id, -32602, "Unknown tool.", { code: "unknown_tool" });
-    const ctx = { profileId: auth.profileId, apiKeyId: auth.apiKeyId, bearerToken: bearerToken ?? "", origin: new URL(request.url).origin, requestId };
+    const ctx = { profileId: auth.profileId, workspaceId: auth.workspaceId, apiKeyId: auth.apiKeyId, bearerToken: bearerToken ?? "", origin: new URL(request.url).origin, requestId };
     const result = await executeTool(ctx, name, (params.arguments && typeof params.arguments === "object" ? params.arguments : {}) as Record<string, unknown>);
     return rpc(id, result);
   }

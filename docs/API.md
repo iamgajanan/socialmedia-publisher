@@ -4,11 +4,11 @@ Production base URL: https://socialmedia-publisher-gules.vercel.app
 
 ## Authentication
 
-All API endpoints use a profile-scoped Bearer API key.
+All API endpoints use a workspace-scoped Bearer API key. Each key is also tied to the profile that created it for auditability.
 
     Authorization: Bearer $API_KEY
 
-The API key resolves the Omnisocial profile and the API only uses that profile's connected accounts. Provider OAuth tokens are never returned. Keep API keys server-side and store them in an automation platform's secret/credential storage.
+The API key resolves both the calling profile and its active workspace. Tenant-owned resources are filtered by workspace so one workspace cannot read another workspace's publishing data. Provider OAuth tokens are never returned. Keep API keys server-side and store them in an automation platform's secret/credential storage.
 
 Every `/api/v1/*` response includes `X-Request-Id`. Supply an `X-Request-Id` header when you need to correlate an automation request with server logs; otherwise OmniSocial generates one.
 
@@ -21,7 +21,7 @@ Publishing: facebook, instagram, threads, linkedin, youtube, tiktok.
 
 ### GET /api/v1/accounts
 
-Lists connected accounts owned by the authenticated profile. Optional query: platforms=instagram,facebook.
+Lists connected accounts available to the authenticated workspace. Optional query: platforms=instagram,facebook.
 
 ### POST /api/v1/media
 
@@ -35,11 +35,11 @@ Rules: platforms 1–6 unique values; text max 5,000 characters; media_paths max
 
 ### GET /api/v1/posts
 
-Lists profile-owned posts. Query parameters: status, platform, from, to, limit (1–50, default 20), offset (0–10000, default 0).
+Lists workspace-owned posts. Query parameters: status, platform, from, to, limit (1–50, default 20), offset (0–10000, default 0).
 
 ### GET /api/v1/posts/{postId}
 
-Returns one profile-owned post and destination publishing results.
+Returns one workspace-owned post and destination publishing results.
 
 ### PATCH /api/v1/posts/{postId}
 
@@ -56,7 +56,7 @@ Draft posts are deleted; scheduled posts are cancelled. Posts already publishing
 ### GET /api/v1/analytics/accounts
 ### GET /api/v1/analytics/reports
 
-These endpoints expose profile-scoped analytics snapshots captured by the Phase 29 provider sync layer. They are read-only and can be consumed by n8n, MCP tools, or other automation clients.
+These endpoints expose workspace-scoped analytics snapshots captured by the Phase 29 provider sync layer. They are read-only and can be consumed by n8n, MCP tools, or other automation clients.
 
 ## Phase 31 AI content engine
 
@@ -75,11 +75,11 @@ Request:
       "require_approval": true
     }
 
-Each variant includes caption, optional title, hashtags, CTA, media recommendations, character count, character limit, and validation warnings. The generation and variants are persisted to the profile. `OPENAI_API_KEY` is required server-side; the model is configurable with `OPENAI_CONTENT_MODEL` and defaults to `gpt-6-luna`.
+Each variant includes caption, optional title, hashtags, CTA, media recommendations, character count, character limit, and validation warnings. The generation and variants are persisted to the workspace and retain the calling profile for auditability. `OPENAI_API_KEY` is required server-side; the model is configurable with `OPENAI_CONTENT_MODEL` and defaults to `gpt-6-luna`.
 
 ### GET /api/v1/ai/content
 
-Lists recent AI generations for the authenticated profile.
+Lists recent AI generations for the authenticated workspace.
 
 ### GET /api/v1/ai/content/{id}
 
