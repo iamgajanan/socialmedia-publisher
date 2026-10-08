@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 import { generateApiKey } from "@/lib/api/api-key-core";
 
 const createApiKeySchema = z.object({
