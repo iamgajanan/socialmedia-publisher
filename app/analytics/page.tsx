@@ -69,7 +69,7 @@ export default async function AnalyticsPage() {
       {metrics.map(([label, value, Icon]) => <Card key={label}><CardContent className="p-5">
         <div className="flex items-center justify-between">
           <div className="flex size-10 items-center justify-center rounded-xl bg-accent"><Icon className="size-4" /></div>
-          <span className="text-2xl font-semibold">{posts.length ? format(value) : "—"}</span>
+          <span className="text-2xl font-semibold">{label === "Published posts" || posts.length ? format(value) : "—"}</span>
         </div>
         <p className="mt-4 text-sm font-medium">{label}</p>
         <p className="mt-1 text-xs text-muted-foreground">{label === "Published posts" ? "Matches Dashboard published count" : posts.length ? "Latest provider snapshots" : "No provider post snapshots yet"}</p>
