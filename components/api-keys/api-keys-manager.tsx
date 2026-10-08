@@ -112,7 +112,7 @@ export default function ApiKeysManager() {
           <p className="text-sm font-medium text-muted-foreground">Developer</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">API keys</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Create credentials for n8n and other integrations to access your Omnisocial account.
+            Create workspace credentials for n8n and other integrations to access the current OmniSocial workspace.
           </p>
         </div>
         <form onSubmit={createKey} className="flex w-full gap-2 sm:w-auto">
@@ -147,8 +147,8 @@ export default function ApiKeysManager() {
 
       <div className="rounded-2xl border bg-card">
         <div className="border-b px-6 py-5">
-          <h2 className="font-semibold">Your API keys</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Keys are scoped to your Omnisocial profile.</p>
+          <h2 className="font-semibold">Workspace API keys</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Keys are scoped to the current workspace and can be managed by workspace admins.</p>
         </div>
 
         {loading ? (
@@ -191,7 +191,7 @@ export default function ApiKeysManager() {
           <div>
             <h3 className="font-medium">Using your API key</h3>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Send it as <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer &lt;your-key&gt;</code>. The API resolves the key to your profile and never exposes provider credentials.
+              Send it as <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer &lt;your-key&gt;</code>. The API resolves the key to its workspace and calling profile. Provider credentials are never exposed.
             </p>
           </div>
         </div>
