@@ -11,7 +11,6 @@ export async function POST() {
   if (error || !claims?.claims?.sub) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   const profileId = String(claims.claims.sub);
   const admin = createAdminClient();
-  const runId: string | undefined = undefined;
 
   // The analytics sync table was introduced after the provider snapshot tables.
   // Keep syncing functional for legacy production databases where that migration
@@ -21,7 +20,7 @@ export async function POST() {
     .insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() })
     .select("id")
     .maybeSingle();
-  const effectiveRunId = run?.id ?? runId;
+  const effectiveRunId = run?.id;
 
   try {
     const result = await syncAnalyticsForProfile(profileId, effectiveRunId);
@@ -38,6 +37,6 @@ export async function POST() {
         })
         .eq("id", effectiveRunId);
     }
-    return NextResponse.json({ ok: false, error: syncError instanceof Error ? syncError.message : "Analytics sync failed.", ...(runId ? { runId } : {}) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: syncError instanceof Error ? syncError.message : "Analytics sync failed.", ...(effectiveRunId ? { runId: effectiveRunId } : {}) }, { status: 500 });
   }
 }
