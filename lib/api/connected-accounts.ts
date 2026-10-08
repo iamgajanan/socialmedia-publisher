@@ -27,7 +27,7 @@ export async function getApiConnectedAccounts(
     .order("platform", { ascending: true })
     .order("account_name", { ascending: true });
 
-  if (platforms?.length) query = query.in("platform", platforms);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);\n  if (platforms?.length) query = query.in("platform", platforms);
 
   const { data, error } = await query;
   if (error) {
