@@ -17,6 +17,7 @@ export type ApiConnectedAccountRow = {
 export async function getApiConnectedAccounts(
   profileId: string,
   platforms?: ApiSocialPlatform[],
+  workspaceId?: string,
 ): Promise<{ accounts: ApiConnectedAccountRow[]; error: string | null }> {
   const admin = createAdminClient();
   let query = admin
@@ -27,12 +28,14 @@ export async function getApiConnectedAccounts(
     .order("platform", { ascending: true })
     .order("account_name", { ascending: true });
 
-  if (workspaceId) query = query.eq("workspace_id", workspaceId);\n  if (platforms?.length) query = query.in("platform", platforms);
+  if (workspaceId) query = query.eq("workspace_id", workspaceId);
+  if (platforms?.length) query = query.in("platform", platforms);
 
   const { data, error } = await query;
   if (error) {
     console.error("api_connected_accounts_lookup_failed", {
       profileId,
+      workspaceId,
       code: error.code,
       message: error.message,
     });
