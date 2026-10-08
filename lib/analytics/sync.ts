@@ -243,7 +243,7 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
     try {
       const publisherAccount: PublisherAccount = { id: account.id, platform: account.platform, external_account_id: account.external_account_id, account_name: account.account_name, username: account.username, metadata: account.metadata ?? {}, token_expires_at: account.token_expires_at };
       const token = await getUsableAccessToken(publisherAccount);
-      const from = new Date(now.getTime() - 30 * 86400000);
+      const from = new Date(now.getTime() - 90 * 86400000);
       const { data: postPlatforms, error: postsError } = await admin.from("socialmedia_post_platforms").select("id,post_id,platform_post_id,platform,status,published_at").eq("social_account_id", account.id).eq("status", "published").not("platform_post_id", "is", null).gte("published_at", from.toISOString()).order("published_at", { ascending: false }).limit(50);
       if (postsError) throw new Error("Unable to load published destinations.");
       result.postsScanned = postPlatforms?.length ?? 0;
