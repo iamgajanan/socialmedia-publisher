@@ -31,6 +31,8 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
 
   const profileId = String(data.profile_id);
   const apiKeyId = String(data.id);
+  const workspaceId = String(data.workspace_id ?? "");
+  if (!workspaceId) return { ok: false, status: 401, error: "API key is not attached to a workspace." };
 
   const { data: rateLimit, error: rateLimitError } = await admin.rpc(
     "socialmedia_consume_api_rate_limit",
@@ -46,6 +48,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
     console.error("api_rate_limit_check_failed", {
       apiKeyId,
       profileId,
+      workspaceId,
       code: rateLimitError.code,
       message: rateLimitError.message,
     });
@@ -62,19 +65,35 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
     };
   }
 
+  const periodStart = new Date();
+  periodStart.setUTCDate(1);
+  const { error: usageError } = await admin.rpc("socialmedia_record_api_request", {
+    target_workspace_id: workspaceId,
+    target_period_start: periodStart.toISOString().slice(0, 10),
+  });
+  if (usageError) {
+    console.error("api_usage_record_failed", {
+      apiKeyId,
+      workspaceId,
+      code: usageError.code,
+      message: usageError.message,
+    });
+  }
+
   const lastUsedAt = data.last_used_at ? new Date(String(data.last_used_at)).getTime() : 0;
   if (!lastUsedAt || Date.now() - lastUsedAt >= 5 * 60 * 1000) {
     const { error: updateError } = await admin
       .from("socialmedia_api_keys")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", apiKeyId)
-      .eq("profile_id", profileId)
+      .eq("workspace_id", workspaceId)
       .is("revoked_at", null);
 
     if (updateError) {
       console.error("api_auth_last_used_update_failed", {
         apiKeyId,
         profileId,
+        workspaceId,
         code: updateError.code,
         message: updateError.message,
       });
