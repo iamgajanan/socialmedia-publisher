@@ -41,7 +41,7 @@ export async function getCurrentWorkspace() {
 
   const { data: workspace, error: workspaceError } = await supabase
     .from("socialmedia_workspaces")
-    .select("id, name, slug, logo_url, primary_color, accent_color, custom_domain, timezone, owner_profile_id, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, stripe_price_id, stripe_billing_currency, stripe_current_period_end")
+    // Keep the core workspace read compatible with production databases while a new schema migration is being rolled out.\n    .select("id, name, timezone, owner_profile_id, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, stripe_price_id, stripe_billing_currency, stripe_current_period_end")
     .eq("id", profile.workspace_id)
     .single();
   if (workspaceError) throw new Error(workspaceError.message);
@@ -57,7 +57,7 @@ export async function getCurrentWorkspace() {
     supabase,
     profileId,
     profileName: profile.display_name ?? "",
-    workspace: workspace as typeof workspace & { plan_id: string; subscription_status: string },
+    workspace: workspaceWithBranding as typeof workspaceWithBranding & { plan_id: string; subscription_status: string },
     plan: plan as WorkspacePlan,
     membership: membership as { id: string; role: WorkspaceRole; status: string },
   };
