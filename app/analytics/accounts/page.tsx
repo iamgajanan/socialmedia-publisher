@@ -31,17 +31,18 @@ export default async function AnalyticsAccountsPage() {
   ).values()];
 
   const accountIds = uniqueAccounts.map((account) => account.id);
-  const { data: snapshots } = accountIds.length
+  const snapshotResult = accountIds.length
     ? await supabase
       .from("socialmedia_account_analytics")
       .select("id,social_account_id,platform,follower_count,impressions,reach,likes,comments,shares,saves,clicks,video_views,captured_at")
       .in("social_account_id", accountIds)
       .order("captured_at", { ascending: false })
       .limit(Math.max(100, accountIds.length * 30))
-    : { data: [] };
+    : null;
+  const snapshots = snapshotResult?.data ?? [];
 
-  const latestByAccount = new Map<string, (typeof snapshots extends Array<infer T> ? T : never)>();
-  for (const snapshot of snapshots ?? []) {
+  const latestByAccount = new Map<string, typeof snapshots[number]>();
+  for (const snapshot of snapshots) {
     if (!latestByAccount.has(snapshot.social_account_id)) latestByAccount.set(snapshot.social_account_id, snapshot);
   }
 
