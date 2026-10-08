@@ -25,8 +25,7 @@ export default async function WorkspaceLayout({
     .from("socialmedia_workspace_members")
     .select("workspace_id, role, socialmedia_workspaces(id, name)")
     .eq("profile_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: true });
+    .eq("status", "active");
 
   if (membershipsError) throw new Error(membershipsError.message);
 
