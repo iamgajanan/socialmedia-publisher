@@ -243,7 +243,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
   }
 
-  const result = await loadResults(admin, post.id, authentication.profileId);
+  const result = await loadResults(admin, post.id, authentication.profileId, authentication.workspaceId);
   if (result.error) return NextResponse.json({ error: "Unable to load updated post." }, { status: 500 });
 
   return NextResponse.json({
@@ -270,7 +270,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { postId } = await context.params;
   const admin = createAdminClient();
-  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId);
+  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId, authentication.workspaceId);
 
   if (postError) return NextResponse.json({ error: "Unable to load the post." }, { status: 500 });
   if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
@@ -334,6 +334,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     .update({ status: "cancelled", scheduled_at: null })
     .eq("id", post.id)
     .eq("profile_id", authentication.profileId)
+    .eq("workspace_id", authentication.workspaceId)
     .eq("status", "scheduled");
 
   if (cancelError) {
