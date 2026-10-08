@@ -161,14 +161,34 @@ as $$
       where g.workspace_id = target_workspace_id
         and g.created_at >= target_period_start::timestamptz
         and g.created_at < (target_period_start + interval '1 month')) as ai_generations,
-    (select count(*) from public.socialmedia_api_keys k
-      where k.workspace_id = target_workspace_id
-        and k.last_used_at >= target_period_start::timestamptz
-        and k.last_used_at < (target_period_start + interval '1 month')) as api_requests;
+    (select coalesce(u.api_requests, 0) from public.socialmedia_workspace_usage_monthly u
+      where u.workspace_id = target_workspace_id
+        and u.period_start = target_period_start) as api_requests;
 $$;
 
 revoke all on function public.socialmedia_workspace_usage(uuid, date) from public, anon;
 grant execute on function public.socialmedia_workspace_usage(uuid, date) to authenticated;
 
+create or replace function public.socialmedia_record_api_request(
+  target_workspace_id uuid,
+  target_period_start date
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  insert into public.socialmedia_workspace_usage_monthly (workspace_id, period_start, api_requests)
+  values (target_workspace_id, target_period_start, 1)
+  on conflict (workspace_id, period_start)
+  do update set api_requests = public.socialmedia_workspace_usage_monthly.api_requests + 1,
+                updated_at = now();
+end;
+$;
+
+revoke all on function public.socialmedia_record_api_request(uuid, date) from public, anon, authenticated;
+
 comment on table public.socialmedia_workspace_usage_monthly is 'Phase 32 workspace usage foundation for plan quotas and SaaS reporting.';
 comment on table public.socialmedia_workspaces is 'Shared tenant boundary including white-label branding and custom domain configuration.';
+
