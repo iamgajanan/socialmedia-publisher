@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hashApiKey, isApiKey, normalizeApiKey } from "./api-key-core";
 
 export type ApiAuthenticationResult =
-  | { ok: true; profileId: string; apiKeyId: string }
+  | { ok: true; profileId: string; apiKeyId: string; workspaceId: string }
   | { ok: false; status: 401 | 429 | 503; error: string; retryAfterSeconds?: number };
 
 export async function authenticateApiRequest(request: Request): Promise<ApiAuthenticationResult> {
@@ -18,7 +18,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("socialmedia_api_keys")
-    .select("id, profile_id, revoked_at, last_used_at")
+    .select("id, profile_id, workspace_id, revoked_at, last_used_at")
     .eq("token_hash", hashApiKey(token))
     .maybeSingle();
 
@@ -81,5 +81,5 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
     }
   }
 
-  return { ok: true, profileId, apiKeyId };
+  return { ok: true, profileId, apiKeyId, workspaceId };
 }
