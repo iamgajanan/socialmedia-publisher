@@ -1,4 +1,4 @@
-import { Eye, Heart, MessageCircle, MousePointerClick, Share2, Users } from "lucide-react";
+import { Eye, Heart, MessageCircle, MousePointerClick, Send, Share2, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ export default async function AnalyticsPage() {
 
   const profileId = String(claims.claims.sub);
   const from = new Date(Date.now() - 30 * 86400000).toISOString();
-  const [postResult, accountResult, runResult] = await Promise.all([
+  const [postResult, accountResult, runResult, publishedResult] = await Promise.all([
     supabase.from("socialmedia_post_analytics")
       .select("id,post_platform_id,platform,impressions,reach,likes,comments,shares,saves,clicks,video_views,captured_at,period_end")
       .eq("profile_id", profileId).gte("period_end", from).order("captured_at", { ascending: false }).limit(1000),
@@ -31,6 +31,10 @@ export default async function AnalyticsPage() {
     supabase.from("socialmedia_analytics_sync_runs")
       .select("status,finished_at,metrics_written,accounts_scanned,accounts_failed,posts_scanned")
       .eq("profile_id", profileId).order("requested_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("socialmedia_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profileId)
+      .eq("status", "published"),
   ]);
 
   const latestPosts = new Map<string, NonNullable<typeof postResult.data>[number]>();
@@ -47,6 +51,7 @@ export default async function AnalyticsPage() {
     ["Clicks", sum(posts, "clicks"), MousePointerClick],
     ["Comments", sum(posts, "comments"), MessageCircle],
     ["Shares", sum(posts, "shares"), Share2],
+    ["Published posts", publishedResult.count ?? 0, Send],
   ] as const;
   const platforms = [...new Set(posts.map((row) => row.platform))];
 
@@ -67,7 +72,7 @@ export default async function AnalyticsPage() {
           <span className="text-2xl font-semibold">{posts.length ? format(value) : "—"}</span>
         </div>
         <p className="mt-4 text-sm font-medium">{label}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{posts.length ? "Latest provider snapshots" : "No provider post snapshots yet"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{label === "Published posts" ? "Matches Dashboard published count" : posts.length ? "Latest provider snapshots" : "No provider post snapshots yet"}</p>
       </CardContent></Card>)}
     </div>
 
