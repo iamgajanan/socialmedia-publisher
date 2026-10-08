@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Building2, CreditCard, Mail, Palette, ShieldCheck, UserRound, Workflow } from "lucide-react";
+import { ArrowUpRight, CreditCard, Mail, Palette, ShieldCheck, UserRound, Workflow } from "lucide-react";
 
 import { AccountSecurityForm, DeleteAccountForm, PasswordForm, ProfileForm, WorkspaceForm } from "@/components/settings/settings-form";
 import { Badge } from "@/components/ui/badge";
