@@ -47,6 +47,7 @@ async function GETImpl(request: Request) {
     .from("socialmedia_posts")
     .select("id,content,status,scheduled_at,published_at,created_at,updated_at", { count: "exact" })
     .eq("profile_id", authentication.profileId)
+    .eq("workspace_id", authentication.workspaceId)
     .gte("created_at", from)
     .lt("created_at", to)
     .order("created_at", { ascending: false })
