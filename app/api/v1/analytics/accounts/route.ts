@@ -11,11 +11,39 @@ export async function GET(request: Request) {
   if (!auth.ok) return apiJson({ error: auth.error }, auth.status, requestId);
   const parsed = parseAnalyticsQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return apiJson({ error: parsed.message, code: "invalid_analytics_query" }, 400, requestId);
+
   const admin = createAdminClient();
-  const { data, error } = await admin.from("socialmedia_account_analytics").select("social_account_id,platform,period_start,period_end,captured_at,follower_count,impressions,reach,likes,comments,shares,saves,clicks,video_views,engagement_rate").eq("profile_id", auth.profileId).in("social_account_id", accountIds).gte("period_start", parsed.data.from).lte("period_end", parsed.data.to).order("captured_at", { ascending: false }).limit(1000);
+  const { data: workspaceAccounts, error: accountsError } = await admin
+    .from("socialmedia_social_accounts")
+    .select("id")
+    .eq("workspace_id", auth.workspaceId)
+    .eq("profile_id", auth.profileId)
+    .eq("status", "connected");
+
+  if (accountsError) return apiJson({ error: "Unable to load workspace accounts.", code: "analytics_workspace_accounts_failed" }, 500, requestId);
+  const accountIds = (workspaceAccounts ?? []).map((row) => row.id);
+  if (!accountIds.length) return withRequestId(apiJson({ success: true, period: parsed.data, accounts: [], count: 0, metric_source: "publishing_data_only" }, 200, requestId), requestId);
+
+  const { data, error } = await admin
+    .from("socialmedia_account_analytics")
+    .select("social_account_id,platform,period_start,period_end,captured_at,follower_count,impressions,reach,likes,comments,shares,saves,clicks,video_views,engagement_rate")
+    .eq("profile_id", auth.profileId)
+    .in("social_account_id", accountIds)
+    .gte("period_start", parsed.data.from)
+    .lte("period_end", parsed.data.to)
+    .order("captured_at", { ascending: false })
+    .limit(1000);
+
   if (error && error.code !== "42P01") return apiJson({ error: "Unable to load account analytics.", code: "analytics_accounts_failed" }, 500, requestId);
   const latest = new Map<string, AccountRow>();
   for (const row of (data ?? []) as AccountRow[]) if (!latest.has(row.social_account_id)) latest.set(row.social_account_id, row);
-  const accounts = [...latest.values()].filter((row) => !parsed.data.platforms || parsed.data.platforms.includes(row.platform as never)).map((row) => { const totals = emptyAnalyticsTotals(); addAnalyticsTotals(totals, row as Partial<Record<AnalyticsMetric, number>>); return { social_account_id: row.social_account_id, platform: row.platform, period: { from: row.period_start, to: row.period_end }, follower_count: row.follower_count, metrics: { ...totals, interactions: interactionCount(totals), engagement_rate: engagementRate(totals) }, captured_at: row.captured_at }; });
+  const accounts = [...latest.values()]
+    .filter((row) => !parsed.data.platforms || parsed.data.platforms.includes(row.platform as never))
+    .map((row) => {
+      const totals = emptyAnalyticsTotals();
+      addAnalyticsTotals(totals, row as Partial<Record<AnalyticsMetric, number>>);
+      return { social_account_id: row.social_account_id, platform: row.platform, period: { from: row.period_start, to: row.period_end }, follower_count: row.follower_count, metrics: { ...totals, interactions: interactionCount(totals), engagement_rate: engagementRate(totals) }, captured_at: row.captured_at };
+    });
+
   return withRequestId(apiJson({ success: true, period: parsed.data, accounts, count: accounts.length, metric_source: accounts.length ? "provider_snapshots" : "publishing_data_only" }, 200, requestId), requestId);
 }
