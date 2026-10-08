@@ -19,13 +19,14 @@ function UsageBar({ used, limit }: { used: number; limit: number | null }) {
 export default async function UsagePage() {
   const context = await getCurrentWorkspace();
   const periodStart = monthStart();
-  const [{ data: usage }, { count: teamCount }, { count: accountCount }] = await Promise.all([
+  const [{ data: usage, error: usageError }, { count: teamCount }, { count: accountCount }] = await Promise.all([
     context.supabase.rpc("socialmedia_workspace_usage", { target_workspace_id: context.workspace.id, target_period_start: periodStart }),
     context.supabase.from("socialmedia_workspace_members").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspace.id).in("status", ["active", "invited"]),
     context.supabase.from("socialmedia_social_accounts").select("id", { count: "exact", head: true }).eq("workspace_id", context.workspace.id).eq("status", "connected"),
   ]);
 
   const row = Array.isArray(usage) ? usage[0] : usage;
+  const usageUnavailable = Boolean(usageError);
   const postsCreated = Number(row?.posts_created ?? 0);
   const postsPublished = Number(row?.posts_published ?? 0);
   const aiGenerations = Number(row?.ai_generations ?? 0);
@@ -48,6 +49,6 @@ export default async function UsagePage() {
       <Card><CardHeader><CardTitle className="flex items-center gap-2"><Link2 className="size-5" />Connected accounts</CardTitle><CardDescription>{accountCount ?? 0} connected destinations in this workspace.</CardDescription></CardHeader><CardContent><UsageBar used={accountCount ?? 0} limit={context.plan.max_social_accounts} /><p className="mt-2 text-xs text-muted-foreground">{Math.max(0, context.plan.max_social_accounts - (accountCount ?? 0))} connected-account slots remaining.</p></CardContent></Card>
     </section>
 
-    <p className="text-xs leading-5 text-muted-foreground">Usage is isolated by workspace. Plan limits remain enforced server-side by the existing publishing and account-management flows.</p>
+    <p className="text-xs leading-5 text-muted-foreground">{usageUnavailable ? "Detailed usage counters are temporarily unavailable while the workspace database upgrade is being applied. Existing publishing and account limits remain unchanged." : "Usage is isolated by workspace."} Plan limits remain enforced server-side by the existing publishing and account-management flows.</p>
   </div>;
 }
