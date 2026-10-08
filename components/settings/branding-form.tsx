@@ -1,10 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { Building2, Globe2, Image as ImageIcon, Palette, Save, Sparkles } from "lucide-react";
+import { Building2, Globe2, Image as ImageIcon, Save, Sparkles } from "lucide-react";
 
 import { updateBranding, type BrandingState } from "@/app/settings/branding/actions";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
