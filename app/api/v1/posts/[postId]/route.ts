@@ -7,7 +7,7 @@ import { mediaTypeFromPath, validateMediaSelection } from "@/lib/publishing/medi
 
 type RouteContext = { params: Promise<{ postId: string }> };
 
-async function loadPost(admin: ReturnType<typeof createAdminClient>, postId: string, profileId: string) {
+async function loadPost(admin: ReturnType<typeof createAdminClient>, postId: string, profileId: string, workspaceId: string) {
   return admin
     .from("socialmedia_posts")
     .select("id,profile_id,status,content,media_urls,scheduled_at,published_at,created_at,updated_at")
@@ -16,7 +16,7 @@ async function loadPost(admin: ReturnType<typeof createAdminClient>, postId: str
     .maybeSingle();
 }
 
-async function loadResults(admin: ReturnType<typeof createAdminClient>, postId: string, profileId: string) {
+async function loadResults(admin: ReturnType<typeof createAdminClient>, postId: string, profileId: string, workspaceId: string) {
   const { data: links, error: linksError } = await admin
     .from("socialmedia_post_platforms")
     .select("id,social_account_id,platform,status,platform_post_id,error_message,scheduled_at,published_at,retry_count,next_retry_at,last_attempt_at")
@@ -67,7 +67,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   const { postId } = await context.params;
   const admin = createAdminClient();
-  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId);
+  const { data: post, error: postError } = await loadPost(admin, postId, authentication.profileId, authentication.workspaceId);
 
   if (postError) {
     console.error("api_post_status_lookup_failed", {
@@ -81,7 +81,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
 
-  const result = await loadResults(admin, post.id, authentication.profileId);
+  const result = await loadResults(admin, post.id, authentication.profileId, authentication.workspaceId);
   if (result.error) {
     console.error("api_post_status_destinations_lookup_failed", {
       profileId: authentication.profileId,
