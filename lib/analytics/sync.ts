@@ -53,22 +53,55 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
     return { video_views: n(m.viewCount), impressions: n(m.viewCount), likes: n(m.likeCount), comments: n(m.commentCount), raw_metrics: m };
   }
   if (platform === "facebook") {
-    const version = graphVersion(); const metrics = "post_impressions,post_reactions_by_type_total,post_comments,post_shares";
+    const version = graphVersion(); const metrics = "post_media_view,post_reactions_by_type_total,post_comments,post_shares";
     const data = await jsonFetch(`https://graph.facebook.com/${version}/${encodeURIComponent(postId)}/insights?metric=${metrics}&access_token=${encodeURIComponent(token)}`);
     const result: Metrics = { raw_metrics: data };
-    for (const item of data.data ?? []) { const value = item.values?.[0]?.value; if (item.name === "post_impressions") result.impressions = n(value); if (item.name === "post_comments") result.comments = n(value); if (item.name === "post_shares") result.shares = n(value); if (item.name === "post_reactions_by_type_total") { const reactions = value && typeof value === "object" ? value : {}; result.likes = Object.values(reactions as Record<string, unknown>).reduce<number>((total, reaction) => total + n(reaction), 0); } }
+    for (const item of data.data ?? []) { const value = item.values?.[0]?.value; if (item.name === "post_media_view") result.impressions = n(value); if (item.name === "post_comments") result.comments = n(value); if (item.name === "post_shares") result.shares = n(value); if (item.name === "post_reactions_by_type_total") { const reactions = value && typeof value === "object" ? value : {}; result.likes = Object.values(reactions as Record<string, unknown>).reduce<number>((total, reaction) => total + n(reaction), 0); } }
     return result;
   }
   if (platform === "instagram") {
-    const version = graphVersion(); const data = await jsonFetch(`https://graph.facebook.com/${version}/${encodeURIComponent(postId)}/insights?metric=impressions,reach,likes,comments,saved,shares&access_token=${encodeURIComponent(token)}`);
+    const version = graphVersion();
+    const data = await jsonFetch(`https://graph.instagram.com/${version}/${encodeURIComponent(postId)}/insights?metric=views,reach,likes,comments,saved,shares`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const result: Metrics = { raw_metrics: data };
-    for (const item of data.data ?? []) { const value = item.values?.[0]?.value ?? item.value; if (item.name === "impressions") result.impressions = n(value); if (item.name === "reach") result.reach = n(value); if (item.name === "likes") result.likes = n(value); if (item.name === "comments") result.comments = n(value); if (item.name === "saved") result.saves = n(value); if (item.name === "shares") result.shares = n(value); }
+    for (const item of data.data ?? []) {
+      const value = item.values?.[0]?.value ?? item.value;
+      if (item.name === "views") { result.video_views = n(value); result.impressions = n(value); }
+      if (item.name === "reach") result.reach = n(value);
+      if (item.name === "likes") result.likes = n(value);
+      if (item.name === "comments") result.comments = n(value);
+      if (item.name === "saved") result.saves = n(value);
+      if (item.name === "shares") result.shares = n(value);
+    }
     return result;
   }
   if (platform === "threads") {
-    const data = await jsonFetch(`https://graph.threads.net/v1.0/${encodeURIComponent(postId)}/insights?metric=views,likes,replies,reposts,quotes&access_token=${encodeURIComponent(token)}`);
+    const data = await jsonFetch(`https://graph.threads.net/v1.0/${encodeURIComponent(postId)}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${encodeURIComponent(token)}`);
     const result: Metrics = { raw_metrics: data };
-    for (const item of data.data ?? []) { const value = item.values?.[0]?.value ?? item.value; if (item.name === "views") result.impressions = n(value); if (item.name === "likes") result.likes = n(value); if (item.name === "replies") result.comments = n(value); if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value); }
+    for (const item of data.data ?? []) {
+      const value = item.values?.[0]?.value ?? item.value;
+      if (item.name === "views") { result.impressions = n(value); result.video_views = n(value); }
+      if (item.name === "likes") result.likes = n(value);
+      if (item.name === "replies") result.comments = n(value);
+      if (item.name === "shares") result.shares = n(value);
+      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
+    }
+    return result;
+  }
+  if (platform === "threads") {
+    const data = await jsonFetch("https://graph.threads.net/v1.0/me/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const result: Metrics = { raw_metrics: data };
+    for (const item of data.data ?? []) {
+      const value = item.total_value?.value ?? item.values?.[item.values.length - 1]?.value ?? item.value;
+      if (item.name === "followers_count") result.follower_count = n(value);
+      if (item.name === "views") result.impressions = n(value);
+      if (item.name === "likes") result.likes = n(value);
+      if (item.name === "replies") result.comments = n(value);
+      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
+    }
     return result;
   }
   if (platform === "tiktok") {
@@ -77,17 +110,44 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
     return { video_views: n(video.view_count), impressions: n(video.view_count), likes: n(video.like_count), comments: n(video.comment_count), shares: n(video.share_count), raw_metrics: video };
   }
   if (platform === "linkedin") {
-    const metadata = account?.metadata ?? {}; const organizationId = String(metadata.linkedin_organization_id ?? metadata.organization_id ?? "").trim();
+    const metadata = account?.metadata ?? {};
+    const organizationId = String(metadata.linkedin_organization_id ?? metadata.organization_id ?? "").trim();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Linkedin-Version": process.env.LINKEDIN_VERSION ?? "202609",
+      "X-Restli-Protocol-Version": "2.0.0",
+    };
     if (organizationId) {
       const organizationUrn = String(metadata.linkedin_organization_urn ?? `urn:li:organization:${organizationId}`);
       const query = new URLSearchParams({ q: "organizationalEntity", organizationalEntity: organizationUrn });
       if (postId.includes(":ugcPost:")) query.set("ugcPosts[0]", postId); else query.set("shares", `List(${postId})`);
-      const data = await jsonFetch(`https://api.linkedin.com/rest/organizationalEntityShareStatistics?${query.toString()}`, { headers: { Authorization: `Bearer ${token}`, "Linkedin-Version": process.env.LINKEDIN_VERSION ?? "202609", "X-Restli-Protocol-Version": "2.0.0" } });
+      const data = await jsonFetch(`https://api.linkedin.com/rest/organizationalEntityShareStatistics?${query.toString()}`, { headers });
       const stats = data.elements?.[0]?.totalShareStatistics ?? {};
       return { impressions: n(stats.impressionCount), reach: n(stats.uniqueImpressionsCount ?? stats.uniqueImpressionsCounts), likes: n(stats.likeCount), comments: n(stats.commentCount), shares: n(stats.shareCount), clicks: n(stats.clickCount), engagement_rate: Number.isFinite(Number(stats.engagement)) ? Number(stats.engagement) : null, raw_metrics: data.elements?.[0] ?? data };
     }
-    const data = await jsonFetch(`https://api.linkedin.com/rest/socialActions/${encodeURIComponent(postId)}`, { headers: { Authorization: `Bearer ${token}`, "Linkedin-Version": process.env.LINKEDIN_VERSION ?? "202609", "X-Restli-Protocol-Version": "2.0.0" } });
-    return { likes: n(data.likesSummary?.totalLikes), comments: n(data.commentsSummary?.totalFirstLevelComments), raw_metrics: data };
+
+    const metricNames = [
+      ["IMPRESSION", "impressions"],
+      ["MEMBERS_REACHED", "reach"],
+      ["RESHARE", "shares"],
+      ["REACTION", "likes"],
+      ["COMMENT", "comments"],
+    ] as const;
+    const responses = await Promise.all(metricNames.map(async ([queryType]) => {
+      const query = new URLSearchParams({ q: "entity", entity: postId, queryType, aggregation: "TOTAL" });
+      const data = await jsonFetch(`https://api.linkedin.com/rest/memberCreatorPostAnalytics?${query.toString()}`, { headers });
+      return { queryType, data };
+    }));
+    const result: Metrics = { raw_metrics: { memberCreatorPostAnalytics: responses.map((item) => item.data) } };
+    for (const item of responses) {
+      const count = item.data.elements?.[0]?.count ?? item.data.count;
+      if (item.queryType === "IMPRESSION") result.impressions = n(count);
+      if (item.queryType === "MEMBERS_REACHED") result.reach = n(count);
+      if (item.queryType === "RESHARE") result.shares = n(count);
+      if (item.queryType === "REACTION") result.likes = n(count);
+      if (item.queryType === "COMMENT") result.comments = n(count);
+    }
+    return result;
   }
   throw new Error(`Analytics provider is not available for ${platform}.`);
 }
@@ -104,26 +164,66 @@ async function fetchAccountMetrics(account: Account, token: string): Promise<Met
     return { follower_count: n(m.followers_count), raw_metrics: m };
   }
   if (platform === "facebook") {
-    const version = graphVersion(); const data = await jsonFetch(`https://graph.facebook.com/${version}/${encodeURIComponent(account.external_account_id)}?fields=id,name,followers_count,fan_count&access_token=${encodeURIComponent(token)}`);
+    const version = graphVersion();
+    const data = await jsonFetch(`https://graph.facebook.com/${version}/${encodeURIComponent(account.external_account_id)}?fields=id,name,followers_count,fan_count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return { follower_count: n(data.followers_count ?? data.fan_count), raw_metrics: data };
   }
   if (platform === "instagram") {
-    const version = graphVersion(); const data = await jsonFetch(`https://graph.facebook.com/${version}/${encodeURIComponent(account.external_account_id)}?fields=id,username,followers_count&access_token=${encodeURIComponent(token)}`);
+    const version = graphVersion();
+    const data = await jsonFetch(`https://graph.instagram.com/${version}/${encodeURIComponent(account.external_account_id)}?fields=id,username,followers_count,media_count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return { follower_count: n(data.followers_count), raw_metrics: data };
   }
   if (platform === "tiktok") {
-    const data = await jsonFetch("https://open.tiktokapis.com/v2/user/info/?fields=open_id,follower_count,following_count,likes_count,video_count", { headers: { Authorization: `Bearer ${token}` } });
+    const data = await jsonFetch("https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,username,follower_count,following_count,likes_count,video_count", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const user = data.data?.user ?? {};
-    return { follower_count: n(user.follower_count), likes: n(user.likes_count), video_views: n(user.video_count), raw_metrics: user };
+    return { follower_count: n(user.follower_count), likes: n(user.likes_count), raw_metrics: user };
   }
   if (platform === "linkedin") {
-    const metadata = account.metadata ?? {}; const organizationId = String(metadata.linkedin_organization_id ?? metadata.organization_id ?? "").trim();
-    if (!organizationId) return { raw_metrics: { provider: platform, status: "personal_account_metrics_not_supported" } };
-    const organizationUrn = String(metadata.linkedin_organization_urn ?? `urn:li:organization:${organizationId}`);
-    const query = new URLSearchParams({ q: "organization", organization: organizationUrn });
-    const data = await jsonFetch(`https://api.linkedin.com/rest/organizationPageStatistics?${query.toString()}`, { headers: { Authorization: `Bearer ${token}`, "Linkedin-Version": process.env.LINKEDIN_VERSION ?? "202609", "X-Restli-Protocol-Version": "2.0.0" } });
-    const stats = data.elements?.[0]?.totalPageStatistics ?? {}; const views = stats.views ?? {}; const allPageViews = views.allPageViews ?? {};
-    return { impressions: n(allPageViews.pageViews), raw_metrics: data.elements?.[0] ?? data };
+    const metadata = account.metadata ?? {};
+    const organizationId = String(metadata.linkedin_organization_id ?? metadata.organization_id ?? "").trim();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Linkedin-Version": process.env.LINKEDIN_VERSION ?? "202609",
+      "X-Restli-Protocol-Version": "2.0.0",
+    };
+    if (organizationId) {
+      const organizationUrn = String(metadata.linkedin_organization_urn ?? `urn:li:organization:${organizationId}`);
+      const query = new URLSearchParams({ q: "organization", organization: organizationUrn });
+      const data = await jsonFetch(`https://api.linkedin.com/rest/organizationPageStatistics?${query.toString()}`, { headers });
+      const stats = data.elements?.[0]?.totalPageStatistics ?? {};
+      const views = stats.views ?? {};
+      const allPageViews = views.allPageViews ?? {};
+      return { impressions: n(allPageViews.pageViews), raw_metrics: data.elements?.[0] ?? data };
+    }
+
+    const metricNames = [
+      ["IMPRESSION", "impressions"],
+      ["MEMBERS_REACHED", "reach"],
+      ["RESHARE", "shares"],
+      ["REACTION", "likes"],
+      ["COMMENT", "comments"],
+    ] as const;
+    const responses = await Promise.all(metricNames.map(async ([queryType]) => {
+      const query = new URLSearchParams({ q: "me", queryType, aggregation: "TOTAL" });
+      const data = await jsonFetch(`https://api.linkedin.com/rest/memberCreatorPostAnalytics?${query.toString()}`, { headers });
+      return { queryType, data };
+    }));
+    const result: Metrics = { raw_metrics: { memberCreatorPostAnalytics: responses.map((item) => item.data) } };
+    for (const item of responses) {
+      const count = item.data.elements?.[0]?.count ?? item.data.count;
+      if (item.queryType === "IMPRESSION") result.impressions = n(count);
+      if (item.queryType === "MEMBERS_REACHED") result.reach = n(count);
+      if (item.queryType === "RESHARE") result.shares = n(count);
+      if (item.queryType === "REACTION") result.likes = n(count);
+      if (item.queryType === "COMMENT") result.comments = n(count);
+    }
+    return result;
   }
   return { raw_metrics: { provider: platform, status: "account_metrics_not_supported" } };
 }
