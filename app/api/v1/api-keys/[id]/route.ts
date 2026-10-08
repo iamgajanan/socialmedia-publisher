@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 
 async function getUserId() {
   const supabase = await createClient();
