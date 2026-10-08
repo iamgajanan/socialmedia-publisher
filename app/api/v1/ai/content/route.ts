@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   if (!auth.ok) return json({ error: auth.error, code: "authentication_failed" }, auth.status, requestId);
   const limit = Math.min(50, Math.max(1, Number(new URL(request.url).searchParams.get("limit") ?? "20")));
   const admin = createAdminClient();
-  const { data, error } = await admin.from("socialmedia_ai_generations").select("id,master_content,requested_platforms,model,status,requires_approval,approved_at,created_at").eq("profile_id", auth.profileId).order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await admin.from("socialmedia_ai_generations").select("id,master_content,requested_platforms,model,status,requires_approval,approved_at,created_at").eq("profile_id", auth.profileId).eq("workspace_id", auth.workspaceId).order("created_at", { ascending: false }).limit(limit);
   if (error) return json({ error: "Unable to load AI content history.", code: "ai_history_failed" }, 500, requestId);
   return json({ success: true, generations: data ?? [] }, 200, requestId);
 }
