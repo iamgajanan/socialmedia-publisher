@@ -39,12 +39,22 @@ export async function getCurrentWorkspace() {
   if (membershipError) throw new Error(membershipError.message);
   if (!membership) throw new Error("You are not a member of this workspace.");
 
+  // Keep the core workspace read compatible with production databases while the Phase 32 schema migration is being rolled out.
   const { data: workspace, error: workspaceError } = await supabase
     .from("socialmedia_workspaces")
-    // Keep the core workspace read compatible with production databases while a new schema migration is being rolled out.\n    .select("id, name, timezone, owner_profile_id, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, stripe_price_id, stripe_billing_currency, stripe_current_period_end")
+    .select("id, name, timezone, owner_profile_id, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, stripe_price_id, stripe_billing_currency, stripe_current_period_end")
     .eq("id", profile.workspace_id)
     .single();
   if (workspaceError) throw new Error(workspaceError.message);
+
+  const workspaceWithBranding = {
+    ...workspace,
+    slug: null,
+    logo_url: null,
+    primary_color: "#111827",
+    accent_color: "#f59e0b",
+    custom_domain: null,
+  };
 
   const { data: plan, error: planError } = await supabase
     .from("socialmedia_plans")
@@ -57,7 +67,7 @@ export async function getCurrentWorkspace() {
     supabase,
     profileId,
     profileName: profile.display_name ?? "",
-    workspace: workspaceWithBranding as typeof workspaceWithBranding & { plan_id: string; subscription_status: string },
+    workspace: workspaceWithBranding,
     plan: plan as WorkspacePlan,
     membership: membership as { id: string; role: WorkspaceRole; status: string },
   };
