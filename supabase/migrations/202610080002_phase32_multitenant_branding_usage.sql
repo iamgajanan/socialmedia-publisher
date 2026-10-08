@@ -48,6 +48,8 @@ alter table public.socialmedia_ai_generations
   add constraint socialmedia_ai_generations_workspace_id_fkey
   foreign key (workspace_id) references public.socialmedia_workspaces(id) on delete cascade;
 
+alter table public.socialmedia_ai_generations alter column workspace_id set not null;
+
 create index if not exists socialmedia_ai_generations_workspace_created_idx
   on public.socialmedia_ai_generations(workspace_id, created_at desc);
 
@@ -65,6 +67,8 @@ alter table public.socialmedia_ai_content_variants
 alter table public.socialmedia_ai_content_variants
   add constraint socialmedia_ai_content_variants_workspace_id_fkey
   foreign key (workspace_id) references public.socialmedia_workspaces(id) on delete cascade;
+
+alter table public.socialmedia_ai_content_variants alter column workspace_id set not null;
 
 create index if not exists socialmedia_ai_variants_workspace_created_idx
   on public.socialmedia_ai_content_variants(workspace_id, created_at desc);
@@ -101,6 +105,8 @@ alter table public.socialmedia_api_keys
 alter table public.socialmedia_api_keys
   add constraint socialmedia_api_keys_workspace_id_fkey
   foreign key (workspace_id) references public.socialmedia_workspaces(id) on delete cascade;
+
+alter table public.socialmedia_api_keys alter column workspace_id set not null;
 
 create index if not exists socialmedia_api_keys_workspace_created_idx
   on public.socialmedia_api_keys(workspace_id, created_at desc);
