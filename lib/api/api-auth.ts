@@ -7,6 +7,10 @@ export type ApiAuthenticationResult =
   | { ok: true; profileId: string; apiKeyId: string; workspaceId: string }
   | { ok: false; status: 401 | 429 | 503; error: string; retryAfterSeconds?: number };
 
+function isMissingWorkspaceColumn(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "PGRST204" || error.code === "42703") && /workspace_id/i.test(error.message ?? ""));
+}
+
 export async function authenticateApiRequest(request: Request): Promise<ApiAuthenticationResult> {
   const authorization = request.headers.get("authorization")?.trim() ?? "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -16,11 +20,35 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   if (!isApiKey(token)) return { ok: false, status: 401, error: "Invalid API key." };
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("socialmedia_api_keys")
     .select("id, profile_id, workspace_id, revoked_at, last_used_at")
     .eq("token_hash", hashApiKey(token))
     .maybeSingle();
+
+  if (isMissingWorkspaceColumn(error)) {
+    // Older production schemas store API keys per profile. Resolve that profile's
+    // workspace explicitly rather than accepting a caller-supplied tenant ID.
+    const legacyResult = await admin
+      .from("socialmedia_api_keys")
+      .select("id, profile_id, revoked_at, last_used_at")
+      .eq("token_hash", hashApiKey(token))
+      .maybeSingle();
+    data = legacyResult.data;
+    error = legacyResult.error;
+    if (!error && data) {
+      const profileResult = await admin
+        .from("socialmedia_profiles")
+        .select("workspace_id")
+        .eq("id", String(data.profile_id))
+        .maybeSingle();
+      if (profileResult.error) {
+        console.error("api_auth_profile_workspace_lookup_failed", { code: profileResult.error.code, message: profileResult.error.message });
+        return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
+      }
+      data = data ? { ...data, workspace_id: profileResult.data?.workspace_id ?? null } : data;
+    }
+  }
 
   if (error) {
     console.error("api_auth_lookup_failed", { code: error.code, message: error.message });
@@ -72,6 +100,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
     target_period_start: periodStart.toISOString().slice(0, 10),
   });
   if (usageError) {
+    // Usage tracking was added with Phase 32; it is non-blocking for API access.
     console.error("api_usage_record_failed", {
       apiKeyId,
       workspaceId,
@@ -82,20 +111,29 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
 
   const lastUsedAt = data.last_used_at ? new Date(String(data.last_used_at)).getTime() : 0;
   if (!lastUsedAt || Date.now() - lastUsedAt >= 5 * 60 * 1000) {
-    const { error: updateError } = await admin
+    let updateResult = await admin
       .from("socialmedia_api_keys")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", apiKeyId)
       .eq("workspace_id", workspaceId)
       .is("revoked_at", null);
 
-    if (updateError) {
+    if (isMissingWorkspaceColumn(updateResult.error)) {
+      updateResult = await admin
+        .from("socialmedia_api_keys")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", apiKeyId)
+        .eq("profile_id", profileId)
+        .is("revoked_at", null);
+    }
+
+    if (updateResult.error) {
       console.error("api_auth_last_used_update_failed", {
         apiKeyId,
         profileId,
         workspaceId,
-        code: updateError.code,
-        message: updateError.message,
+        code: updateResult.error.code,
+        message: updateResult.error.message,
       });
     }
   }
