@@ -9,6 +9,10 @@ const createApiKeySchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
 
+function isMissingWorkspaceColumn(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "PGRST204" || error.code === "42703") && /workspace_id/i.test(error.message ?? ""));
+}
+
 function publicKey(row: Record<string, unknown>) {
   return {
     id: String(row.id),
@@ -23,15 +27,31 @@ function publicKey(row: Record<string, unknown>) {
 export async function GET() {
   const context = await requireWorkspaceAdmin();
   const admin = createAdminClient();
-  const { data, error } = await admin
+  const workspaceQuery = await admin
     .from("socialmedia_api_keys")
     .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
     .eq("workspace_id", context.workspace.id)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: "Unable to load API keys." }, { status: 500 });
+  if (!workspaceQuery.error) {
+    return NextResponse.json({ apiKeys: (workspaceQuery.data ?? []).map((row) => publicKey(row as Record<string, unknown>)) });
+  }
 
-  return NextResponse.json({ apiKeys: (data ?? []).map((row) => publicKey(row as Record<string, unknown>)) });
+  // Phase 32's workspace_id migration may not have reached the connected production database yet.
+  // The legacy schema scopes keys to profile_id, so only show keys owned by this signed-in profile.
+  if (isMissingWorkspaceColumn(workspaceQuery.error)) {
+    const legacyQuery = await admin
+      .from("socialmedia_api_keys")
+      .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
+      .eq("profile_id", context.profileId)
+      .order("created_at", { ascending: false });
+    if (!legacyQuery.error) {
+      return NextResponse.json({ apiKeys: (legacyQuery.data ?? []).map((row) => publicKey(row as Record<string, unknown>)) });
+    }
+  }
+
+  console.error("api_key_list_failed", { profileId: context.profileId, workspaceId: context.workspace.id, code: workspaceQuery.error.code, message: workspaceQuery.error.message });
+  return NextResponse.json({ error: "Unable to load API keys. Please verify the API-key database migration." }, { status: 500 });
 }
 
 export async function POST(request: Request) {
@@ -44,22 +64,40 @@ export async function POST(request: Request) {
 
   const generated = generateApiKey();
   const admin = createAdminClient();
+  const values = {
+    profile_id: context.profileId,
+    workspace_id: context.workspace.id,
+    name: parsed.data.name,
+    token_prefix: generated.tokenPrefix,
+    token_hash: generated.tokenHash,
+  };
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("socialmedia_api_keys")
-    .insert({
-      profile_id: context.profileId,
-      workspace_id: context.workspace.id,
-      name: parsed.data.name,
-      token_prefix: generated.tokenPrefix,
-      token_hash: generated.tokenHash,
-    })
+    .insert(values)
     .select("id, name, token_prefix, created_at")
     .single();
 
+  // Keep key creation working against the pre-Phase-32 schema. In that schema,
+  // API keys are profile-scoped; never broaden the fallback to another profile.
+  if (isMissingWorkspaceColumn(error)) {
+    const legacyResult = await admin
+      .from("socialmedia_api_keys")
+      .insert({
+        profile_id: context.profileId,
+        name: parsed.data.name,
+        token_prefix: generated.tokenPrefix,
+        token_hash: generated.tokenHash,
+      })
+      .select("id, name, token_prefix, created_at")
+      .single();
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
+
   if (error || !data) {
     console.error("api_key_create_failed", { profileId: context.profileId, workspaceId: context.workspace.id, code: error?.code, message: error?.message });
-    return NextResponse.json({ error: "Unable to create API key." }, { status: 500 });
+    return NextResponse.json({ error: "Unable to create API key. Please verify the API-key database migration." }, { status: 500 });
   }
 
   return NextResponse.json({
