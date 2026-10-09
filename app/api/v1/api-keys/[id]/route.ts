@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspaceAdmin } from "@/lib/workspace/server";
 
+function isMissingWorkspaceColumn(error: { code?: string; message?: string } | null | undefined) {
+  return Boolean(error && (error.code === "PGRST204" || error.code === "42703") && /workspace_id/i.test(error.message ?? ""));
+}
+
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const workspaceContext = await requireWorkspaceAdmin();
   const { id } = await context.params;
   const admin = createAdminClient();
-  const { data, error } = await admin
+
+  let { data, error } = await admin
     .from("socialmedia_api_keys")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id)
@@ -15,6 +20,19 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     .is("revoked_at", null)
     .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
     .maybeSingle();
+
+  if (isMissingWorkspaceColumn(error)) {
+    const legacyResult = await admin
+      .from("socialmedia_api_keys")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("profile_id", workspaceContext.profileId)
+      .is("revoked_at", null)
+      .select("id, name, token_prefix, created_at, last_used_at, revoked_at")
+      .maybeSingle();
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
 
   if (error) {
     console.error("api_key_revoke_failed", { profileId: workspaceContext.profileId, workspaceId: workspaceContext.workspace.id, apiKeyId: id, code: error.code, message: error.message });
