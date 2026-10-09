@@ -20,11 +20,13 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   if (!isApiKey(token)) return { ok: false, status: 401, error: "Invalid API key." };
 
   const admin = createAdminClient();
-  let { data, error } = await admin
+  const initialLookup = await admin
     .from("socialmedia_api_keys")
     .select("id, profile_id, workspace_id, revoked_at, last_used_at")
     .eq("token_hash", hashApiKey(token))
     .maybeSingle();
+  let data: Record<string, unknown> | null = initialLookup.data as Record<string, unknown> | null;
+  let error = initialLookup.error;
 
   if (isMissingWorkspaceColumn(error)) {
     // Older production schemas store API keys per profile. Resolve that profile's
@@ -34,7 +36,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
       .select("id, profile_id, revoked_at, last_used_at")
       .eq("token_hash", hashApiKey(token))
       .maybeSingle();
-    data = legacyResult.data;
+    data = legacyResult.data as Record<string, unknown> | null;
     error = legacyResult.error;
     if (!error && data) {
       const profileResult = await admin
