@@ -53,7 +53,8 @@ async function linkedinFetch(url: string, accessToken: string) {
 export async function discoverLinkedInOrganizations(accessToken: string): Promise<LinkedInOrganization[]> {
   const aclUrl = new URL("https://api.linkedin.com/rest/organizationAcls");
   aclUrl.searchParams.set("q", "roleAssignee");
-  aclUrl.searchParams.set("projection", "(elements*(organization~))");
+  aclUrl.searchParams.set("role", "ADMINISTRATOR");
+  aclUrl.searchParams.set("state", "APPROVED");
 
   const aclPayload = record(await linkedinFetch(aclUrl.toString(), accessToken));
   const elements = Array.isArray(aclPayload.elements) ? aclPayload.elements : [];
