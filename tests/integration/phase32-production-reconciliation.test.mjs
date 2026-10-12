@@ -81,6 +81,13 @@ test("Phase 32 migration defines a safe private workspace-membership helper befo
   assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role"));
 });
 
+test("Phase 32 usage table grants authenticated reads but denies anonymous access", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  assert.ok(sql.includes("revoke all on table public.socialmedia_workspace_usage_monthly from anon;"));
+  assert.ok(sql.includes("grant select on table public.socialmedia_workspace_usage_monthly to authenticated;"));
+  assert.ok(sql.includes("grant all on table public.socialmedia_workspace_usage_monthly to service_role;"));
+});
+
 test("Phase 32 usage RPC authorizes workspace membership before reading aggregate counts", async () => {
   const sql = await readFile(migrationPath, "utf8");
   const start = sql.indexOf("create or replace function public.socialmedia_workspace_usage(");
