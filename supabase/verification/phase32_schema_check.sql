@@ -105,22 +105,22 @@ begin
     raise exception 'Phase 32 verification failed; socialmedia_record_api_request(uuid,date) is missing';
   end if;
 
-  if not has_function_privilege('authenticated', usage_rpc, 'EXECUTE')
-     or has_function_privilege('anon', usage_rpc, 'EXECUTE') then
+  if not has_function_privilege('authenticated', usage_rpc::oid, 'EXECUTE')
+     or has_function_privilege('anon', usage_rpc::oid, 'EXECUTE') then
     raise exception 'Phase 32 verification failed; usage RPC grants are incorrect';
   end if;
 
-  if not has_function_privilege('service_role', record_rpc, 'EXECUTE')
-     or has_function_privilege('anon', record_rpc, 'EXECUTE')
-     or has_function_privilege('authenticated', record_rpc, 'EXECUTE') then
+  if not has_function_privilege('service_role', record_rpc::oid, 'EXECUTE')
+     or has_function_privilege('anon', record_rpc::oid, 'EXECUTE')
+     or has_function_privilege('authenticated', record_rpc::oid, 'EXECUTE') then
     raise exception 'Phase 32 verification failed; API request RPC grants are incorrect';
   end if;
 
-  if (select p.prosecdef from pg_proc p where p.oid = usage_rpc) then
+  if (select p.prosecdef from pg_proc p where p.oid = usage_rpc::oid) then
     raise exception 'Phase 32 verification failed; usage RPC must remain SECURITY INVOKER';
   end if;
 
-  if not (select p.prosecdef from pg_proc p where p.oid = record_rpc) then
+  if not (select p.prosecdef from pg_proc p where p.oid = record_rpc::oid) then
     raise exception 'Phase 32 verification failed; API request RPC must remain SECURITY DEFINER';
   end if;
 end
