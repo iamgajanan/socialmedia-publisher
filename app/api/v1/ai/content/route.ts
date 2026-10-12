@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
   const platforms = Array.isArray(input.platforms) ? input.platforms.filter((value): value is string => typeof value === "string") : [];
   try {
-    const result = await generatePlatformContent({ profileId: auth.profileId, masterContent: typeof input.master_content === "string" ? input.master_content : "", platforms, brandVoice: typeof input.brand_voice === "string" ? input.brand_voice : "", instructions: typeof input.instructions === "string" ? input.instructions : "", variations: typeof input.variations === "number" ? input.variations : 1, requireApproval: input.require_approval === true });
+    const result = await generatePlatformContent({ profileId: auth.profileId, workspaceId: auth.workspaceId, masterContent: typeof input.master_content === "string" ? input.master_content : "", platforms, brandVoice: typeof input.brand_voice === "string" ? input.brand_voice : "", instructions: typeof input.instructions === "string" ? input.instructions : "", variations: typeof input.variations === "number" ? input.variations : 1, requireApproval: input.require_approval === true });
     return json({ success: true, generation: result.generation, variants: result.variants }, 200, requestId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI content generation failed.";
