@@ -140,9 +140,6 @@ alter table public.socialmedia_workspace_members
 -- the function is in a non-exposed schema, pins an empty search_path, and never
 -- accepts a caller-supplied profile ID.
 create schema if not exists private;
-revoke all on schema private from public, anon;
-grant usage on schema private to authenticated, service_role;
-
 create or replace function private.socialmedia_user_workspace_ids()
 returns setof uuid
 language sql
