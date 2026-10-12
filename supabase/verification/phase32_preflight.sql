@@ -167,142 +167,51 @@ begin
       problem_count;
   end if;
 
-  -- Catch partially-created Phase 32 columns that would make the migration fail
-  -- while adding unique indexes, color constraints, or workspace foreign keys.
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_workspaces'
-      and column_name = 'slug'
-  ) then
-    execute $query$
-      select count(*) from (
-        select slug
-        from public.socialmedia_workspaces
-        where slug is not null and trim(slug) <> ''
-        group by slug
-        having count(*) > 1
-      ) duplicates
-    $query$ into problem_count;
+  -- Detect partial Phase 32 data that would block unique indexes, colour constraints, or foreign keys.
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'slug') then
+    execute format('select count(*) from (select slug from public.socialmedia_workspaces where slug is not null and trim(slug) <> %L group by slug having count(*) > 1) duplicates', '') into problem_count;
     if problem_count > 0 then
-      raise exception 'Phase 32 preflight failed: % duplicate workspace slug value(s) would prevent the unique index from being created',
-        problem_count;
+      raise exception 'Phase 32 preflight failed: % duplicate workspace slug value(s) would prevent the unique index from being created', problem_count;
     end if;
   end if;
 
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_workspaces'
-      and column_name = 'custom_domain'
-  ) then
-    execute $query$
-      select count(*) from (
-        select lower(trim(custom_domain))
-        from public.socialmedia_workspaces
-        where custom_domain is not null and trim(custom_domain) <> ''
-        group by lower(trim(custom_domain))
-        having count(*) > 1
-      ) duplicates
-    $query$ into problem_count;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'custom_domain') then
+    execute format('select count(*) from (select lower(trim(custom_domain)) from public.socialmedia_workspaces where custom_domain is not null and trim(custom_domain) <> %L group by lower(trim(custom_domain)) having count(*) > 1) duplicates', '') into problem_count;
     if problem_count > 0 then
-      raise exception 'Phase 32 preflight failed: % duplicate custom-domain value group(s) require reconciliation before release',
-        problem_count;
+      raise exception 'Phase 32 preflight failed: % duplicate custom-domain value group(s) require reconciliation before release', problem_count;
     end if;
   end if;
 
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_workspaces'
-      and column_name = 'primary_color'
-  ) then
-    execute $query$
-      select count(*) from public.socialmedia_workspaces
-      where primary_color is null or primary_color !~ '^#[0-9a-fA-F]{6}
-end
-$phase32_preflight$;
-
-select 'Phase 32 preflight passed; no data or schema was modified' as preflight_result;
-
-    $query$ into problem_count;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'primary_color') then
+    execute format('select count(*) from public.socialmedia_workspaces where primary_color is null or length(primary_color) <> 7 or primary_color !~ %L', '^#[0-9a-fA-F]{6}') into problem_count;
     if problem_count > 0 then
-      raise exception 'Phase 32 preflight failed: % workspace(s) have invalid primary colors',
-        problem_count;
+      raise exception 'Phase 32 preflight failed: % workspace(s) have invalid primary colors', problem_count;
     end if;
   end if;
 
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_workspaces'
-      and column_name = 'accent_color'
-  ) then
-    execute $query$
-      select count(*) from public.socialmedia_workspaces
-      where accent_color is null or accent_color !~ '^#[0-9a-fA-F]{6}
-end
-$phase32_preflight$;
-
-select 'Phase 32 preflight passed; no data or schema was modified' as preflight_result;
-
-    $query$ into problem_count;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'accent_color') then
+    execute format('select count(*) from public.socialmedia_workspaces where accent_color is null or length(accent_color) <> 7 or accent_color !~ %L', '^#[0-9a-fA-F]{6}') into problem_count;
     if problem_count > 0 then
-      raise exception 'Phase 32 preflight failed: % workspace(s) have invalid accent colors',
-        problem_count;
+      raise exception 'Phase 32 preflight failed: % workspace(s) have invalid accent colors', problem_count;
     end if;
   end if;
 
-  for requirement in
-    select * from (values
-      ('socialmedia_ai_generations'),
-      ('socialmedia_ai_content_variants'),
-      ('socialmedia_mcp_audit_logs'),
-      ('socialmedia_api_keys')
-    ) as expected(table_name)
-  loop
-    if exists (
-      select 1 from information_schema.columns
-      where table_schema = 'public'
-        and table_name = requirement.table_name
-        and column_name = 'workspace_id'
-    ) then
-      execute format(
-        'select count(*) from public.%I t left join public.socialmedia_workspaces w on w.id = t.workspace_id where t.workspace_id is not null and w.id is null',
-        requirement.table_name
-      ) into problem_count;
+  for requirement in select * from (values ('socialmedia_ai_generations'), ('socialmedia_ai_content_variants'), ('socialmedia_mcp_audit_logs'), ('socialmedia_api_keys')) as expected(table_name) loop
+    if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = requirement.table_name and column_name = 'workspace_id') then
+      execute format('select count(*) from public.%I t left join public.socialmedia_workspaces w on w.id = t.workspace_id where t.workspace_id is not null and w.id is null', requirement.table_name) into problem_count;
       if problem_count > 0 then
-        raise exception 'Phase 32 preflight failed: % row(s) in public.% have workspace IDs that do not reference a workspace',
-          problem_count, requirement.table_name;
+        raise exception 'Phase 32 preflight failed: % row(s) in public.% have workspace IDs that do not reference a workspace', problem_count, requirement.table_name;
       end if;
     end if;
   end loop;
 
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_ai_content_variants'
-      and column_name = 'workspace_id'
-  ) and exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'socialmedia_ai_generations'
-      and column_name = 'workspace_id'
-  ) then
-    execute $query$
-      select count(*)
-      from public.socialmedia_ai_content_variants v
-      join public.socialmedia_ai_generations g on g.id = v.generation_id
-      where v.workspace_id is not null
-        and g.workspace_id is not null
-        and v.workspace_id is distinct from g.workspace_id
-    $query$ into problem_count;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_ai_content_variants' and column_name = 'workspace_id')
+     and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_ai_generations' and column_name = 'workspace_id') then
+    execute 'select count(*) from public.socialmedia_ai_content_variants v join public.socialmedia_ai_generations g on g.id = v.generation_id where v.workspace_id is not null and g.workspace_id is not null and v.workspace_id is distinct from g.workspace_id' into problem_count;
     if problem_count > 0 then
-      raise exception 'Phase 32 preflight failed: % AI variant(s) are assigned to a different workspace than their parent generation',
-        problem_count;
+      raise exception 'Phase 32 preflight failed: % AI variant(s) are assigned to a different workspace than their parent generation', problem_count;
     end if;
   end if;
-
   raise notice 'Phase 32 preflight passed: prerequisite tables, columns, and profile/workspace ownership and partial-schema data are consistent';
 end
 $phase32_preflight$;
