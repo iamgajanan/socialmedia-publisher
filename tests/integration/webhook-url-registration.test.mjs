@@ -23,7 +23,7 @@ test("worker sends directly to a pinned public HTTPS address without redirect-fo
 });
 
 test("public IP checks normalize IPv6 and reject non-public hostname suffixes", () => {
-  assert.match(urlSafety, /function ipv6Number/);
+  assert.match(urlSafety, /function ipv6Parts/);
   assert.match(urlSafety, /inV6Range\(address, "2000::", 3\)/);
   assert.match(urlSafety, /\["2001:db8::", 32\]/);
   assert.match(urlSafety, /"\.arpa", "\.onion"/);
