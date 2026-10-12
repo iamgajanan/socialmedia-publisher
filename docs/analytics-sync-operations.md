@@ -1,6 +1,13 @@
 # Analytics sync operations
 
-The production Vercel cron runs `/api/cron/analytics` daily at 03:00 UTC (08:30 India Standard Time). Vercel sends the configured `CRON_SECRET` as a Bearer token; do not place the secret in source control or in the URL.
+The analytics route is intentionally scheduled by an external scheduler rather than Vercel Cron, because the production project uses Vercel Hobby and the existing minute-level workers are externally scheduled. Add a daily request to the existing scheduler (for example, the user's n8n workflow) at 03:00 UTC (08:30 India Standard Time):
+
+- Method: `GET`
+- Path: `/api/cron/analytics`
+- Header: `Authorization: Bearer <CRON_SECRET>`
+- Cadence: daily; adjust only after considering provider API quotas.
+
+Keep `CRON_SECRET` in the scheduler's secret store; never place it in source control or the URL.
 
 The route processes connected profiles concurrently and writes operational run state to `socialmedia_analytics_sync_runs`. Provider metric collection is independent of the run-history insert: if run logging fails, the route emits a structured error and continues syncing.
 
