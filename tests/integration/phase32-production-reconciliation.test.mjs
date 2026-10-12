@@ -69,6 +69,18 @@ test("Phase 32 schema migration backfills tenant ownership before enforcing NOT 
   assert.ok(sql.includes("grant execute on function public.socialmedia_record_api_request(uuid, date) to service_role;"));
 });
 
+test("Phase 32 migration defines a safe private workspace-membership helper before usage RLS", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  const helper = sql.indexOf("create or replace function private.socialmedia_user_workspace_ids()");
+  const usagePolicy = sql.indexOf("create policy socialmedia_workspace_usage_monthly_select_member");
+
+  assert.ok(helper >= 0 && helper < usagePolicy);
+  assert.match(sql, /security definer[\\s\\S]*?set search_path = ''/i);
+  assert.match(sql, /where wm\\.profile_id = \\(select auth\\.uid\\(\\)\\)/i);
+  assert.match(sql, /revoke all on function private\\.socialmedia_user_workspace_ids\\(\\) from public, anon/i);
+  assert.match(sql, /grant execute on function private\\.socialmedia_user_workspace_ids\\(\\) to authenticated, service_role/i);
+});
+
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
   const doc = await readFile(runbookPath, "utf8");
 
