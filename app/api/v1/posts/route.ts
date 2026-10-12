@@ -25,8 +25,10 @@ async function GETImpl(request: Request) {
   if (platform) {
     const { data: links, error: linksError } = await admin
       .from("socialmedia_post_platforms")
-      .select("post_id")
-      .eq("platform", platform);
+      .select("post_id,socialmedia_posts!inner(profile_id,workspace_id)")
+      .eq("platform", platform)
+      .eq("socialmedia_posts.profile_id", authentication.profileId)
+      .eq("socialmedia_posts.workspace_id", authentication.workspaceId);
 
     if (linksError) {
       console.error("api_posts_platform_filter_failed", {
