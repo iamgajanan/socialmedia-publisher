@@ -43,7 +43,7 @@ test("Phase 32 schema verifier remains read-only and covers critical RPC grants"
 
   assert.match(sql, /socialmedia_workspace_usage\(uuid,date\)/);
   assert.match(sql, /socialmedia_record_api_request\(uuid,date\)/);
-  assert.match(sql, /grant execute on function public\.socialmedia_record_api_request\(uuid, date\) to service_role/i);
+  assert.ok(sql.includes("has_function_privilege('service_role', record_rpc::oid, 'EXECUTE')"));
   assert.match(sql, /has_function_privilege\('service_role'/i);
   assert.match(sql, /relrowsecurity/i);
   assert.doesNotMatch(sql, /\b(insert\s+into|update\s+public\.|delete\s+from|alter\s+table|create\s+table|drop\s+table)\b/i);
@@ -58,7 +58,7 @@ test("Phase 32 schema migration backfills tenant ownership before enforcing NOT 
 
   assert.ok(aiBackfill >= 0 && aiBackfill < aiNotNull);
   assert.ok(keyBackfill >= 0 && keyBackfill < keyNotNull);
-  assert.match(sql, /grant execute on function public\.socialmedia_record_api_request\(uuid, date\) to service_role/i);
+  assert.ok(sql.includes("has_function_privilege('service_role', record_rpc::oid, 'EXECUTE')"));
 });
 
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
