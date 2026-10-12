@@ -97,6 +97,19 @@ begin
     end if;
   end loop;
 
+  if to_regprocedure('private.socialmedia_user_workspace_ids()') is null then
+    raise exception 'Phase 32 verification failed; private workspace membership helper is missing';
+  end if;
+
+  if not has_function_privilege('authenticated', 'private.socialmedia_user_workspace_ids()', 'EXECUTE')
+     or has_function_privilege('anon', 'private.socialmedia_user_workspace_ids()', 'EXECUTE') then
+    raise exception 'Phase 32 verification failed; private workspace membership helper grants are incorrect';
+  end if;
+
+  if not (select p.prosecdef from pg_proc p where p.oid = to_regprocedure('private.socialmedia_user_workspace_ids()')::oid) then
+    raise exception 'Phase 32 verification failed; workspace membership helper must bypass member-table RLS safely';
+  end if;
+
   if usage_rpc is null then
     raise exception 'Phase 32 verification failed; socialmedia_workspace_usage(uuid,date) is missing';
   end if;
