@@ -101,6 +101,10 @@ begin
     raise exception 'Phase 32 verification failed; private workspace membership helper is missing';
   end if;
 
+  if not has_schema_privilege('authenticated', 'private', 'USAGE') then
+    raise exception 'Phase 32 verification failed; authenticated role lacks usage on the private schema';
+  end if;
+
   if not has_function_privilege('authenticated', 'private.socialmedia_user_workspace_ids()', 'EXECUTE')
      or has_function_privilege('anon', 'private.socialmedia_user_workspace_ids()', 'EXECUTE') then
     raise exception 'Phase 32 verification failed; private workspace membership helper grants are incorrect';
