@@ -33,7 +33,7 @@ Review the full output. Confirm whether `202610080002_phase32_multitenant_brandi
 
 ## 3. Run the read-only data preflight
 
-Open `supabase/verification/phase32_preflight.sql` in the SQL editor for the confirmed project and execute it. It only reads schema/data and raises an exception if required tables/columns or profile-to-workspace relationships are missing or inconsistent.
+Open `supabase/verification/phase32_preflight.sql` in the SQL editor for the confirmed project and execute it. It only reads schema/data and raises an exception if required tables/columns or profile-to-workspace relationships are missing or inconsistent. It also checks partial Phase 32 state for duplicate slugs/domains, invalid branding colours, orphan workspace IDs, and variants assigned to a different workspace than their parent generation.
 
 If it fails, stop and repair the reported rows/schema with a separately reviewed, reversible plan. Do not bypass the preflight.
 
