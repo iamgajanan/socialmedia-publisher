@@ -36,6 +36,11 @@ test("Phase 32 preflight catches profile/workspace and membership inconsistencie
   assert.match(sql, /AI variant\(s\) cannot be assigned/i);
   assert.match(sql, /MCP audit log\(s\) cannot be assigned/i);
   assert.match(sql, /lack active membership/i);
+  assert.match(sql, /duplicate workspace slug/i);
+  assert.match(sql, /duplicate custom-domain/i);
+  assert.match(sql, /invalid primary colors/i);
+  assert.match(sql, /workspace IDs that do not reference a workspace/i);
+  assert.match(sql, /different workspace than their parent generation/i);
 });
 
 test("Phase 32 schema verifier remains read-only and covers critical RPC grants", async () => {
