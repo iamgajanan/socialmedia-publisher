@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashApiKey, isApiKey, normalizeApiKey } from "./api-key-core";
-import { isWorkspaceBindingValid } from "./workspace-binding-core";
+import { isActiveWorkspaceMembership } from "./workspace-binding-core";
 
 export type ApiAuthenticationResult =
   | { ok: true; profileId: string; apiKeyId: string; workspaceId: string }
@@ -28,7 +28,6 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
     .maybeSingle();
   let data: Record<string, unknown> | null = initialLookup.data as Record<string, unknown> | null;
   let error = initialLookup.error;
-  let profileWorkspaceId: string | null = null;
 
   if (isMissingWorkspaceColumn(error)) {
     // Older production schemas store API keys per profile. Resolve that profile's
@@ -50,7 +49,7 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
         console.error("api_auth_profile_workspace_lookup_failed", { code: profileResult.error.code, message: profileResult.error.message });
         return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
       }
-      profileWorkspaceId = profileResult.data?.workspace_id ? String(profileResult.data.workspace_id) : null;
+      const profileWorkspaceId = profileResult.data?.workspace_id ? String(profileResult.data.workspace_id) : null;
       data = data ? { ...data, workspace_id: profileWorkspaceId } : data;
     }
   }
@@ -67,20 +66,20 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   const workspaceId = String(data.workspace_id ?? "");
   if (!workspaceId) return { ok: false, status: 401, error: "API key is not attached to a workspace." };
 
-  if (profileWorkspaceId === null) {
-    const profileResult = await admin
-      .from("socialmedia_profiles")
-      .select("workspace_id")
-      .eq("id", profileId)
-      .maybeSingle();
-    if (profileResult.error) {
-      console.error("api_auth_profile_workspace_lookup_failed", { code: profileResult.error.code, message: profileResult.error.message });
-      return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
-    }
-    profileWorkspaceId = profileResult.data?.workspace_id ? String(profileResult.data.workspace_id) : null;
+  const { data: memberships, error: membershipError } = await admin
+    .from("socialmedia_workspace_members")
+    .select("workspace_id")
+    .eq("profile_id", profileId)
+    .eq("workspace_id", workspaceId)
+    .eq("status", "active")
+    .limit(1);
+
+  if (membershipError) {
+    console.error("api_auth_workspace_membership_lookup_failed", { apiKeyId, profileId, code: membershipError.code, message: membershipError.message });
+    return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
   }
 
-  if (!isWorkspaceBindingValid(workspaceId, profileWorkspaceId)) {
+  if (!isActiveWorkspaceMembership(workspaceId, (memberships ?? []).map((row) => String(row.workspace_id)))) {
     console.error("api_auth_workspace_binding_mismatch", { apiKeyId, profileId });
     return { ok: false, status: 401, error: "Invalid API key workspace binding." };
   }
