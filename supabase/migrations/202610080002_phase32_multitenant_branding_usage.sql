@@ -135,6 +135,30 @@ create index if not exists socialmedia_workspace_usage_monthly_period_idx
 alter table public.socialmedia_workspace_members
   add column if not exists created_at timestamptz not null default now();
 
+-- Resolve all active workspace memberships for the authenticated caller.
+-- SECURITY DEFINER is required because workspace_members itself is RLS protected;
+-- the function is in a non-exposed schema, pins an empty search_path, and never
+-- accepts a caller-supplied profile ID.
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated, service_role;
+
+create or replace function private.socialmedia_user_workspace_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select wm.workspace_id
+  from public.socialmedia_workspace_members wm
+  where wm.profile_id = (select auth.uid())
+    and wm.status = 'active';
+$;
+
+revoke all on function private.socialmedia_user_workspace_ids() from public, anon;
+grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role;
+
 alter table public.socialmedia_workspace_usage_monthly enable row level security;
 
 drop policy if exists socialmedia_workspace_usage_monthly_select_member on public.socialmedia_workspace_usage_monthly;
