@@ -32,7 +32,7 @@ test("Phase 32 API usage RPC is only executable by the service role", async () =
   );
   assert.match(
     sql,
-    /create or replace function public\.socialmedia_record_api_request[\s\S]*?security definer[\s\S]*?set search_path = public[\s\S]*?as \$\$/,
+    /create or replace function public\.socialmedia_record_api_request[\s\S]*?security definer[\s\S]*?set search_path = ''[\s\S]*?as \$\$/,
   );
 });
 
