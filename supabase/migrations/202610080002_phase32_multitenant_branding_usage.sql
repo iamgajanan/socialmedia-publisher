@@ -225,7 +225,7 @@ create or replace function public.socialmedia_record_api_request(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.socialmedia_workspace_usage_monthly (workspace_id, period_start, api_requests)
