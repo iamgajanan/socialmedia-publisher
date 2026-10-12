@@ -156,6 +156,10 @@ $workspace_ids$;
 revoke all on function private.socialmedia_user_workspace_ids() from public, anon;
 grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role;
 
+revoke all on table public.socialmedia_workspace_usage_monthly from anon;
+grant select on table public.socialmedia_workspace_usage_monthly to authenticated;
+grant all on table public.socialmedia_workspace_usage_monthly to service_role;
+
 alter table public.socialmedia_workspace_usage_monthly enable row level security;
 
 drop policy if exists socialmedia_workspace_usage_monthly_select_member on public.socialmedia_workspace_usage_monthly;
