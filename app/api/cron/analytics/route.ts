@@ -19,18 +19,33 @@ export async function POST(request: Request) {
   const { data: profiles, error } = await admin.from("socialmedia_social_accounts").select("profile_id").eq("status", "connected");
   if (error) return NextResponse.json({ ok: false, error: "Unable to discover analytics profiles." }, { status: 500 });
   const profileIds = [...new Set((profiles ?? []).map((row) => row.profile_id))];
-  const results = [];
-  for (const profileId of profileIds) {
-    const { data: run, error: runStartError } = await admin.from("socialmedia_analytics_sync_runs").insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() }).select("id").single();
+  const results = await Promise.all(profileIds.map(async (profileId) => {
+    const { data: run, error: runStartError } = await admin
+      .from("socialmedia_analytics_sync_runs")
+      .insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() })
+      .select("id")
+      .single();
     if (runStartError) console.error("analytics_sync_run_start_failed", { profileId, code: runStartError.code, message: runStartError.message });
+
     try {
       const result = await syncAnalyticsForProfile(profileId, run?.id);
-      results.push({ profileId, ...result });
+      return { profileId, ...result };
     } catch (error) {
-      if (run?.id) await admin.from("socialmedia_analytics_sync_runs").update({ status: "failed", finished_at: new Date().toISOString(), error_count: 1, errors: [{ error: error instanceof Error ? error.message : "Analytics sync failed." }] }).eq("id", run.id);
-      results.push({ profileId, error: error instanceof Error ? error.message : "Analytics sync failed." });
+      if (run?.id) {
+        const { error: runFinishError } = await admin
+          .from("socialmedia_analytics_sync_runs")
+          .update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_count: 1,
+            errors: [{ error: error instanceof Error ? error.message : "Analytics sync failed." }],
+          })
+          .eq("id", run.id);
+        if (runFinishError) console.error("analytics_sync_run_finish_failed", { runId: run.id, code: runFinishError.code, message: runFinishError.message });
+      }
+      return { profileId, error: error instanceof Error ? error.message : "Analytics sync failed." };
     }
-  }
+  }));
   return NextResponse.json({ ok: true, profiles: profileIds.length, results });
 }
 
