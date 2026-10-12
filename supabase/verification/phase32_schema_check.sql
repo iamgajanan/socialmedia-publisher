@@ -6,7 +6,7 @@ do $verify$
 declare
   requirement record;
   missing_items text[] := array[]::text[];
-  usage_rpc regprocedure := to_regprocedure('public.socialmedia_workspace_usage(uuid,date)');
+  usage_rpc regprocedure := to_regprocedure('private.socialmedia_workspace_usage(uuid,date)');
   record_rpc regprocedure := to_regprocedure('public.socialmedia_record_api_request(uuid,date)');
 begin
   for requirement in
@@ -114,8 +114,12 @@ begin
     raise exception 'Phase 32 verification failed; workspace membership helper must bypass member-table RLS safely';
   end if;
 
+  if to_regprocedure('public.socialmedia_workspace_usage(uuid,date)') is not null then
+    raise exception 'Phase 32 verification failed; workspace usage RPC must not remain in the exposed public schema';
+  end if;
+
   if usage_rpc is null then
-    raise exception 'Phase 32 verification failed; socialmedia_workspace_usage(uuid,date) is missing';
+    raise exception 'Phase 32 verification failed; private.socialmedia_workspace_usage(uuid,date) is missing';
   end if;
 
   if record_rpc is null then
@@ -134,7 +138,7 @@ begin
   end if;
 
   if not (select p.prosecdef from pg_proc p where p.oid = usage_rpc::oid) then
-    raise exception 'Phase 32 verification failed; usage RPC must be SECURITY DEFINER with an explicit membership check';
+    raise exception 'Phase 32 verification failed; private usage RPC must be SECURITY DEFINER with an explicit membership check';
   end if;
 
   if position('socialmedia_workspace_members' in pg_get_functiondef(usage_rpc::oid)) = 0
