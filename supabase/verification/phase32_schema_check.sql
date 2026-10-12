@@ -129,8 +129,13 @@ begin
     raise exception 'Phase 32 verification failed; API request RPC grants are incorrect';
   end if;
 
-  if (select p.prosecdef from pg_proc p where p.oid = usage_rpc::oid) then
-    raise exception 'Phase 32 verification failed; usage RPC must remain SECURITY INVOKER';
+  if not (select p.prosecdef from pg_proc p where p.oid = usage_rpc::oid) then
+    raise exception 'Phase 32 verification failed; usage RPC must be SECURITY DEFINER with an explicit membership check';
+  end if;
+
+  if position('socialmedia_workspace_members' in pg_get_functiondef(usage_rpc::oid)) = 0
+     or position('auth.uid()' in pg_get_functiondef(usage_rpc::oid)) = 0 then
+    raise exception 'Phase 32 verification failed; usage RPC is missing its workspace membership authorization check';
   end if;
 
   if not (select p.prosecdef from pg_proc p where p.oid = record_rpc::oid) then
