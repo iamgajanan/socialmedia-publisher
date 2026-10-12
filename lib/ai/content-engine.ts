@@ -154,19 +154,19 @@ export async function generatePlatformContent(input: {
   return { generation: { ...generation, profile_id: input.profileId }, variants: normalized };
 }
 
-export async function getGeneration(profileId: string, generationId: string) {
+export async function getGeneration(profileId: string, workspaceId: string, generationId: string) {
   const admin = createAdminClient();
-  const { data: generation, error } = await admin.from("socialmedia_ai_generations").select("id,master_content,brand_voice,instructions,requested_platforms,model,provider,status,requires_approval,approved_at,created_at,updated_at,error_message").eq("id", generationId).eq("profile_id", profileId).maybeSingle();
+  const { data: generation, error } = await admin.from("socialmedia_ai_generations").select("id,master_content,brand_voice,instructions,requested_platforms,model,provider,status,requires_approval,approved_at,created_at,updated_at,error_message").eq("id", generationId).eq("profile_id", profileId).eq("workspace_id", workspaceId).maybeSingle();
   if (error || !generation) return null;
-  const { data: variants } = await admin.from("socialmedia_ai_content_variants").select("id,platform,variation,title,caption,hashtags,cta,media_recommendations,character_count,character_limit,validation,approval_status,created_at").eq("generation_id", generationId).eq("profile_id", profileId).order("platform").order("variation");
+  const { data: variants } = await admin.from("socialmedia_ai_content_variants").select("id,platform,variation,title,caption,hashtags,cta,media_recommendations,character_count,character_limit,validation,approval_status,created_at").eq("generation_id", generationId).eq("profile_id", profileId).eq("workspace_id", workspaceId).order("platform").order("variation");
   return { generation, variants: variants ?? [] };
 }
 
-export async function approveGeneration(profileId: string, generationId: string, approvedBy: string) {
+export async function approveGeneration(profileId: string, workspaceId: string, generationId: string, approvedBy: string) {
   const admin = createAdminClient();
-  const { data: generation, error } = await admin.from("socialmedia_ai_generations").update({ status: "approved", approved_at: new Date().toISOString(), approved_by: approvedBy, updated_at: new Date().toISOString() }).eq("id", generationId).eq("profile_id", profileId).select("id,status,approved_at").maybeSingle();
+  const { data: generation, error } = await admin.from("socialmedia_ai_generations").update({ status: "approved", approved_at: new Date().toISOString(), approved_by: approvedBy, updated_at: new Date().toISOString() }).eq("id", generationId).eq("profile_id", profileId).eq("workspace_id", workspaceId).select("id,status,approved_at").maybeSingle();
   if (error || !generation) throw new Error("Generation not found.");
-  const { error: variantsError } = await admin.from("socialmedia_ai_content_variants").update({ approval_status: "approved", updated_at: new Date().toISOString() }).eq("generation_id", generationId).eq("profile_id", profileId);
+  const { error: variantsError } = await admin.from("socialmedia_ai_content_variants").update({ approval_status: "approved", updated_at: new Date().toISOString() }).eq("generation_id", generationId).eq("profile_id", profileId).eq("workspace_id", workspaceId);
   if (variantsError) throw new Error("Unable to approve generated variants.");
   return generation;
 }
