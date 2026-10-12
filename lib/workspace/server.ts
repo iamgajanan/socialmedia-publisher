@@ -36,9 +36,10 @@ export async function getCurrentWorkspace() {
     .select("id, role, status")
     .eq("workspace_id", profile.workspace_id)
     .eq("profile_id", profileId)
+    .eq("status", "active")
     .maybeSingle();
   if (membershipError) throw new Error(membershipError.message);
-  if (!membership) throw new Error("You are not a member of this workspace.");
+  if (!membership) throw new Error("You are not an active member of this workspace.");
 
   // Keep the core workspace read compatible with production databases while the Phase 32 schema migration is being rolled out.
   const { data: workspace, error: workspaceError } = await supabase
