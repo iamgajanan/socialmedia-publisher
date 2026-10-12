@@ -5,7 +5,7 @@ import test from "node:test";
 
 const migrationPath = join(
   process.cwd(),
-  "supabase/migrations/202610080002_phase32_multitenant_branding_usage.sql",
+  "supabase/migrations/20261012175048_phase32_multitenant_branding_usage.sql",
 );
 
 test("Phase 32 SQL function bodies use valid dollar quoting", async () => {

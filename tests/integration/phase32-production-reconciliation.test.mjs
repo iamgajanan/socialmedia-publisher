@@ -6,7 +6,7 @@ import test from "node:test";
 const root = process.cwd();
 const preflightPath = join(root, "supabase/verification/phase32_preflight.sql");
 const verificationPath = join(root, "supabase/verification/phase32_schema_check.sql");
-const migrationPath = join(root, "supabase/migrations/202610080002_phase32_multitenant_branding_usage.sql");
+const migrationPath = join(root, "supabase/migrations/20261012175048_phase32_multitenant_branding_usage.sql");
 const runbookPath = join(root, "docs/phase32-production-reconciliation.md");
 
 test("Phase 32 preflight is read-only and checks prerequisite schema", async () => {

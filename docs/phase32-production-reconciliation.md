@@ -53,7 +53,7 @@ If the migration is already marked applied but required objects are missing, wri
 
 Run `supabase/verification/phase32_schema_check.sql` against the same project. It must finish without raising an exception. Also verify the migration list again and review Supabase security/performance advisors.
 
-The migration creates a private, non-exposed workspace-membership helper before installing usage-table RLS; the helper pins an empty search path, derives identity only from auth.uid(), and is not executable by anon. The verification SQL checks required columns, constraints, indexes, usage-table RLS, function definitions, helper/RPC execution grants, and security modes. The preflight and verification scripts are read-only.
+The migration creates a private, non-exposed workspace-membership helper before installing usage-table RLS; the helper pins an empty search path, derives identity only from auth.uid(), and is not executable by anon. The follow-up private-usage-RPC migration moves workspace aggregate reporting out of the exposed public schema. The verification SQL checks required columns, constraints, indexes, usage-table RLS, function definitions, helper/RPC execution grants, and security modes. The preflight and verification scripts are read-only.
 
 ## 6. Application smoke tests
 

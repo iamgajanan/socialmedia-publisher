@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const migration = readFileSync("supabase/migrations/202610080002_phase32_multitenant_branding_usage.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20261012175048_phase32_multitenant_branding_usage.sql", "utf8");
 const apiAuth = readFileSync("lib/api/api-auth.ts", "utf8");
 const apiKeys = readFileSync("app/api/v1/api-keys/route.ts", "utf8");
 const shell = readFileSync("components/dashboard/dashboard-shell.tsx", "utf8");
