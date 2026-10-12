@@ -183,24 +183,14 @@ begin
   end if;
 
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'primary_color') then
-    execute format('select count(*) from public.socialmedia_workspaces where primary_color is null or primary_color !~ %L', '^#[0-9a-fA-F]{6}
-end
-$phase32_preflight$;
-
-select 'Phase 32 preflight passed; no data or schema was modified' as preflight_result;
-) into problem_count;
+    execute format('select count(*) from public.socialmedia_workspaces where primary_color is null or length(primary_color) <> 7 or primary_color !~ %L', '^#[0-9a-fA-F]{6}') into problem_count;
     if problem_count > 0 then
       raise exception 'Phase 32 preflight failed: % workspace(s) have invalid primary colors', problem_count;
     end if;
   end if;
 
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'socialmedia_workspaces' and column_name = 'accent_color') then
-    execute format('select count(*) from public.socialmedia_workspaces where accent_color is null or accent_color !~ %L', '^#[0-9a-fA-F]{6}
-end
-$phase32_preflight$;
-
-select 'Phase 32 preflight passed; no data or schema was modified' as preflight_result;
-) into problem_count;
+    execute format('select count(*) from public.socialmedia_workspaces where accent_color is null or length(accent_color) <> 7 or accent_color !~ %L', '^#[0-9a-fA-F]{6}') into problem_count;
     if problem_count > 0 then
       raise exception 'Phase 32 preflight failed: % workspace(s) have invalid accent colors', problem_count;
     end if;
