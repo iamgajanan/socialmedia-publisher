@@ -58,7 +58,7 @@ test("Phase 32 schema migration backfills tenant ownership before enforcing NOT 
 
   assert.ok(aiBackfill >= 0 && aiBackfill < aiNotNull);
   assert.ok(keyBackfill >= 0 && keyBackfill < keyNotNull);
-  assert.match(sql, /grant execute on function public\\.socialmedia_record_api_request\\(uuid, date\\) to service_role/i);
+  assert.ok(sql.includes("grant execute on function public.socialmedia_record_api_request(uuid, date) to service_role;"));
 });
 
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
