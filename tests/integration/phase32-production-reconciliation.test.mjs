@@ -25,6 +25,9 @@ test("Phase 32 preflight is read-only and checks prerequisite schema", async () 
   assert.match(sql, /socialmedia_posts/);
   assert.match(sql, /raise exception/i);
   assert.doesNotMatch(sql, /\b(insert\s+into|update\s+public\.|delete\s+from|alter\s+table|create\s+table|drop\s+table)\b/i);
+  assert.equal(sql.split("$phase32_preflight$").length - 1, 2);
+  assert.equal((sql.split("$query$").length - 1) % 2, 0);
+  assert.equal(sql.split("preflight_result").length - 1, 1);
 });
 
 test("Phase 32 preflight catches profile/workspace and membership inconsistencies before migration", async () => {
