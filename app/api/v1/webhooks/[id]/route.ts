@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isWebhookEventType } from "@/lib/webhooks/events";
+import { validateWebhookUrl } from "@/lib/webhooks/url-safety";
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -20,8 +21,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = await request.json().catch(() => null) as { url?: string; events?: string[]; description?: string; status?: string } | null;
   const patch: Record<string, unknown> = {};
   if (body?.url !== undefined) {
-    try { if (new URL(body.url).protocol !== "https:") throw new Error(); } catch { return NextResponse.json({ error: "Webhook URL must be a valid HTTPS URL." }, { status: 400 }); }
-    patch.url = body.url.trim();
+    const url = body.url.trim();
+    try { validateWebhookUrl(url); } catch {
+      return NextResponse.json({ error: "Webhook URL must be a publicly routable HTTPS URL without embedded credentials." }, { status: 400 });
+    }
+    patch.url = url;
   }
   if (body?.events !== undefined) {
     const events = Array.isArray(body.events) ? [...new Set(body.events)] : [];
