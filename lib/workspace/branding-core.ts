@@ -6,7 +6,9 @@ export type WorkspaceBranding = {
   custom_domain: string | null;
 };
 
-export type WorkspaceBrandingRow = Partial<WorkspaceBranding> | null | undefined;
+export type WorkspaceBrandingRow = {
+  [Key in keyof WorkspaceBranding]?: WorkspaceBranding[Key] | null;
+} | null | undefined;
 
 export const DEFAULT_WORKSPACE_BRANDING: WorkspaceBranding = {
   slug: null,
