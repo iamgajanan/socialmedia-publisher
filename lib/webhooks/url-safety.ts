@@ -19,7 +19,7 @@ function inV4Range(address: string, base: string, bits: number): boolean {
   return (value & mask) === (network & mask);
 }
 
-function ipv6Number(input: string): bigint | null {
+function ipv6Parts(input: string): number[] | null {
   let address = input.toLowerCase().split("%")[0] ?? "";
   if (isIP(address) !== 6) return null;
 
@@ -41,15 +41,21 @@ function ipv6Number(input: string): bigint | null {
   if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
   const parts = [...left, ...Array.from({ length: missing }, () => "0"), ...right];
   if (parts.length !== 8 || parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return null;
-  return parts.reduce((value, part) => (value << 16n) | BigInt("0x" + part), 0n);
+  return parts.map((part) => Number.parseInt(part, 16));
 }
 
 function inV6Range(address: string, base: string, bits: number): boolean {
-  const value = ipv6Number(address);
-  const network = ipv6Number(base);
-  if (value === null || network === null) return false;
-  const shift = BigInt(128 - bits);
-  return (value >> shift) === (network >> shift);
+  const value = ipv6Parts(address);
+  const network = ipv6Parts(base);
+  if (!value || !network) return false;
+  const fullWords = Math.floor(bits / 16);
+  for (let index = 0; index < fullWords; index++) {
+    if (value[index] !== network[index]) return false;
+  }
+  const remainingBits = bits % 16;
+  if (remainingBits === 0) return true;
+  const mask = (0xffff << (16 - remainingBits)) & 0xffff;
+  return ((value[fullWords] ?? 0) & mask) === ((network[fullWords] ?? 0) & mask);
 }
 
 export function isPublicIpAddress(input: string): boolean {
