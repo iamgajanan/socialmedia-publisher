@@ -78,7 +78,8 @@ test("Phase 32 migration defines a safe private workspace-membership helper befo
   assert.ok(sql.includes("security definer\nset search_path = ''"));
   assert.ok(sql.includes("where wm.profile_id = (select auth.uid())"));
   assert.ok(sql.includes("revoke all on function private.socialmedia_user_workspace_ids() from public, anon"));
-  assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role"));
+  assert.ok(sql.includes("grant usage on schema private to authenticated;"));
+  assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated;"));
 });
 
 test("Phase 32 usage table grants authenticated reads but denies anonymous access", async () => {
