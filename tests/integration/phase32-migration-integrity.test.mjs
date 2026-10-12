@@ -11,10 +11,12 @@ const migrationPath = join(
 test("Phase 32 SQL function bodies use valid dollar quoting", async () => {
   const sql = await readFile(migrationPath, "utf8");
 
-  assert.equal((sql.match(/\bas \$\$/g) ?? []).length, 2);
-  assert.equal((sql.match(/\$\$;/g) ?? []).length, 2);
-  assert.doesNotMatch(sql, /\bas \$(?!\$)/);
-  assert.doesNotMatch(sql, /(^|\n)\$;(?=\n)/m);
+  assert.equal((sql.match(/\bas \$\$/g) ?? []).length, 1);
+  assert.equal((sql.match(/\$\$;/g) ?? []).length, 1);
+  assert.equal((sql.match(/\$workspace_ids\$/g) ?? []).length, 2);
+  assert.equal((sql.match(/\$workspace_usage\$/g) ?? []).length, 2);
+  assert.doesNotMatch(sql, /\bas \$(?!\$|workspace_ids\$|workspace_usage\$)/);
+  assert.doesNotMatch(sql, /(^|\n)\$(?!\$|workspace_ids\$|workspace_usage\$);(?=\n)/m);
 });
 
 test("Phase 32 API usage RPC is only executable by the service role", async () => {
@@ -30,7 +32,7 @@ test("Phase 32 API usage RPC is only executable by the service role", async () =
   );
   assert.match(
     sql,
-    /create or replace function public\.socialmedia_record_api_request[\s\S]*?security definer[\s\S]*?set search_path = public[\s\S]*?as \$\$/,
+    /create or replace function public\.socialmedia_record_api_request[\s\S]*?security definer[\s\S]*?set search_path = ''[\s\S]*?as \$\$/,
   );
 });
 

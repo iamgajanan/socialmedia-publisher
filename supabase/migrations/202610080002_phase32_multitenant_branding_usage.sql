@@ -135,6 +135,32 @@ create index if not exists socialmedia_workspace_usage_monthly_period_idx
 alter table public.socialmedia_workspace_members
   add column if not exists created_at timestamptz not null default now();
 
+-- Resolve all active workspace memberships for the authenticated caller.
+-- SECURITY DEFINER is required because workspace_members itself is RLS protected;
+-- the function is in a non-exposed schema, pins an empty search_path, and never
+-- accepts a caller-supplied profile ID.
+create schema if not exists private;
+grant usage on schema private to authenticated;
+create or replace function private.socialmedia_user_workspace_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $workspace_ids$
+  select wm.workspace_id
+  from public.socialmedia_workspace_members wm
+  where wm.profile_id = (select auth.uid())
+    and wm.status = 'active';
+$workspace_ids$;
+
+revoke all on function private.socialmedia_user_workspace_ids() from public, anon;
+grant execute on function private.socialmedia_user_workspace_ids() to authenticated;
+
+revoke all on table public.socialmedia_workspace_usage_monthly from anon;
+grant select on table public.socialmedia_workspace_usage_monthly to authenticated;
+grant all on table public.socialmedia_workspace_usage_monthly to service_role;
+
 alter table public.socialmedia_workspace_usage_monthly enable row level security;
 
 drop policy if exists socialmedia_workspace_usage_monthly_select_member on public.socialmedia_workspace_usage_monthly;
@@ -153,11 +179,25 @@ returns table (
   ai_generations bigint,
   api_requests bigint
 )
-language sql
+language plpgsql
 stable
-security invoker
-set search_path = public
-as $$
+security definer
+set search_path = ''
+as $workspace_usage$
+begin
+  -- This function bypasses row-level filtering so it can count all workspace
+  -- activity. Explicitly validate membership before reading any tenant data.
+  if not exists (
+    select 1
+    from public.socialmedia_workspace_members wm
+    where wm.workspace_id = target_workspace_id
+      and wm.profile_id = (select auth.uid())
+      and wm.status = 'active'
+  ) then
+    raise exception 'Not authorized to read workspace usage' using errcode = '42501';
+  end if;
+
+  return query
   select
     (select count(*) from public.socialmedia_posts p
       where p.workspace_id = target_workspace_id
@@ -175,7 +215,8 @@ as $$
     coalesce((select u.api_requests from public.socialmedia_workspace_usage_monthly u
       where u.workspace_id = target_workspace_id
         and u.period_start = target_period_start), 0) as api_requests;
-$$;
+end;
+$workspace_usage$;
 
 -- Do not expose usage for a workspace the current authenticated user does not belong to.
 -- The counts below therefore remain tenant-scoped even when a caller supplies an arbitrary id.
@@ -189,7 +230,7 @@ create or replace function public.socialmedia_record_api_request(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.socialmedia_workspace_usage_monthly (workspace_id, period_start, api_requests)
@@ -203,6 +244,11 @@ $$;
 revoke all on function public.socialmedia_record_api_request(uuid, date) from public, anon, authenticated;
 -- API usage is recorded by trusted server-side code using the Supabase service role.
 grant execute on function public.socialmedia_record_api_request(uuid, date) to service_role;
+
+-- These SECURITY DEFINER functions are trigger helpers, not public RPCs.
+-- Trigger execution does not require callers to have direct EXECUTE privileges.
+revoke all on function public.socialmedia_enforce_user_limit() from public, anon, authenticated;
+revoke all on function public.socialmedia_enforce_social_account_limit() from public, anon, authenticated;
 
 comment on table public.socialmedia_workspace_usage_monthly is 'Phase 32 workspace usage foundation for plan quotas and SaaS reporting.';
 comment on table public.socialmedia_workspaces is 'Shared tenant boundary including white-label branding and custom domain configuration.';

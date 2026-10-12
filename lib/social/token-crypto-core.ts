@@ -20,3 +20,14 @@ export function decryptTokenWithKey(value: string, key: Buffer) {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
+
+export function decryptTokenWithKeys(value: string, keys: Buffer[]) {
+  for (const key of keys) {
+    try {
+      return decryptTokenWithKey(value, key);
+    } catch {
+      // Try the next explicitly configured rotation key.
+    }
+  }
+  throw new Error("Unable to decrypt OAuth token with the configured key ring.");
+}

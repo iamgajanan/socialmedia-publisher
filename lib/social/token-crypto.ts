@@ -1,47 +1,49 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { encryptTokenWithKey, decryptTokenWithKey } from "./token-crypto-core";
+import { encryptTokenWithKey, decryptTokenWithKeys } from "./token-crypto-core";
 
-function getKey() {
-  const raw = process.env.SOCIAL_OAUTH_ENCRYPTION_KEY;
+function parseKey(raw: string, variable: string) {
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) throw new Error(`${variable} must be a base64-encoded 32-byte key.`);
+  return key;
+}
 
-  if (raw) {
-    const key = Buffer.from(raw, "base64");
-    if (key.length !== 32) {
-      throw new Error(
-        "SOCIAL_OAUTH_ENCRYPTION_KEY must be a base64-encoded 32-byte key.",
-      );
-    }
-    return key;
-  }
-
-  // Keep OAuth encryption server-only even when an existing deployment has
-  // not yet provisioned the dedicated encryption key. The Supabase service
-  // role key is already required by the server admin client and never reaches
-  // the browser, so derive a separate 256-bit encryption key from it.
-  //
-  // A dedicated SOCIAL_OAUTH_ENCRYPTION_KEY remains preferred and should be
-  // provisioned before rotating the Supabase service-role credential.
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
-
-  if (!serviceRoleKey) {
-    throw new Error(
-      "Missing SOCIAL_OAUTH_ENCRYPTION_KEY and Supabase server secret.",
-    );
-  }
-
+function legacyKey() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
+  if (!serviceRoleKey) return null;
   return createHash("sha256")
     .update("socialmedia-publisher/oauth-token-encryption/v1:")
     .update(serviceRoleKey)
     .digest();
 }
 
+function primaryKey() {
+  const raw = process.env.SOCIAL_OAUTH_ENCRYPTION_KEY;
+  if (raw) return parseKey(raw, "SOCIAL_OAUTH_ENCRYPTION_KEY");
+  const legacy = legacyKey();
+  if (!legacy) throw new Error("Missing SOCIAL_OAUTH_ENCRYPTION_KEY and Supabase server secret.");
+  return legacy;
+}
+
+function decryptionKeys() {
+  const keys: Buffer[] = [];
+  const primary = process.env.SOCIAL_OAUTH_ENCRYPTION_KEY;
+  const previous = process.env.SOCIAL_OAUTH_ENCRYPTION_KEY_PREVIOUS;
+  if (primary) keys.push(parseKey(primary, "SOCIAL_OAUTH_ENCRYPTION_KEY"));
+  if (previous) keys.push(parseKey(previous, "SOCIAL_OAUTH_ENCRYPTION_KEY_PREVIOUS"));
+  const legacy = legacyKey();
+  if (legacy) keys.push(legacy);
+  if (keys.length === 0) throw new Error("Missing OAuth token encryption key configuration.");
+  return keys.filter((key, index) => keys.findIndex((candidate) => candidate.equals(key)) === index);
+}
+
 export function encryptToken(value: string) {
-  return encryptTokenWithKey(value, getKey());
+  // New ciphertext always uses the primary dedicated key when configured.
+  // The legacy service-role-derived key remains a temporary compatibility fallback.
+  return encryptTokenWithKey(value, primaryKey());
 }
 
 export function decryptToken(value: string) {
-  return decryptTokenWithKey(value, getKey());
+  return decryptTokenWithKeys(value, decryptionKeys());
 }

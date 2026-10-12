@@ -1,9 +1,18 @@
 import crypto from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { postPublicHttpsJson } from "@/lib/webhooks/url-safety";
+import { isRetryableWebhookStatus } from "@/lib/webhooks/retry-policy";
 
 const MAX_ATTEMPTS = 6;
 const RETRIES_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
 const CLAIM_MS = 120_000;
+
+class WebhookHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "WebhookHttpError";
+  }
+}
 
 function admin() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -111,21 +120,16 @@ export async function runWebhookWorker(limit = 50) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
 
     try {
-      const response = await fetch(webhook.url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "user-agent": "OmniSocial-Webhooks/1.0",
-          "x-omnisocial-event-id": row.event_id,
-          "x-omnisocial-event": event.event_type,
-          "x-omnisocial-timestamp": timestamp,
-          "x-omnisocial-signature": `v1=${signature(webhook.secret, timestamp, payload)}`,
-        },
-        body: payload,
-        signal: AbortSignal.timeout(10_000),
-      });
+      const response = await postPublicHttpsJson(webhook.url, {
+        "content-type": "application/json",
+        "user-agent": "OmniSocial-Webhooks/1.0",
+        "x-omnisocial-event-id": row.event_id,
+        "x-omnisocial-event": event.event_type,
+        "x-omnisocial-timestamp": timestamp,
+        "x-omnisocial-signature": `v1=${signature(webhook.secret, timestamp, payload)}`,
+      }, payload, 10_000);
 
-      const text = (await response.text()).slice(0, 4000);
+      const text = response.body;
 
       if (response.ok) {
         const { error: markDeliveredError } = await supabase
@@ -155,16 +159,19 @@ export async function runWebhookWorker(limit = 50) {
 
         delivered++;
       } else {
-        throw new Error(`HTTP ${response.status}: ${text}`);
+        throw new WebhookHttpError(response.status, `HTTP ${response.status}: ${text}`);
       }
     } catch (error) {
-      const terminal = attempt >= MAX_ATTEMPTS;
       const message = error instanceof Error ? error.message : "Webhook delivery failed";
+      const responseStatus = error instanceof WebhookHttpError ? error.status : null;
+      const terminal = attempt >= MAX_ATTEMPTS ||
+        (responseStatus !== null && !isRetryableWebhookStatus(responseStatus));
 
       await supabase
         .from("socialmedia_webhook_deliveries")
         .update({
           status: terminal ? "failed" : "pending",
+          response_status: responseStatus,
           response_body: message,
           attempt,
           next_attempt_at: new Date(

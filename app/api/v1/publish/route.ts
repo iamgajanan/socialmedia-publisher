@@ -60,9 +60,7 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const requestHash = hashRequestBody(rawBody);
-  const { data: profileWorkspace } = await admin.from("socialmedia_profiles").select("workspace_id").eq("id", authentication.profileId).maybeSingle();
-  const workspaceId = profileWorkspace?.workspace_id ? String(profileWorkspace.workspace_id) : null;
-  if (!workspaceId) return apiJson({ error: "Your workspace has not been initialized yet.", code: "workspace_not_initialized" }, 500, requestId);
+  const workspaceId = authentication.workspaceId;
 
   if (idempotencyKey) {
     const now = new Date().toISOString();

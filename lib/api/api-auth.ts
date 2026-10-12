@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashApiKey, isApiKey, normalizeApiKey } from "./api-key-core";
+import { isActiveWorkspaceMembership } from "./workspace-binding-core";
 
 export type ApiAuthenticationResult =
   | { ok: true; profileId: string; apiKeyId: string; workspaceId: string }
@@ -48,7 +49,8 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
         console.error("api_auth_profile_workspace_lookup_failed", { code: profileResult.error.code, message: profileResult.error.message });
         return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
       }
-      data = data ? { ...data, workspace_id: profileResult.data?.workspace_id ?? null } : data;
+      const profileWorkspaceId = profileResult.data?.workspace_id ? String(profileResult.data.workspace_id) : null;
+      data = data ? { ...data, workspace_id: profileWorkspaceId } : data;
     }
   }
 
@@ -63,6 +65,24 @@ export async function authenticateApiRequest(request: Request): Promise<ApiAuthe
   const apiKeyId = String(data.id);
   const workspaceId = String(data.workspace_id ?? "");
   if (!workspaceId) return { ok: false, status: 401, error: "API key is not attached to a workspace." };
+
+  const { data: memberships, error: membershipError } = await admin
+    .from("socialmedia_workspace_members")
+    .select("workspace_id")
+    .eq("profile_id", profileId)
+    .eq("workspace_id", workspaceId)
+    .eq("status", "active")
+    .limit(1);
+
+  if (membershipError) {
+    console.error("api_auth_workspace_membership_lookup_failed", { apiKeyId, profileId, code: membershipError.code, message: membershipError.message });
+    return { ok: false, status: 503, error: "API workspace lookup is temporarily unavailable." };
+  }
+
+  if (!isActiveWorkspaceMembership(workspaceId, (memberships ?? []).map((row) => String(row.workspace_id)))) {
+    console.error("api_auth_workspace_binding_mismatch", { apiKeyId, profileId });
+    return { ok: false, status: 401, error: "Invalid API key workspace binding." };
+  }
 
   const { data: rateLimit, error: rateLimitError } = await admin.rpc(
     "socialmedia_consume_api_rate_limit",

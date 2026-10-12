@@ -89,21 +89,6 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
     }
     return result;
   }
-  if (platform === "threads") {
-    const data = await jsonFetch("https://graph.threads.net/v1.0/me/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const result: Metrics = { raw_metrics: data };
-    for (const item of data.data ?? []) {
-      const value = item.total_value?.value ?? item.values?.[item.values.length - 1]?.value ?? item.value;
-      if (item.name === "followers_count") result.follower_count = n(value);
-      if (item.name === "views") result.impressions = n(value);
-      if (item.name === "likes") result.likes = n(value);
-      if (item.name === "replies") result.comments = n(value);
-      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
-    }
-    return result;
-  }
   if (platform === "tiktok") {
     const data = await jsonFetch("https://open.tiktokapis.com/v2/video/query/?fields=id,like_count,comment_count,share_count,view_count", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ filters: { video_ids: [postId] } }) });
     const video = Array.isArray(data.data?.videos) ? data.data.videos[0] ?? {} : {};
@@ -153,6 +138,21 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
 }
 async function fetchAccountMetrics(account: Account, token: string): Promise<Metrics> {
   const platform = account.platform.toLowerCase();
+  if (platform === "threads") {
+    const data = await jsonFetch("https://graph.threads.net/v1.0/me/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const result: Metrics = { raw_metrics: data };
+    for (const item of data.data ?? []) {
+      const value = item.total_value?.value ?? item.values?.[item.values.length - 1]?.value ?? item.value;
+      if (item.name === "followers_count") result.follower_count = n(value);
+      if (item.name === "views") result.impressions = n(value);
+      if (item.name === "likes") result.likes = n(value);
+      if (item.name === "replies") result.comments = n(value);
+      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
+    }
+    return result;
+  }
   if (platform === "youtube") {
     const data = await jsonFetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(account.external_account_id)}`, { headers: { Authorization: `Bearer ${token}` } });
     const m = data.items?.[0]?.statistics ?? {};
@@ -262,6 +262,25 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
     } catch (accountError) { result.error = accountError instanceof Error ? accountError.message : "Analytics sync failed."; }
     results.push(result);
   }
-  if (runId) { const failed = results.filter((item) => !item.ok).length; await admin.from("socialmedia_analytics_sync_runs").update({ status: failed === 0 ? "succeeded" : failed === results.length ? "failed" : "partial", finished_at: new Date().toISOString(), accounts_scanned: results.length, accounts_succeeded: results.filter((item) => item.ok).length, accounts_failed: failed, posts_scanned: results.reduce((total, item) => total + item.postsScanned, 0), metrics_written: results.reduce((total, item) => total + item.metricsWritten, 0), error_count: failed, errors: results.filter((item) => item.error).map((item) => ({ account_id: item.accountId, platform: item.platform, error: item.error })) }).eq("id", runId); }
+  if (runId) {
+    const failed = results.filter((item) => !item.ok).length;
+    const { error: runUpdateError } = await admin
+      .from("socialmedia_analytics_sync_runs")
+      .update({
+        status: failed === 0 ? "succeeded" : failed === results.length ? "failed" : "partial",
+        finished_at: new Date().toISOString(),
+        accounts_scanned: results.length,
+        accounts_succeeded: results.filter((item) => item.ok).length,
+        accounts_failed: failed,
+        posts_scanned: results.reduce((total, item) => total + item.postsScanned, 0),
+        metrics_written: results.reduce((total, item) => total + item.metricsWritten, 0),
+        error_count: failed,
+        errors: results.filter((item) => item.error).map((item) => ({ account_id: item.accountId, platform: item.platform, error: item.error })),
+      })
+      .eq("id", runId);
+    if (runUpdateError) {
+      console.error("analytics_sync_run_finish_failed", { runId, code: runUpdateError.code, message: runUpdateError.message });
+    }
+  }
   return { results };
 }

@@ -69,6 +69,44 @@ test("Phase 32 schema migration backfills tenant ownership before enforcing NOT 
   assert.ok(sql.includes("grant execute on function public.socialmedia_record_api_request(uuid, date) to service_role;"));
 });
 
+test("Phase 32 migration defines a safe private workspace-membership helper before usage RLS", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  const helper = sql.indexOf("create or replace function private.socialmedia_user_workspace_ids()");
+  const usagePolicy = sql.indexOf("create policy socialmedia_workspace_usage_monthly_select_member");
+
+  assert.ok(helper >= 0 && helper < usagePolicy);
+  assert.ok(sql.includes("security definer\nset search_path = ''"));
+  assert.ok(sql.includes("where wm.profile_id = (select auth.uid())"));
+  assert.ok(sql.includes("revoke all on function private.socialmedia_user_workspace_ids() from public, anon"));
+  assert.ok(sql.includes("grant usage on schema private to authenticated;"));
+  assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated;"));
+});
+
+test("Phase 32 usage table grants authenticated reads but denies anonymous access", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  assert.ok(sql.includes("revoke all on table public.socialmedia_workspace_usage_monthly from anon;"));
+  assert.ok(sql.includes("grant select on table public.socialmedia_workspace_usage_monthly to authenticated;"));
+  assert.ok(sql.includes("grant all on table public.socialmedia_workspace_usage_monthly to service_role;"));
+});
+
+test("Phase 32 usage RPC authorizes workspace membership before reading aggregate counts", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  const start = sql.indexOf("create or replace function public.socialmedia_workspace_usage(");
+  const end = sql.indexOf("-- Do not expose usage for a workspace", start);
+  const usageRpc = sql.slice(start, end);
+
+  assert.match(usageRpc, /security definer/i);
+  assert.match(usageRpc, /set search_path = ''/i);
+  assert.match(usageRpc, /socialmedia_workspace_members/);
+  assert.match(usageRpc, /wm\.workspace_id = target_workspace_id/);
+  assert.match(usageRpc, /wm\.profile_id = \(select auth\.uid\(\)\)/);
+  assert.match(usageRpc, /errcode = '42501'/);
+  assert.ok(sql.includes("revoke all on function public.socialmedia_enforce_user_limit() from public, anon, authenticated;"));
+  assert.ok(sql.includes("revoke all on function public.socialmedia_enforce_social_account_limit() from public, anon, authenticated;"));
+  assert.equal(sql.split("$workspace_ids$").length - 1, 2);
+  assert.equal(sql.split("$workspace_usage$").length - 1, 2);
+});
+
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
   const doc = await readFile(runbookPath, "utf8");
 

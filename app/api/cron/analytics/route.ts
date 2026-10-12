@@ -21,7 +21,8 @@ export async function POST(request: Request) {
   const profileIds = [...new Set((profiles ?? []).map((row) => row.profile_id))];
   const results = [];
   for (const profileId of profileIds) {
-    const { data: run } = await admin.from("socialmedia_analytics_sync_runs").insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() }).select("id").single();
+    const { data: run, error: runStartError } = await admin.from("socialmedia_analytics_sync_runs").insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() }).select("id").single();
+    if (runStartError) console.error("analytics_sync_run_start_failed", { profileId, code: runStartError.code, message: runStartError.message });
     try {
       const result = await syncAnalyticsForProfile(profileId, run?.id);
       results.push({ profileId, ...result });
