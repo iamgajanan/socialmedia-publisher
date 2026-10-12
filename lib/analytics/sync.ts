@@ -262,6 +262,25 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
     } catch (accountError) { result.error = accountError instanceof Error ? accountError.message : "Analytics sync failed."; }
     results.push(result);
   }
-  if (runId) { const failed = results.filter((item) => !item.ok).length; await admin.from("socialmedia_analytics_sync_runs").update({ status: failed === 0 ? "succeeded" : failed === results.length ? "failed" : "partial", finished_at: new Date().toISOString(), accounts_scanned: results.length, accounts_succeeded: results.filter((item) => item.ok).length, accounts_failed: failed, posts_scanned: results.reduce((total, item) => total + item.postsScanned, 0), metrics_written: results.reduce((total, item) => total + item.metricsWritten, 0), error_count: failed, errors: results.filter((item) => item.error).map((item) => ({ account_id: item.accountId, platform: item.platform, error: item.error })) }).eq("id", runId); }
+  if (runId) {
+    const failed = results.filter((item) => !item.ok).length;
+    const { error: runUpdateError } = await admin
+      .from("socialmedia_analytics_sync_runs")
+      .update({
+        status: failed === 0 ? "succeeded" : failed === results.length ? "failed" : "partial",
+        finished_at: new Date().toISOString(),
+        accounts_scanned: results.length,
+        accounts_succeeded: results.filter((item) => item.ok).length,
+        accounts_failed: failed,
+        posts_scanned: results.reduce((total, item) => total + item.postsScanned, 0),
+        metrics_written: results.reduce((total, item) => total + item.metricsWritten, 0),
+        error_count: failed,
+        errors: results.filter((item) => item.error).map((item) => ({ account_id: item.accountId, platform: item.platform, error: item.error })),
+      })
+      .eq("id", runId);
+    if (runUpdateError) {
+      console.error("analytics_sync_run_finish_failed", { runId, code: runUpdateError.code, message: runUpdateError.message });
+    }
+  }
   return { results };
 }
