@@ -24,7 +24,7 @@ function ipv6Parts(input: string): number[] | null {
   if (isIP(address) !== 6) return null;
 
   // Convert a dotted IPv4 tail (including IPv4-mapped notation) into two hextets.
-  const ipv4Tail = address.match(/(\\d{1,3}(?:\\.\\d{1,3}){3})$/);
+  const ipv4Tail = address.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
   if (ipv4Tail) {
     const value = ipv4Number(ipv4Tail[1]);
     if (value === null) return null;
