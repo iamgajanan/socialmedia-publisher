@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encryptTokenWithKey, decryptTokenWithKey } from "../../lib/social/token-crypto-core.ts";
+import { encryptTokenWithKey, decryptTokenWithKey, decryptTokenWithKeys } from "../../lib/social/token-crypto-core.ts";
 const key = Buffer.alloc(32, 7);
 
 test("encrypts and decrypts OAuth tokens", () => {
@@ -15,4 +15,12 @@ test("tampering with ciphertext fails authentication", () => {
   const payload = Buffer.from(encrypted, "base64");
   payload[payload.length - 1] ^= 1;
   assert.throws(() => decryptTokenWithKey(payload.toString("base64"), key));
+});
+
+test("decrypts with a previous rotation key after primary key rotation", () => {
+  const previousKey = Buffer.alloc(32, 9);
+  const primaryKey = Buffer.alloc(32, 10);
+  const encrypted = encryptTokenWithKey("old-provider-token", previousKey);
+  assert.equal(decryptTokenWithKeys(encrypted, [primaryKey, previousKey]), "old-provider-token");
+  assert.throws(() => decryptTokenWithKeys(encrypted, [primaryKey]));
 });
