@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { postPublicHttpsJson } from "@/lib/webhooks/url-safety";
 
 const MAX_ATTEMPTS = 6;
 const RETRIES_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
@@ -111,21 +112,16 @@ export async function runWebhookWorker(limit = 50) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
 
     try {
-      const response = await fetch(webhook.url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "user-agent": "OmniSocial-Webhooks/1.0",
-          "x-omnisocial-event-id": row.event_id,
-          "x-omnisocial-event": event.event_type,
-          "x-omnisocial-timestamp": timestamp,
-          "x-omnisocial-signature": `v1=${signature(webhook.secret, timestamp, payload)}`,
-        },
-        body: payload,
-        signal: AbortSignal.timeout(10_000),
-      });
+      const response = await postPublicHttpsJson(webhook.url, {
+        "content-type": "application/json",
+        "user-agent": "OmniSocial-Webhooks/1.0",
+        "x-omnisocial-event-id": row.event_id,
+        "x-omnisocial-event": event.event_type,
+        "x-omnisocial-timestamp": timestamp,
+        "x-omnisocial-signature": `v1=${signature(webhook.secret, timestamp, payload)}`,
+      }, payload, 10_000);
 
-      const text = (await response.text()).slice(0, 4000);
+      const text = response.body;
 
       if (response.ok) {
         const { error: markDeliveredError } = await supabase
