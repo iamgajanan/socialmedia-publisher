@@ -1,4 +1,4 @@
-export const API_SOCIAL_PLATFORMS = ["facebook","instagram","threads","linkedin","x","youtube","tiktok"] as const;
+export const API_SOCIAL_PLATFORMS = ["facebook","instagram","threads","linkedin","x","youtube","tiktok","pinterest","bluesky","google_business_profile","reddit"] as const;
 export type ApiSocialPlatform = (typeof API_SOCIAL_PLATFORMS)[number];
 
 export type ApiConnectedAccount = {
