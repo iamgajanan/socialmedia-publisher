@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("analytics sync run migration matches server write contract and stays service-only", async () => {
-  const sql = await readFile("supabase/migrations/202610120001_phase29_analytics_sync_runs_reconciliation.sql", "utf8");
+  const sql = await readFile("supabase/migrations/20261012175109_phase29_analytics_sync_runs_reconciliation.sql", "utf8");
   for (const column of ["profile_id", "status", "started_at", "finished_at", "accounts_scanned", "accounts_succeeded", "accounts_failed", "posts_scanned", "metrics_written", "error_count", "errors"]) {
     assert.match(sql, new RegExp("\\b" + column + "\\b"));
   }
