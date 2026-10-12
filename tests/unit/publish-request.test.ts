@@ -12,6 +12,13 @@ test("accepts text requests and deduplicates platforms", () => {
   if (result.ok) assert.deepEqual(result.data.platforms, ["facebook", "instagram"]);
 });
 
+test("accepts all implemented non-X providers through the public publish contract", () => {
+  for (const platform of ["pinterest", "bluesky", "google_business_profile", "reddit"]) {
+    const result = parsePublishRequest({ platforms: [platform], text: "release readiness" });
+    assert.equal(result.ok, true, platform);
+  }
+});
+
 test("accepts media-only requests", () => {
   const result = parsePublishRequest({
     platforms: ["instagram"],
