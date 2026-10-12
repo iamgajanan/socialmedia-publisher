@@ -17,7 +17,7 @@ export default async function WorkspaceLayout({
   const context = await getCurrentWorkspace();
   const { data: profile } = await supabase
     .from("socialmedia_profiles")
-    .select("display_name, avatar_url, workspace_name")
+    .select("display_name, avatar_url")
     .eq("id", userId)
     .maybeSingle();
 
@@ -49,7 +49,7 @@ export default async function WorkspaceLayout({
         email,
         name: profile?.display_name ?? email.split("@")[0] ?? "Creator",
         avatarUrl: profile?.avatar_url ?? null,
-        workspaceName: profile?.workspace_name ?? context.workspace.name,
+        workspaceName: context.workspace.name,
       }}
       currentWorkspace={{
         id: context.workspace.id,
