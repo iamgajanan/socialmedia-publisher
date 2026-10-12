@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("workspace usage RPC returns bigint for every declared aggregate column", async () => {
-  const sql = await readFile("supabase/migrations/20261012175700_phase32_private_usage_rpc_bigint_fix.sql", "utf8");
+  const sql = await readFile("supabase/migrations/20261012180035_phase32_private_usage_rpc_bigint_fix.sql", "utf8");
   assert.match(sql, /coalesce\(\(select u\.api_requests[\s\S]*?\), 0\)::bigint as api_requests/i);
 });
 test("workspace aggregate usage RPC is private, membership-checked, and not exposed publicly", async () => {
