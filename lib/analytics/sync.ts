@@ -89,21 +89,6 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
     }
     return result;
   }
-  if (platform === "threads") {
-    const data = await jsonFetch("https://graph.threads.net/v1.0/me/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const result: Metrics = { raw_metrics: data };
-    for (const item of data.data ?? []) {
-      const value = item.total_value?.value ?? item.values?.[item.values.length - 1]?.value ?? item.value;
-      if (item.name === "followers_count") result.follower_count = n(value);
-      if (item.name === "views") result.impressions = n(value);
-      if (item.name === "likes") result.likes = n(value);
-      if (item.name === "replies") result.comments = n(value);
-      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
-    }
-    return result;
-  }
   if (platform === "tiktok") {
     const data = await jsonFetch("https://open.tiktokapis.com/v2/video/query/?fields=id,like_count,comment_count,share_count,view_count", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ filters: { video_ids: [postId] } }) });
     const video = Array.isArray(data.data?.videos) ? data.data.videos[0] ?? {} : {};
@@ -153,6 +138,21 @@ async function fetchPostMetrics(platform: string, postId: string, token: string,
 }
 async function fetchAccountMetrics(account: Account, token: string): Promise<Metrics> {
   const platform = account.platform.toLowerCase();
+  if (platform === "threads") {
+    const data = await jsonFetch("https://graph.threads.net/v1.0/me/threads_insights?metric=views,likes,replies,reposts,quotes,followers_count", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const result: Metrics = { raw_metrics: data };
+    for (const item of data.data ?? []) {
+      const value = item.total_value?.value ?? item.values?.[item.values.length - 1]?.value ?? item.value;
+      if (item.name === "followers_count") result.follower_count = n(value);
+      if (item.name === "views") result.impressions = n(value);
+      if (item.name === "likes") result.likes = n(value);
+      if (item.name === "replies") result.comments = n(value);
+      if (item.name === "reposts" || item.name === "quotes") result.shares = n(result.shares) + n(value);
+    }
+    return result;
+  }
   if (platform === "youtube") {
     const data = await jsonFetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${encodeURIComponent(account.external_account_id)}`, { headers: { Authorization: `Bearer ${token}` } });
     const m = data.items?.[0]?.statistics ?? {};
