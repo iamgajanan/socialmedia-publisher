@@ -75,10 +75,10 @@ test("Phase 32 migration defines a safe private workspace-membership helper befo
   const usagePolicy = sql.indexOf("create policy socialmedia_workspace_usage_monthly_select_member");
 
   assert.ok(helper >= 0 && helper < usagePolicy);
-  assert.match(sql, /security definer[\\s\\S]*?set search_path = ''/i);
-  assert.match(sql, /where wm\\.profile_id = \\(select auth\\.uid\\(\\)\\)/i);
-  assert.match(sql, /revoke all on function private\\.socialmedia_user_workspace_ids\\(\\) from public, anon/i);
-  assert.match(sql, /grant execute on function private\\.socialmedia_user_workspace_ids\\(\\) to authenticated, service_role/i);
+  assert.ok(sql.includes("security definer\nset search_path = ''"));
+  assert.ok(sql.includes("where wm.profile_id = (select auth.uid())"));
+  assert.ok(sql.includes("revoke all on function private.socialmedia_user_workspace_ids() from public, anon"));
+  assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role"));
 });
 
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
