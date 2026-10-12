@@ -15,11 +15,12 @@ export async function POST() {
   // The analytics sync table was introduced after the provider snapshot tables.
   // Keep syncing functional for legacy production databases where that migration
   // has not been applied yet; sync health is optional metadata, not a prerequisite.
-  const { data: run } = await admin
+  const { data: run, error: runStartError } = await admin
     .from("socialmedia_analytics_sync_runs")
     .insert({ profile_id: profileId, status: "running", started_at: new Date().toISOString() })
     .select("id")
     .maybeSingle();
+  if (runStartError) console.error("analytics_sync_run_start_failed", { profileId, code: runStartError.code, message: runStartError.message });
   const effectiveRunId = run?.id;
 
   try {
