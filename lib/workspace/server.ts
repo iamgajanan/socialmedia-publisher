@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { isMissingWorkspaceBrandingColumn, normalizeWorkspaceBranding } from "@/lib/workspace/branding-core";
 
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 export type WorkspacePlan = {
@@ -47,13 +48,21 @@ export async function getCurrentWorkspace() {
     .single();
   if (workspaceError) throw new Error(workspaceError.message);
 
+  // Read white-label fields separately so the app remains usable while older
+  // production databases are still missing the additive Phase 32 branding columns.
+  const { data: branding, error: brandingError } = await supabase
+    .from("socialmedia_workspaces")
+    .select("slug, logo_url, primary_color, accent_color, custom_domain")
+    .eq("id", profile.workspace_id)
+    .maybeSingle();
+
+  if (brandingError && !isMissingWorkspaceBrandingColumn(brandingError)) {
+    throw new Error(brandingError.message);
+  }
+
   const workspaceWithBranding = {
     ...workspace,
-    slug: null,
-    logo_url: null,
-    primary_color: "#111827",
-    accent_color: "#f59e0b",
-    custom_domain: null,
+    ...normalizeWorkspaceBranding(brandingError ? null : branding),
   };
 
   const { data: plan, error: planError } = await supabase
