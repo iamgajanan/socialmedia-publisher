@@ -96,6 +96,7 @@ const RESPONSE_SCHEMA = {
 
 export async function generatePlatformContent(input: {
   profileId: string;
+  workspaceId?: string;
   masterContent: string;
   platforms: string[];
   brandVoice?: string;
@@ -143,8 +144,11 @@ export async function generatePlatformContent(input: {
   const normalized = variants.map((variant) => ({ ...variant, hashtags: variant.hashtags ?? [], media_recommendations: variant.media_recommendations ?? [], validation: validateVariant(variant) }));
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from("socialmedia_profiles").select("workspace_id").eq("id", input.profileId).maybeSingle();
-  const workspaceId = profile?.workspace_id ? String(profile.workspace_id) : null;
+  let workspaceId = input.workspaceId?.trim() || null;
+  if (!workspaceId) {
+    const { data: profile } = await admin.from("socialmedia_profiles").select("workspace_id").eq("id", input.profileId).maybeSingle();
+    workspaceId = profile?.workspace_id ? String(profile.workspace_id) : null;
+  }
   const requiresApproval = Boolean(input.requireApproval);
   const { data: generation, error: generationError } = await admin.from("socialmedia_ai_generations").insert({ profile_id: input.profileId, workspace_id: workspaceId, master_content: masterContent, brand_voice: input.brandVoice?.trim() || null, instructions: input.instructions?.trim() || null, requested_platforms: platforms, model, provider: "openai", status: normalized.every((item) => item.validation.within_limit) ? "completed" : "partial", requires_approval: requiresApproval, result: { variants: normalized } }).select("id,created_at,status,model,requires_approval").single();
   if (generationError || !generation) throw new Error("Generated content could not be saved.");
