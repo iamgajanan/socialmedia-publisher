@@ -1,10 +1,18 @@
 import crypto from "node:crypto";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { postPublicHttpsJson } from "@/lib/webhooks/url-safety";
+import { isRetryableWebhookStatus } from "@/lib/webhooks/retry-policy";
 
 const MAX_ATTEMPTS = 6;
 const RETRIES_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
 const CLAIM_MS = 120_000;
+
+class WebhookHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = "WebhookHttpError";
+  }
+}
 
 function admin() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -151,16 +159,19 @@ export async function runWebhookWorker(limit = 50) {
 
         delivered++;
       } else {
-        throw new Error(`HTTP ${response.status}: ${text}`);
+        throw new WebhookHttpError(response.status, `HTTP ${response.status}: ${text}`);
       }
     } catch (error) {
-      const terminal = attempt >= MAX_ATTEMPTS;
       const message = error instanceof Error ? error.message : "Webhook delivery failed";
+      const responseStatus = error instanceof WebhookHttpError ? error.status : null;
+      const terminal = attempt >= MAX_ATTEMPTS ||
+        (responseStatus !== null && !isRetryableWebhookStatus(responseStatus));
 
       await supabase
         .from("socialmedia_webhook_deliveries")
         .update({
           status: terminal ? "failed" : "pending",
+          response_status: responseStatus,
           response_body: message,
           attempt,
           next_attempt_at: new Date(
