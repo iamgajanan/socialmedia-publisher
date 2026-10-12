@@ -6,6 +6,7 @@ const migration = readFileSync("supabase/migrations/20261012175048_phase32_multi
 const apiAuth = readFileSync("lib/api/api-auth.ts", "utf8");
 const apiKeys = readFileSync("app/api/v1/api-keys/route.ts", "utf8");
 const shell = readFileSync("components/dashboard/dashboard-shell.tsx", "utf8");
+const workspaceServer = readFileSync("lib/workspace/server.ts", "utf8");
 
 test("Phase 32 adds workspace white-label identity fields", () => {
   assert.match(migration, /add column if not exists slug text/);
@@ -22,6 +23,11 @@ test("Phase 32 backfills tenant ownership for AI, MCP, and API credentials", () 
   }
   assert.match(apiAuth, /workspace_id/);
   assert.match(apiKeys, /workspace_id: context\.workspace\.id/);
+});
+
+test("workspace context denies inactive members before exposing tenant resources", () => {
+  assert.match(workspaceServer, /from\("socialmedia_workspace_members"\)[\s\S]*?eq\("workspace_id", profile\.workspace_id\)[\s\S]*?eq\("profile_id", profileId\)[\s\S]*?eq\("status", "active"\)/);
+  assert.match(workspaceServer, /if \(!membership\) throw new Error\("You are not an active member of this workspace\."\)/);
 });
 
 test("Phase 32 records workspace API usage and exposes a workspace switcher", () => {
