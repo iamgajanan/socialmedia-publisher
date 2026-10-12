@@ -81,6 +81,24 @@ test("Phase 32 migration defines a safe private workspace-membership helper befo
   assert.ok(sql.includes("grant execute on function private.socialmedia_user_workspace_ids() to authenticated, service_role"));
 });
 
+test("Phase 32 usage RPC authorizes workspace membership before reading aggregate counts", async () => {
+  const sql = await readFile(migrationPath, "utf8");
+  const start = sql.indexOf("create or replace function public.socialmedia_workspace_usage(");
+  const end = sql.indexOf("-- Do not expose usage for a workspace", start);
+  const usageRpc = sql.slice(start, end);
+
+  assert.match(usageRpc, /security definer/i);
+  assert.match(usageRpc, /set search_path = ''/i);
+  assert.match(usageRpc, /socialmedia_workspace_members/);
+  assert.match(usageRpc, /wm\.workspace_id = target_workspace_id/);
+  assert.match(usageRpc, /wm\.profile_id = \(select auth\.uid\(\)\)/);
+  assert.match(usageRpc, /errcode = '42501'/);
+  assert.ok(sql.includes("revoke all on function public.socialmedia_enforce_user_limit() from public, anon, authenticated;"));
+  assert.ok(sql.includes("revoke all on function public.socialmedia_enforce_social_account_limit() from public, anon, authenticated;"));
+  assert.equal(sql.split("$workspace_ids$").length - 1, 2);
+  assert.equal(sql.split("$workspace_usage$").length - 1, 2);
+});
+
 test("Phase 32 runbook prevents blind production migration reapplication", async () => {
   const doc = await readFile(runbookPath, "utf8");
 
