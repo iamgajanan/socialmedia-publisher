@@ -2,10 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { WEBHOOK_EVENTS, isWebhookEventType } from "@/lib/webhooks/events";
-
-function validUrl(value: string) {
-  try { const url = new URL(value); return url.protocol === "https:"; } catch { return false; }
-}
+import { validateWebhookUrl } from "@/lib/webhooks/url-safety";
 
 export async function GET() {
   const supabase = await createClient();
@@ -29,7 +26,11 @@ export async function POST(request: Request) {
   const url = body?.url?.trim() ?? "";
   const events = Array.isArray(body?.events) ? [...new Set(body.events)] : [];
 
-  if (!validUrl(url)) return NextResponse.json({ error: "Webhook URL must be a valid HTTPS URL." }, { status: 400 });
+  try {
+    validateWebhookUrl(url);
+  } catch {
+    return NextResponse.json({ error: "Webhook URL must be a publicly routable HTTPS URL without embedded credentials." }, { status: 400 });
+  }
   if (events.some((event) => typeof event !== "string" || !isWebhookEventType(event))) {
     return NextResponse.json({ error: "One or more webhook events are unsupported." }, { status: 400 });
   }

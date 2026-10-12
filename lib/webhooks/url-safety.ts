@@ -19,8 +19,47 @@ function inV4Range(address: string, base: string, bits: number): boolean {
   return (value & mask) === (network & mask);
 }
 
+function ipv6Parts(input: string): number[] | null {
+  let address = input.toLowerCase().split("%")[0] ?? "";
+  if (isIP(address) !== 6) return null;
+
+  // Convert a dotted IPv4 tail (including IPv4-mapped notation) into two hextets.
+  const ipv4Tail = address.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (ipv4Tail) {
+    const value = ipv4Number(ipv4Tail[1]);
+    if (value === null) return null;
+    const high = ((value >>> 16) & 0xffff).toString(16);
+    const low = (value & 0xffff).toString(16);
+    address = address.slice(0, -ipv4Tail[1].length) + high + ":" + low;
+  }
+
+  const halves = address.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  if ((halves.length === 1 && missing !== 0) || (halves.length === 2 && missing < 1)) return null;
+  const parts = [...left, ...Array.from({ length: missing }, () => "0"), ...right];
+  if (parts.length !== 8 || parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return null;
+  return parts.map((part) => Number.parseInt(part, 16));
+}
+
+function inV6Range(address: string, base: string, bits: number): boolean {
+  const value = ipv6Parts(address);
+  const network = ipv6Parts(base);
+  if (!value || !network) return false;
+  const fullWords = Math.floor(bits / 16);
+  for (let index = 0; index < fullWords; index++) {
+    if (value[index] !== network[index]) return false;
+  }
+  const remainingBits = bits % 16;
+  if (remainingBits === 0) return true;
+  const mask = (0xffff << (16 - remainingBits)) & 0xffff;
+  return ((value[fullWords] ?? 0) & mask) === ((network[fullWords] ?? 0) & mask);
+}
+
 export function isPublicIpAddress(input: string): boolean {
-  const address = input.toLowerCase().split("%")[0];
+  const address = input.toLowerCase().split("%")[0] ?? "";
   const family = isIP(address);
   if (family === 4) {
     const blocked: Array<[string, number]> = [
@@ -33,18 +72,16 @@ export function isPublicIpAddress(input: string): boolean {
   }
   if (family !== 6) return false;
 
-  // IPv4-mapped IPv6 must be checked against the embedded IPv4 address too.
-  const mapped = address.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped) return isPublicIpAddress(mapped[1]);
-
-  // Only global-unicast 2000::/3 addresses are accepted. This rejects unspecified,
-  // loopback, unique-local, link-local, multicast, IPv4-compatible and other special ranges.
-  const firstHextet = Number.parseInt(address.split(":").find(Boolean) ?? "", 16);
-  if (!Number.isFinite(firstHextet) || firstHextet < 0x2000 || firstHextet > 0x3fff) return false;
-  if (address.startsWith("2001:db8:") || address.startsWith("2001:10:") ||
-      address.startsWith("2001:20:") || address.startsWith("2001:0:") ||
-      address.startsWith("2002:")) return false;
-  return true;
+  // Only global-unicast IPv6 is eligible. Prefix comparisons use parsed 128-bit
+  // values so expanded/compressed spellings of special ranges behave identically.
+  if (!inV6Range(address, "2000::", 3)) return false;
+  const blocked: Array<[string, number]> = [
+    ["2001::", 23],       // IETF protocol assignments, including Teredo/ORCHID ranges
+    ["2001:db8::", 32],   // Documentation
+    ["2002::", 16],       // 6to4
+    ["3fff::", 20],       // Documentation
+  ];
+  return !blocked.some(([base, bits]) => inV6Range(address, base, bits));
 }
 
 export function validateWebhookUrl(raw: string): URL {
@@ -57,10 +94,13 @@ export function validateWebhookUrl(raw: string): URL {
   const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (url.protocol !== "https:") throw new Error("Webhook delivery requires HTTPS.");
   if (url.username || url.password) throw new Error("Webhook URLs must not contain credentials.");
-  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") ||
-      hostname.endsWith(".local") || hostname.endsWith(".internal") ||
-      hostname.endsWith(".test") || hostname.endsWith(".invalid") ||
-      hostname.endsWith(".example")) {
+  const nonPublicSuffixes = [
+    ".localhost", ".local", ".internal", ".test", ".invalid", ".example",
+    ".arpa", ".onion", ".home", ".home.arpa", ".lan", ".corp",
+  ];
+  if (!hostname || hostname === "localhost" || hostname === "local" ||
+      hostname === "internal" || hostname === "test" ||
+      nonPublicSuffixes.some((suffix) => hostname.endsWith(suffix))) {
     throw new Error("Webhook URL hostname is not publicly routable.");
   }
   if (isIP(hostname) && !isPublicIpAddress(hostname)) {
