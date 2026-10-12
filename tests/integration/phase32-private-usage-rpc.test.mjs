@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+test("workspace usage RPC returns bigint for every declared aggregate column", async () => {
+  const sql = await readFile("supabase/migrations/20261012175700_phase32_private_usage_rpc_bigint_fix.sql", "utf8");
+  assert.match(sql, /coalesce\(\(select u\.api_requests[\s\S]*?\), 0\)::bigint as api_requests/i);
+});
 test("workspace aggregate usage RPC is private, membership-checked, and not exposed publicly", async () => {
-  const sql = await readFile("supabase/migrations/20261012175200_phase32_private_usage_rpc.sql", "utf8");
+  const sql = await readFile("supabase/migrations/20261012175632_phase32_private_usage_rpc.sql", "utf8");
   const verifier = await readFile("supabase/verification/phase32_schema_check.sql", "utf8");
 
   assert.match(sql, /create or replace function private\.socialmedia_workspace_usage/i);
