@@ -130,6 +130,11 @@ create table if not exists public.socialmedia_workspace_usage_monthly (
 create index if not exists socialmedia_workspace_usage_monthly_period_idx
   on public.socialmedia_workspace_usage_monthly(period_start desc);
 
+-- The application reads this timestamp for workspace-member listings. Older databases
+-- may have created the table before this column was part of the contract.
+alter table public.socialmedia_workspace_members
+  add column if not exists created_at timestamptz not null default now();
+
 alter table public.socialmedia_workspace_usage_monthly enable row level security;
 
 drop policy if exists socialmedia_workspace_usage_monthly_select_member on public.socialmedia_workspace_usage_monthly;
@@ -152,7 +157,7 @@ language sql
 stable
 security invoker
 set search_path = public
-as $
+as $$
   select
     (select count(*) from public.socialmedia_posts p
       where p.workspace_id = target_workspace_id
@@ -167,10 +172,10 @@ as $
       where g.workspace_id = target_workspace_id
         and g.created_at >= target_period_start::timestamptz
         and g.created_at < (target_period_start + interval '1 month')) as ai_generations,
-    (select coalesce(u.api_requests, 0) from public.socialmedia_workspace_usage_monthly u
+    coalesce((select u.api_requests from public.socialmedia_workspace_usage_monthly u
       where u.workspace_id = target_workspace_id
-        and u.period_start = target_period_start) as api_requests;
-$;
+        and u.period_start = target_period_start), 0) as api_requests;
+$$;
 
 -- Do not expose usage for a workspace the current authenticated user does not belong to.
 -- The counts below therefore remain tenant-scoped even when a caller supplies an arbitrary id.
@@ -185,7 +190,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   insert into public.socialmedia_workspace_usage_monthly (workspace_id, period_start, api_requests)
   values (target_workspace_id, target_period_start, 1)
@@ -193,9 +198,11 @@ begin
   do update set api_requests = public.socialmedia_workspace_usage_monthly.api_requests + 1,
                 updated_at = now();
 end;
-$;
+$$;
 
 revoke all on function public.socialmedia_record_api_request(uuid, date) from public, anon, authenticated;
+-- API usage is recorded by trusted server-side code using the Supabase service role.
+grant execute on function public.socialmedia_record_api_request(uuid, date) to service_role;
 
 comment on table public.socialmedia_workspace_usage_monthly is 'Phase 32 workspace usage foundation for plan quotas and SaaS reporting.';
 comment on table public.socialmedia_workspaces is 'Shared tenant boundary including white-label branding and custom domain configuration.';
