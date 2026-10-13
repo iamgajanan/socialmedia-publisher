@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("grant hardening scopes revokes to SocialMedia tables and server-managed notification logs", () => {
   const migration = readFileSync(
-    "supabase/migrations/20261013153000_harden_socialmedia_table_privileges.sql",
+    "supabase/migrations/20261013105605_harden_socialmedia_table_privileges.sql",
     "utf8",
   );
 
@@ -18,7 +18,7 @@ test("grant hardening scopes revokes to SocialMedia tables and server-managed no
 
 test("grant hardening restores only policy-aligned browser table operations", () => {
   const migration = readFileSync(
-    "supabase/migrations/20261013153000_harden_socialmedia_table_privileges.sql",
+    "supabase/migrations/20261013105605_harden_socialmedia_table_privileges.sql",
     "utf8",
   );
 
