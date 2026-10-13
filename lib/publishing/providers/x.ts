@@ -1,6 +1,7 @@
 import "server-only";
 import { providerFetch } from "./http";
 import { PublisherError, type Publisher } from "./types";
+import { normalizeXRefreshResponse } from "./x-refresh";
 
 export const xPublisher: Publisher = {
   platform: "x",
@@ -19,8 +20,8 @@ export const xPublisher: Publisher = {
     const clientId = process.env.X_CLIENT_ID?.trim(); const clientSecret = process.env.X_CLIENT_SECRET?.trim(); if (!clientId || !clientSecret) return null;
     const body = new URLSearchParams({ refresh_token: refreshToken, grant_type: "refresh_token", client_id: clientId });
     const response = await providerFetch("https://api.x.com/2/oauth2/token", { method: "POST", headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" }, body });
-    const data = await response.json() as { access_token?: string; expires_in?: number };
-    return data.access_token ? { accessToken: data.access_token, expiresIn: data.expires_in } : null;
+    const data = await response.json() as { access_token?: string; refresh_token?: string; expires_in?: number };
+    return normalizeXRefreshResponse(data);
   },
   async getAccount(accessToken) {
     const response = await providerFetch("https://api.x.com/2/users/me?user.fields=name,username,profile_image_url", { headers: { Authorization: `Bearer ${accessToken}` } });
