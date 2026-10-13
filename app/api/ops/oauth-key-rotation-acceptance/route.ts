@@ -6,6 +6,7 @@ import { reencryptOAuthTokenPair } from "@/lib/social/token-reencryption-core";
 import { getUsableAccessToken } from "@/lib/publishing/refresh";
 import { getPublisher } from "@/lib/publishing/providers";
 import { PublisherError, type PublisherAccount } from "@/lib/publishing/providers/types";
+import { syncAnalyticsForProfile } from "@/lib/analytics/sync";
 
 export const maxDuration = 60;
 
@@ -23,6 +24,59 @@ function errorCode(error: unknown) {
   return "provider_request_failed";
 }
 
+async function runAnalyticsAcceptance(admin: ReturnType<typeof createAdminClient>) {
+  const { data: profiles, error } = await admin.from("socialmedia_profiles").select("id");
+  if (error) return NextResponse.json({ ok: false, error: "Unable to load analytics profiles." }, { status: 500 });
+
+  const runs: Array<{ runId: string; accountsScanned: number; accountsSucceeded: number; accountsFailed: number; postsScanned: number; metricsWritten: number; warnings: number }> = [];
+  for (const profile of profiles ?? []) {
+    const startedAt = new Date().toISOString();
+    const { data: run, error: runError } = await admin
+      .from("socialmedia_analytics_sync_runs")
+      .insert({ profile_id: profile.id, status: "running", started_at: startedAt })
+      .select("id")
+      .maybeSingle();
+    if (runError || !run?.id) {
+      runs.push({ runId: "not-created", accountsScanned: 0, accountsSucceeded: 0, accountsFailed: 1, postsScanned: 0, metricsWritten: 0, warnings: 0 });
+      continue;
+    }
+    try {
+      const result = await syncAnalyticsForProfile(profile.id, run.id);
+      runs.push({
+        runId: run.id,
+        accountsScanned: result.results.length,
+        accountsSucceeded: result.results.filter((item) => item.ok).length,
+        accountsFailed: result.results.filter((item) => !item.ok).length,
+        postsScanned: result.results.reduce((total, item) => total + item.postsScanned, 0),
+        metricsWritten: result.results.reduce((total, item) => total + item.metricsWritten, 0),
+        warnings: result.results.filter((item) => item.warning).length,
+      });
+    } catch {
+      await admin.from("socialmedia_analytics_sync_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_count: 1,
+        errors: [{ error: "analytics_sync_failed" }],
+      }).eq("id", run.id);
+      runs.push({ runId: run.id, accountsScanned: 0, accountsSucceeded: 0, accountsFailed: 1, postsScanned: 0, metricsWritten: 0, warnings: 0 });
+    }
+  }
+
+  return NextResponse.json({
+    ok: runs.every((run) => run.accountsFailed === 0),
+    analytics: {
+      profilesScanned: runs.length,
+      accountsScanned: runs.reduce((total, run) => total + run.accountsScanned, 0),
+      accountsSucceeded: runs.reduce((total, run) => total + run.accountsSucceeded, 0),
+      accountsFailed: runs.reduce((total, run) => total + run.accountsFailed, 0),
+      postsScanned: runs.reduce((total, run) => total + run.postsScanned, 0),
+      metricsWritten: runs.reduce((total, run) => total + run.metricsWritten, 0),
+      warnings: runs.reduce((total, run) => total + run.warnings, 0),
+      runs,
+    },
+  });
+}
+
 export async function POST(request: Request) {
   if (!process.env.OAUTH_TOKEN_ROTATION_SECRET) {
     return NextResponse.json({ ok: false, error: "rotation_acceptance_not_configured" }, { status: 503 });
@@ -33,6 +87,8 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+  const body = await request.json().catch(() => ({})) as { action?: string };
+  if (body.action === "analytics-sync") return runAnalyticsAcceptance(admin);
   const { data: secrets, error: secretsError } = await admin
     .from("socialmedia_account_secrets")
     .select("social_account_id,access_token_ciphertext,refresh_token_ciphertext,updated_at")
