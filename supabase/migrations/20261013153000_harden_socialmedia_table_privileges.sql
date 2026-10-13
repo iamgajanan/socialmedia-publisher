@@ -92,12 +92,10 @@ to authenticated;
 
 grant select on table public.socialmedia_workspace_usage_monthly to authenticated;
 
--- Prevent new public-schema tables, sequences, and functions created by the
--- migration owner from silently inheriting browser access. Existing unrelated
--- tables are not changed by these default-privilege rules.
+-- Prevent new public-schema tables and sequences created by the migration
+-- owner from silently inheriting browser access. Existing unrelated tables are
+-- not changed by these default-privilege rules.
 alter default privileges for role postgres in schema public
   revoke all on tables from public, anon, authenticated;
 alter default privileges for role postgres in schema public
   revoke all on sequences from public, anon, authenticated;
-alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated;
