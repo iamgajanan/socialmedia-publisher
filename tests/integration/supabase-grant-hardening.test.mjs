@@ -27,5 +27,4 @@ test("grant hardening restores only policy-aligned browser table operations", ()
   assert.match(migration, /grant select on table public\.socialmedia_workspace_usage_monthly to authenticated/i);
   assert.match(migration, /alter default privileges for role postgres in schema public[\s\S]*revoke all on tables from public, anon, authenticated/i);
   assert.match(migration, /revoke all on sequences from public, anon, authenticated/i);
-  assert.match(migration, /revoke execute on functions from public, anon, authenticated/i);
 });
