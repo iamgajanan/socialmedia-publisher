@@ -96,11 +96,13 @@ export async function runOAuthRotationAcceptance(admin: AdminClient) {
           const token = await getUsableAccessToken(publisherAccount);
           const profile = await getPublisher(account.platform).getAccount(token);
           const returnedId = typeof profile.external_account_id === "string" ? profile.external_account_id : null;
+          const identityMatched = returnedId ? returnedId === account.external_account_id : null;
           smokeResults.push({
             accountId: account.id,
             platform: account.platform,
-            ok: true,
-            identityMatched: returnedId ? returnedId === account.external_account_id : null,
+            ok: identityMatched !== false,
+            identityMatched,
+            ...(identityMatched === false ? { errorCode: "identity_mismatch" } : {}),
           });
         } catch (error) {
           smokeResults.push({
