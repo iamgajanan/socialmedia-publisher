@@ -44,5 +44,5 @@ test("requires public HTTPS URLs without embedded credentials or local hostnames
     "https://0177.0.0.1/events",
     "https://127.1/events",
     "https://168.63.129.16/events",
-  ]) assert.throws(() => validateWebhookUrl(url), undefined, url);
+  ]) assert.throws(() => validateWebhookUrl(url));
 });
