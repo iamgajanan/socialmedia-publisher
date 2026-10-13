@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncAnalyticsForProfile } from "@/lib/analytics/sync";
+import { runOAuthRotationAcceptance } from "@/lib/social/rotate-oauth-tokens";
 
 export const maxDuration = 60;
 
@@ -16,6 +17,11 @@ function authorized(request: Request) {
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   const admin = createAdminClient();
+  let oauthKeyRotation: unknown = { enabled: false };
+  if (process.env.OAUTH_TOKEN_ROTATION_ENABLED === "true") {
+    try { oauthKeyRotation = await runOAuthRotationAcceptance(admin); }
+    catch (error) { console.error("oauth_key_rotation_acceptance_failed", error instanceof Error ? error.message : "unknown_error"); }
+  }
   const { data: profiles, error } = await admin.from("socialmedia_social_accounts").select("profile_id").eq("status", "connected");
   if (error) return NextResponse.json({ ok: false, error: "Unable to discover analytics profiles." }, { status: 500 });
   const profileIds = [...new Set((profiles ?? []).map((row) => row.profile_id))];
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
       return { profileId, error: error instanceof Error ? error.message : "Analytics sync failed." };
     }
   }));
-  return NextResponse.json({ ok: true, profiles: profileIds.length, results });
+  return NextResponse.json({ ok: true, profiles: profileIds.length, results, oauthKeyRotation });
 }
 
 export async function GET(request: Request) { return POST(request); }
