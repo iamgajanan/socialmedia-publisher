@@ -13,7 +13,7 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public'
       and c.relkind in ('r', 'p')
-      and (c.relname like 'socialmedia\_%' escape '\\' or c.relname = 'notification_logs')
+      and (left(c.relname, 12) = 'socialmedia_' or c.relname = 'notification_logs')
   loop
     execute format(
       'revoke all privileges on table %I.%I from public, anon, authenticated',
@@ -31,8 +31,8 @@ begin
     where n.nspname = 'public'
       and c.relkind = 'S'
       and (
-        c.relname like 'socialmedia\_%' escape '\\'
-        or c.relname like 'notification_logs\_%' escape '\\'
+        left(c.relname, 12) = 'socialmedia_'
+        or left(c.relname, 18) = 'notification_logs_'
       )
   loop
     execute format(
@@ -50,7 +50,7 @@ begin
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname like 'socialmedia\_%' escape '\\'
+      and left(p.proname, 12) = 'socialmedia_'
   loop
     execute format(
       'revoke execute on function %I.%I(%s) from public, anon, authenticated',
@@ -92,21 +92,12 @@ to authenticated;
 
 grant select on table public.socialmedia_workspace_usage_monthly to authenticated;
 
--- Prevent new public-schema tables, sequences, and functions created by either
+-- Prevent new public-schema tables, sequences, and functions created by the
 -- migration owner from silently inheriting browser access. Existing unrelated
 -- tables are not changed by these default-privilege rules.
 alter default privileges for role postgres in schema public
   revoke all on tables from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke all on tables from public, anon, authenticated;
 alter default privileges for role postgres in schema public
-  revoke all on sequences from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
   revoke all on sequences from public, anon, authenticated;
 alter default privileges for role postgres in schema public
   revoke execute on functions from public, anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke execute on functions from public, anon, authenticated;
-
-comment on table public.notification_logs is
-  'Server-managed notification history. RLS enabled; browser-role table privileges revoked.';
