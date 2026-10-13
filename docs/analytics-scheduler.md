@@ -1,6 +1,6 @@
 # Analytics sync schedule
 
-The production analytics sync is scheduled by Vercel Cron at **12:10 UTC daily** via `vercel.json`.
+The production analytics sync is scheduled by Vercel Cron at **11:15 UTC daily** via `vercel.json`.
 
 - Endpoint: `GET /api/cron/analytics` (delegates to the same protected handler as POST).
 - Authentication: Vercel sends `Authorization: Bearer $CRON_SECRET`; the handler checks it with a constant-time comparison. Keep `CRON_SECRET` configured in the Vercel Production environment.
