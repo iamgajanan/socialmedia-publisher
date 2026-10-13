@@ -3,9 +3,10 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUsableAccessToken } from "@/lib/publishing/refresh";
 import type { PublisherAccount } from "@/lib/publishing/providers/types";
+import { getAnalyticsCapabilityWarning } from "@/lib/analytics/capabilities";
 
-export type SyncResult = { accountId: string; platform: string; postsScanned: number; metricsWritten: number; ok: boolean; error?: string };
-type Account = { id: string; profile_id: string; platform: string; external_account_id: string; account_name: string; username: string | null; metadata: Record<string, unknown> | null; token_expires_at: string | null };
+export type SyncResult = { accountId: string; platform: string; postsScanned: number; metricsWritten: number; ok: boolean; error?: string; warning?: string };
+type Account = { id: string; profile_id: string; platform: string; external_account_id: string; account_name: string; username: string | null; metadata: Record<string, unknown> | null; scopes: string[] | null; token_expires_at: string | null };
 type Metrics = { impressions?: number; reach?: number; likes?: number; comments?: number; shares?: number; saves?: number; clicks?: number; video_views?: number; engagement_rate?: number | null; follower_count?: number; raw_metrics?: Record<string, unknown> };
 function n(value: unknown): number { const parsed = Number(value ?? 0); return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0; }
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -229,7 +230,7 @@ async function fetchAccountMetrics(account: Account, token: string): Promise<Met
 }
 export async function syncAnalyticsForProfile(profileId: string, runId?: string): Promise<{ results: SyncResult[] }> {
   const admin = createAdminClient();
-  const { data: rawAccounts, error } = await admin.from("socialmedia_social_accounts").select("id,profile_id,platform,external_account_id,account_name,username,metadata,token_expires_at").eq("profile_id", profileId).eq("status", "connected");
+  const { data: rawAccounts, error } = await admin.from("socialmedia_social_accounts").select("id,profile_id,platform,external_account_id,account_name,username,metadata,scopes,token_expires_at").eq("profile_id", profileId).eq("status", "connected");
   if (error) {
     console.error("analytics_connected_accounts_lookup_failed", { profileId, code: error.code, message: error.message });
     throw new Error("Unable to load connected social accounts.");
@@ -241,6 +242,13 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
   for (const account of accounts) {
     const result: SyncResult = { accountId: account.id, platform: account.platform, postsScanned: 0, metricsWritten: 0, ok: false };
     try {
+      const capabilityWarning = getAnalyticsCapabilityWarning(account);
+      if (capabilityWarning) {
+        result.ok = true;
+        result.warning = capabilityWarning;
+        results.push(result);
+        continue;
+      }
       const publisherAccount: PublisherAccount = { id: account.id, platform: account.platform, external_account_id: account.external_account_id, account_name: account.account_name, username: account.username, metadata: account.metadata ?? {}, token_expires_at: account.token_expires_at };
       const token = await getUsableAccessToken(publisherAccount);
       const from = new Date(now.getTime() - 90 * 86400000);
@@ -275,7 +283,7 @@ export async function syncAnalyticsForProfile(profileId: string, runId?: string)
         posts_scanned: results.reduce((total, item) => total + item.postsScanned, 0),
         metrics_written: results.reduce((total, item) => total + item.metricsWritten, 0),
         error_count: failed,
-        errors: results.filter((item) => item.error).map((item) => ({ account_id: item.accountId, platform: item.platform, error: item.error })),
+        errors: results.filter((item) => item.error || item.warning).map((item) => ({ account_id: item.accountId, platform: item.platform, ...(item.error ? { error: item.error } : {}), ...(item.warning ? { warning: item.warning } : {}) })),
       })
       .eq("id", runId);
     if (runUpdateError) {
