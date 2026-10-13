@@ -6,6 +6,7 @@ test("blocks private, loopback, link-local, shared and reserved IPv4 ranges", ()
   for (const address of [
     "0.0.0.0", "10.1.2.3", "100.64.0.1", "127.0.0.1", "169.254.10.2",
     "172.16.0.1", "192.168.1.1", "198.18.0.1", "203.0.113.10", "224.0.0.1",
+    "168.63.129.16",
   ]) assert.equal(isPublicIpAddress(address), false, address);
   assert.equal(isPublicIpAddress("8.8.8.8"), true);
   assert.equal(isPublicIpAddress("1.1.1.1"), true);
@@ -37,5 +38,11 @@ test("requires public HTTPS URLs without embedded credentials or local hostnames
     "https://metadata.home.arpa/events",
     "https://service.onion/events",
     "https://service.internal/events",
-  ]) assert.throws(() => validateWebhookUrl(url));
+    // WHATWG URL parsing canonicalizes non-decimal and abbreviated IPv4 forms.
+    "https://2130706433/events",
+    "https://0x7f000001/events",
+    "https://0177.0.0.1/events",
+    "https://127.1/events",
+    "https://168.63.129.16/events",
+  ]) assert.throws(() => validateWebhookUrl(url), undefined, url);
 });
