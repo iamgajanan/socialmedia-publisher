@@ -10,8 +10,10 @@ test("production security headers are configured", () => {
   assert.match(nextConfig, /poweredByHeader:\s*false/);
 });
 
-test("scheduled worker routes are configured for external scheduling", () => {
-  assert.equal(existsSync("vercel.json"), false, "Vercel Hobby must not own the minute-level cron schedule");
+test("only the daily analytics route uses Vercel Cron; minute-level workers stay external", () => {
+  const cronConfig = existsSync("vercel.json") ? JSON.parse(readFileSync("vercel.json", "utf8")) : { crons: [] };
+  assert.deepEqual(cronConfig.crons, [{ path: "/api/cron/analytics", schedule: "15 11 * * *" }]);
+  assert.equal(cronConfig.crons.some((cron) => ["/api/cron/publish", "/api/cron/notifications"].includes(cron.path)), false);
   const publishRoute = readFileSync("app/api/cron/publish/route.ts", "utf8");
   const notificationRoute = readFileSync("app/api/cron/notifications/route.ts", "utf8");
   assert.match(publishRoute, /CRON_SECRET/);
