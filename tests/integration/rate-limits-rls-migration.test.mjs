@@ -5,7 +5,7 @@ import test from "node:test";
 
 const migrationPath = join(
   process.cwd(),
-  "supabase/migrations/20261013152500_secure_socialmedia_rate_limits.sql",
+  "supabase/migrations/20261013101003_secure_socialmedia_rate_limits.sql",
 );
 
 test("legacy rate-limit counters enable RLS and remain server-only", async () => {
