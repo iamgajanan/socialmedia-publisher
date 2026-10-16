@@ -62,8 +62,10 @@ async function GETImpl(request: Request) {
   const { data: links, error: linksError } = postIds.length
     ? await admin
         .from("socialmedia_post_platforms")
-        .select("id,post_id,social_account_id,platform,status,platform_post_id,error_message,published_at")
+        .select("id,post_id,social_account_id,platform,status,platform_post_id,error_message,published_at,socialmedia_posts!inner(profile_id,workspace_id)")
         .in("post_id", postIds)
+        .eq("socialmedia_posts.profile_id", authentication.profileId)
+        .eq("socialmedia_posts.workspace_id", authentication.workspaceId)
     : { data: [], error: null };
 
   if (linksError) {
@@ -71,7 +73,13 @@ async function GETImpl(request: Request) {
     return apiJson({ error: "Unable to load post destinations.", code: "analytics_posts_destinations_failed" }, 500, requestId);
   }
 
-  const filteredLinks = (links ?? []).filter((link) => !allowedPlatforms || allowedPlatforms.has(link.platform));
+  const linkedAccountIds = [...new Set((links ?? []).map((link) => link.social_account_id).filter((id): id is string => Boolean(id)))];
+  const { data: ownedAccounts, error: ownedAccountsError } = linkedAccountIds.length
+    ? await admin.from("socialmedia_social_accounts").select("id").in("id", linkedAccountIds).eq("profile_id", authentication.profileId).eq("workspace_id", authentication.workspaceId)
+    : { data: [], error: null };
+  if (ownedAccountsError) return apiJson({ error: "Unable to verify post destinations.", code: "analytics_destination_ownership_failed" }, 500, requestId);
+  const ownedAccountIds = new Set((ownedAccounts ?? []).map((account) => account.id));
+  const filteredLinks = (links ?? []).filter((link) => (!link.social_account_id || ownedAccountIds.has(link.social_account_id)) && (!allowedPlatforms || allowedPlatforms.has(link.platform)));
   const filteredPostIds = new Set(filteredLinks.map((link) => link.post_id));
   const filteredPosts = (posts ?? []).filter((post) => !allowedPlatforms || filteredPostIds.has(post.id));
   const postPlatformIds = filteredLinks.map((link) => link.id);
