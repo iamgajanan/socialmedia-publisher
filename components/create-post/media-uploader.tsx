@@ -29,6 +29,7 @@ export type UploadedMedia = {
   name: string;
   type: string;
   size: number;
+  available?: boolean;
 };
 
 export function MediaUploader({
@@ -226,7 +227,7 @@ function removeFromPost(path: string) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{item.name}</span>
-                <span className="block text-xs text-muted-foreground">{(item.size / 1024 / 1024).toFixed(1)} MB · {item.type.split("/")[1]?.toUpperCase()}</span>
+                <span className="block text-xs text-muted-foreground">{item.available === false ? "File missing from storage" : `${(item.size / 1024 / 1024).toFixed(1)} MB · ${item.type.split("/")[1]?.toUpperCase() ?? "MEDIA"}`}</span>
               </span>
               <div className="flex shrink-0 items-center gap-1">
                 <Button
