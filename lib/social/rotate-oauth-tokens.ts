@@ -74,10 +74,13 @@ export async function runOAuthRotationAcceptance(admin: AdminClient) {
   const smokeResults: Array<{ accountId: string; platform: string; ok: boolean; identityMatched: boolean | null; errorCode?: string }> = [];
 
   if (rotationOk) {
+    // X is intentionally excluded from this release's provider acceptance:
+    // live API identity checks can require a paid X API tier.
     const { data: accounts, error: accountsError } = await admin
       .from("socialmedia_social_accounts")
       .select("id,platform,external_account_id,account_name,username,metadata,token_expires_at")
-      .eq("status", "connected");
+      .eq("status", "connected")
+      .neq("platform", "x");
 
     if (accountsError) {
       smokeResults.push({ accountId: "all", platform: "all", ok: false, identityMatched: null, errorCode: "connected_accounts_lookup_failed" });
