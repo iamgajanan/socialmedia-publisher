@@ -6,6 +6,11 @@ test("non-LinkedIn analytics is unaffected by LinkedIn-specific scopes", () => {
   assert.equal(getAnalyticsCapabilityWarning({ platform: "instagram", metadata: null, scopes: [] }), null);
 });
 
+test("X analytics is skipped because it is outside the current release scope", () => {
+  assert.equal(getAnalyticsCapabilityWarning({ platform: "x", metadata: null, scopes: [] }), "x_analytics_not_in_release_scope");
+  assert.equal(getAnalyticsCapabilityWarning({ platform: "X", metadata: null, scopes: [] }), "x_analytics_not_in_release_scope");
+});
+
 test("personal LinkedIn analytics is skipped when the provider has not granted its analytics scope", () => {
   assert.equal(getAnalyticsCapabilityWarning({
     platform: "linkedin",
