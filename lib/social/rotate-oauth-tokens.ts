@@ -14,9 +14,9 @@ function providerErrorCode(error: unknown) {
 }
 
 /**
- * Runs only while the temporary production flag is enabled, and only once:
- * ciphertext rows written after the configured cutoff are treated as rotated.
- * The caller is the existing CRON_SECRET-protected analytics cron route.
+ * Re-encrypts only rows older than the configured cutoff and runs read-only
+ * identity checks for supported providers. The caller is the existing
+ * CRON_SECRET-protected analytics cron route.
  */
 export async function runOAuthRotationAcceptance(admin: AdminClient) {
   if (process.env.OAUTH_TOKEN_ROTATION_ENABLED !== "true") return { enabled: false };
@@ -39,7 +39,7 @@ export async function runOAuthRotationAcceptance(admin: AdminClient) {
     const updated = Date.parse(row.updated_at ?? "");
     return !Number.isFinite(updated) || updated < cutoff;
   });
-  if (pending.length === 0) return { enabled: true, alreadyCompleted: true, scanned: secrets?.length ?? 0 };
+  const alreadyCompleted = pending.length === 0;
 
   let rewritten = 0;
   let skipped = 0;
@@ -74,10 +74,13 @@ export async function runOAuthRotationAcceptance(admin: AdminClient) {
   const smokeResults: Array<{ accountId: string; platform: string; ok: boolean; identityMatched: boolean | null; errorCode?: string }> = [];
 
   if (rotationOk) {
+    // X's live API checks are intentionally out of scope because the required
+    // API access is paid. Local token re-encryption still includes all rows.
     const { data: accounts, error: accountsError } = await admin
       .from("socialmedia_social_accounts")
       .select("id,platform,external_account_id,account_name,username,metadata,token_expires_at")
-      .eq("status", "connected");
+      .eq("status", "connected")
+      .neq("platform", "x");
 
     if (accountsError) {
       smokeResults.push({ accountId: "all", platform: "all", ok: false, identityMatched: null, errorCode: "connected_accounts_lookup_failed" });
@@ -141,5 +144,5 @@ export async function runOAuthRotationAcceptance(admin: AdminClient) {
   if (workerLogError) console.error("oauth_key_rotation_acceptance_log_failed", { code: workerLogError.code });
 
   console.info("oauth_key_rotation_acceptance", result);
-  return { enabled: true, alreadyCompleted: false, ...result };
+  return { enabled: true, alreadyCompleted, ...result };
 }
