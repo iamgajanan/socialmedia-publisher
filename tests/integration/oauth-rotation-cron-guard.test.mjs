@@ -16,3 +16,16 @@ test("rotation acceptance never returns or logs token values", () => {
   assert.match(rotation, /oauth_key_rotation_acceptance/);
   assert.doesNotMatch(rotation, /console\.(log|info|error)\([^\n]*(access_token_ciphertext|refresh_token_ciphertext)/);
 });
+
+test("live OAuth acceptance excludes X while keeping local key rotation intact", () => {
+  assert.match(rotation, /\.neq\("platform", "x"\)/);
+  assert.match(rotation, /reencryptOAuthTokenPair/);
+  assert.match(rotation, /X's live API checks are intentionally out of scope/);
+});
+
+test("live provider checks still run after key rotation is already complete", () => {
+  assert.match(rotation, /const alreadyCompleted = pending\.length === 0/);
+  assert.doesNotMatch(rotation, /if \(pending\.length === 0\) return/);
+  assert.match(rotation, /if \(rotationOk\) \{/);
+  assert.match(rotation, /return \{ enabled: true, alreadyCompleted, \.\.\.result \}/);
+});
