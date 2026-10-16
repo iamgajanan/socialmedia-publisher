@@ -73,8 +73,10 @@ async function GETImpl(request: Request) {
   const { data: links, error: linksError } = postIds.length
     ? await admin
         .from("socialmedia_post_platforms")
-        .select("id,post_id,social_account_id,platform,status,platform_post_id,error_message,scheduled_at,published_at,retry_count,next_retry_at,last_attempt_at")
+        .select("id,post_id,social_account_id,platform,status,platform_post_id,error_message,scheduled_at,published_at,retry_count,next_retry_at,last_attempt_at,socialmedia_posts!inner(profile_id,workspace_id)")
         .in("post_id", postIds)
+        .eq("socialmedia_posts.profile_id", authentication.profileId)
+        .eq("socialmedia_posts.workspace_id", authentication.workspaceId)
         .order("created_at", { ascending: true })
     : { data: [], error: null };
 
@@ -100,7 +102,7 @@ async function GETImpl(request: Request) {
 
   const accountsById = new Map((accounts ?? []).map((account) => [account.id, account]));
   const linksByPost = new Map<string, typeof links>();
-  for (const link of links ?? []) {
+  for (const link of (links ?? []).filter((link) => !link.social_account_id || accountsById.has(link.social_account_id))) {
     const current = linksByPost.get(link.post_id) ?? [];
     current.push(link);
     linksByPost.set(link.post_id, current);
