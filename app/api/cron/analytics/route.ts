@@ -35,7 +35,8 @@ export async function POST(request: Request) {
 
     try {
       const result = await syncAnalyticsForProfile(profileId, run?.id);
-      return { profileId, ...result };
+      const failedAccounts = result.results.filter((item) => !item.ok).length;
+      return { profileId, ...result, failedAccounts };
     } catch (error) {
       if (run?.id) {
         const { error: runFinishError } = await admin
@@ -49,10 +50,15 @@ export async function POST(request: Request) {
           .eq("id", run.id);
         if (runFinishError) console.error("analytics_sync_run_finish_failed", { runId: run.id, code: runFinishError.code, message: runFinishError.message });
       }
-      return { profileId, error: error instanceof Error ? error.message : "Analytics sync failed." };
+      return { profileId, error: error instanceof Error ? error.message : "Analytics sync failed.", failedAccounts: 1 };
     }
   }));
-  return NextResponse.json({ ok: true, profiles: profileIds.length, results, oauthKeyRotation });
+  const failedProfiles = results.filter((item) => Boolean(item.error) || item.failedAccounts > 0).length;
+  const ok = failedProfiles === 0;
+  return NextResponse.json(
+    { ok, profiles: profileIds.length, failedProfiles, results, oauthKeyRotation },
+    { status: ok ? 200 : 502 },
+  );
 }
 
 export async function GET(request: Request) { return POST(request); }
