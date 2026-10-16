@@ -5,7 +5,13 @@ export type AnalyticsAccountCapability = {
 };
 
 export function getAnalyticsCapabilityWarning(account: AnalyticsAccountCapability): string | null {
-  if (account.platform.toLowerCase() !== "linkedin") return null;
+  const platform = account.platform.toLowerCase();
+
+  // X requires a paid API tier for the analytics endpoints used here. It is
+  // intentionally outside the current release scope, so do not make the
+  // daily analytics worker fail on X accounts.
+  if (platform === "x") return "x_analytics_not_in_release_scope";
+  if (platform !== "linkedin") return null;
 
   const metadata = account.metadata ?? {};
   const scopes = new Set(account.scopes ?? []);
