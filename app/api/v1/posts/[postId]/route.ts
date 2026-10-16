@@ -20,8 +20,10 @@ async function loadPost(admin: ReturnType<typeof createAdminClient>, postId: str
 async function loadResults(admin: ReturnType<typeof createAdminClient>, postId: string, profileId: string, workspaceId: string) {
   const { data: links, error: linksError } = await admin
     .from("socialmedia_post_platforms")
-    .select("id,social_account_id,platform,status,platform_post_id,error_message,scheduled_at,published_at,retry_count,next_retry_at,last_attempt_at")
+    .select("id,social_account_id,platform,status,platform_post_id,error_message,scheduled_at,published_at,retry_count,next_retry_at,last_attempt_at,socialmedia_posts!inner(profile_id,workspace_id)")
     .eq("post_id", postId)
+    .eq("socialmedia_posts.profile_id", profileId)
+    .eq("socialmedia_posts.workspace_id", workspaceId)
     .order("created_at", { ascending: true });
 
   if (linksError) return { error: linksError, results: [] };
@@ -40,7 +42,7 @@ async function loadResults(admin: ReturnType<typeof createAdminClient>, postId: 
 
   return {
     error: null,
-    results: (links ?? []).map((link) => {
+    results: (links ?? []).filter((link) => !link.social_account_id || accountsById.has(link.social_account_id)).map((link) => {
       const account = link.social_account_id ? accountsById.get(link.social_account_id) : null;
       return {
         platform: link.platform ?? account?.platform ?? null,
