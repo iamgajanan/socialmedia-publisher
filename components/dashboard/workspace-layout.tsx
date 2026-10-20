@@ -1,12 +1,27 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace/server";
 
-export const instant = false;
+export default function WorkspaceLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-[60vh] items-center justify-center" aria-live="polite" aria-busy="true">
+          <p className="text-sm text-muted-foreground">Loading workspace…</p>
+        </main>
+      }
+    >
+      <WorkspaceContent>{children}</WorkspaceContent>
+    </Suspense>
+  );
+}
 
-export default async function WorkspaceLayout({
+async function WorkspaceContent({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const supabase = await createClient();
