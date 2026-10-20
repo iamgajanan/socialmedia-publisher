@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Link2, Sparkles, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -7,12 +8,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 
-// Phase 3 sanity verification: account-attention flow is covered in production UI.
-// Publishing users are intentionally isolated: the composer only receives destinations
-// belonging to the selected logical publishing user.
-export const instant = false;
+type CreatePostPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function CreatePostPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default function CreatePostPage({ searchParams }: CreatePostPageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4" aria-live="polite" aria-busy="true">
+          <div className="h-8 w-48 animate-pulse rounded-lg bg-muted" />
+          <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+          <div className="h-72 animate-pulse rounded-2xl bg-muted" />
+          <p className="text-sm text-muted-foreground">Loading post composer…</p>
+        </div>
+      }
+    >
+      <CreatePostContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function CreatePostContent({ searchParams }: CreatePostPageProps) {
   const params = await searchParams;
   const requestedUser = typeof params.user === "string" ? params.user : null;
 
