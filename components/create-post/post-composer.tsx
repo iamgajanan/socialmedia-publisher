@@ -136,7 +136,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
                     {mediaIssues.map((issue) => (
                       <div key={`${issue.platform}:${issue.message}`} className="flex flex-col gap-2 rounded-xl border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs leading-5"><span className="font-semibold">{getPlatformMeta(issue.platform).name}:</span> {issue.message}</p>
-                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => removePlatform(issue.platform)}>Remove {meta[issue.platform]?.name ?? issue.platform}</Button>
+                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => removePlatform(issue.platform)}>Remove {getPlatformMeta(issue.platform).name}</Button>
                       </div>
                     ))}
                   </div>
