@@ -14,7 +14,9 @@ import { getPlatformMediaIssues, getUploadMediaCapability, mediaTypeFromPath } f
 import { useToast } from "@/components/ui/toast-provider";
 
 type Account = { id: string; platform: string; account_name: string; username: string | null; avatar_url: string | null };
-const meta: Record<string, { name: string; icon: typeof Facebook; limit: number }> = {
+type PlatformMeta = { name: string; icon: typeof Facebook; limit: number };
+
+const meta: Record<string, PlatformMeta> = {
   facebook: { name: "Facebook", icon: Facebook, limit: 63206 },
   instagram: { name: "Instagram", icon: Instagram, limit: 2200 },
   linkedin: { name: "LinkedIn", icon: Linkedin, limit: 3000 },
@@ -22,7 +24,21 @@ const meta: Record<string, { name: string; icon: typeof Facebook; limit: number 
   youtube: { name: "YouTube", icon: Youtube, limit: 5000 },
   threads: { name: "Threads", icon: AtSign, limit: 500 },
   tiktok: { name: "TikTok", icon: Send, limit: 2200 },
+  pinterest: { name: "Pinterest", icon: Send, limit: 800 },
+  bluesky: { name: "Bluesky", icon: AtSign, limit: 300 },
+  google_business_profile: { name: "Google Business Profile", icon: Send, limit: 1500 },
+  reddit: { name: "Reddit", icon: AtSign, limit: 40000 },
 };
+
+// Keep the composer resilient when a new provider is added before its UI metadata.
+// The generic limit is only a UI fallback; provider-side validation remains authoritative.
+function getPlatformMeta(platform: string): PlatformMeta {
+  return meta[platform] ?? {
+    name: platform.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()),
+    icon: Send,
+    limit: 5000,
+  };
+}
 
 const PUBLISHING_DISABLED_PLATFORMS = new Set(["x"]);
 const initialState: SaveDraftState = { ok: false, message: "" };
@@ -62,13 +78,13 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
   const mediaTypes = useMemo(() => media.map((item) => item.type || mediaTypeFromPath(item.path)).filter(Boolean), [media]);
   const mediaIssues = useMemo(() => getPlatformMediaIssues(selectedPlatforms, mediaTypes), [selectedPlatforms, mediaTypes]);
   const previewAccount = selectedAccounts.find((account) => account.platform === previewPlatform) ?? selectedAccounts[0];
-  const selectedMeta = previewPlatform ? meta[previewPlatform] : null;
+  const selectedMeta = previewPlatform ? getPlatformMeta(previewPlatform) : null;
   const overLimit = selectedMeta ? content.length > selectedMeta.limit : false;
   const canSave = content.trim().length > 0 && selected.length > 0 && !overLimit && (mode === "draft" || Boolean(scheduledAtLocal));
   const canPublish = canSave && mediaIssues.length === 0;
 
   const limits = useMemo(
-    () => selectedPlatforms.map((platform) => ({ platform, ...meta[platform], over: content.length > meta[platform].limit })),
+    () => selectedPlatforms.map((platform) => { const platformMeta = getPlatformMeta(platform); return { platform, ...platformMeta, over: content.length > platformMeta.limit }; }),
     [selectedPlatforms, content.length],
   );
 
@@ -119,8 +135,8 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
                   <div className="mt-3 space-y-2">
                     {mediaIssues.map((issue) => (
                       <div key={`${issue.platform}:${issue.message}`} className="flex flex-col gap-2 rounded-xl border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-xs leading-5"><span className="font-semibold">{meta[issue.platform]?.name ?? issue.platform}:</span> {issue.message}</p>
-                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => removePlatform(issue.platform)}>Remove {meta[issue.platform]?.name ?? issue.platform}</Button>
+                        <p className="text-xs leading-5"><span className="font-semibold">{getPlatformMeta(issue.platform).name}:</span> {issue.message}</p>
+                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => removePlatform(issue.platform)}>Remove {getPlatformMeta(issue.platform).name}</Button>
                       </div>
                     ))}
                   </div>
@@ -163,7 +179,7 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
             <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold">Destinations</p><p className="text-xs text-muted-foreground">Choose one or more connected accounts.</p></div><Badge variant="outline">{selectedPlatforms.length} platform{selectedPlatforms.length === 1 ? "" : "s"}</Badge></div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {accounts.map((account) => {
-                const platform = meta[account.platform];
+                const platform = getPlatformMeta(account.platform);
                 const Icon = platform?.icon ?? Send;
                 const active = selected.includes(account.id);
                 const publishingDisabled = PUBLISHING_DISABLED_PLATFORMS.has(account.platform);
@@ -192,12 +208,12 @@ export function PostComposer({ accounts, timezone = "Asia/Kolkata", initialPost 
         <CardHeader className="border-b bg-muted/20">
           <div className="flex items-center justify-between gap-3">
             <div><CardTitle>Preview</CardTitle><CardDescription>Text preview for the selected destination.</CardDescription></div>
-            {selectedPlatforms.length > 1 && <select aria-label="Preview platform" value={previewPlatform ?? ""} onChange={(event) => setPreviewPlatform(event.target.value)} className="rounded-lg border bg-background px-2 py-1.5 text-xs">{selectedPlatforms.map((platform) => <option key={platform} value={platform}>{meta[platform]?.name ?? platform}</option>)}</select>}
+            {selectedPlatforms.length > 1 && <select aria-label="Preview platform" value={previewPlatform ?? ""} onChange={(event) => setPreviewPlatform(event.target.value)} className="rounded-lg border bg-background px-2 py-1.5 text-xs">{selectedPlatforms.map((platform) => <option key={platform} value={platform}>{getPlatformMeta(platform).name}</option>)}</select>}
           </div>
         </CardHeader>
         <CardContent className="p-5">
           {previewAccount ? <div className="overflow-hidden rounded-2xl border bg-background shadow-sm">
-            <div className="flex items-center gap-3 border-b p-4"><div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-semibold">{previewAccount.account_name.slice(0,2).toUpperCase()}</div><div className="min-w-0"><p className="truncate text-sm font-semibold">{previewAccount.account_name}</p><p className="truncate text-xs text-muted-foreground">{meta[previewAccount.platform]?.name ?? previewAccount.platform}{previewAccount.username ? ` · @${previewAccount.username}` : ""}</p></div></div>
+            <div className="flex items-center gap-3 border-b p-4"><div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-semibold">{previewAccount.account_name.slice(0,2).toUpperCase()}</div><div className="min-w-0"><p className="truncate text-sm font-semibold">{previewAccount.account_name}</p><p className="truncate text-xs text-muted-foreground">{getPlatformMeta(previewAccount.platform).name}{previewAccount.username ? ` · @${previewAccount.username}` : ""}</p></div></div>
             <div className="min-h-44 whitespace-pre-wrap p-4 text-sm leading-6">{content || <span className="text-muted-foreground">Your post preview will appear here.</span>}</div>
             <div className="border-t px-4 py-3 text-xs text-muted-foreground">{selectedMeta?.name ?? "Social"} preview · text only</div>
           </div> : <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Select a connected account to preview the post.</div>}
