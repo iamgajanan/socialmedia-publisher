@@ -66,7 +66,6 @@ test("LinkedIn supports up to 20 images and PDF document publishing", () => {
   assert.equal(validateMediaSelection(["linkedin", "instagram"], ["application/pdf", "image/jpeg"]), null);
 });
 
-
 test("Threads and Facebook retain all selected carousel media", () => {
   const paths = ["profile/slide-01.png", "profile/slide-02.png", "profile/slide-03.png"];
   const types = ["image/png", "image/png", "image/png"];
@@ -74,5 +73,5 @@ test("Threads and Facebook retain all selected carousel media", () => {
   assert.deepEqual(getMediaPathsForPlatform("threads", paths), paths);
   assert.deepEqual(getMediaTypesForPlatform("threads", types), types);
   assert.deepEqual(getMediaPathsForPlatform("instagram", paths), paths);
-  assert.deepEqual(getMediaTypesForPlatform("facebook", types), types);
+  assert.deepEqual(getMediaPathsForPlatform("facebook", types), types);
 });
