@@ -54,3 +54,11 @@ test("Instagram image carousels are allowed while mixed image/video carousels ar
     /cannot mix images and videos/i,
   );
 });
+
+test("LinkedIn supports up to 20 images and PDF document publishing", () => {
+  assert.equal(validateMediaSelection(["linkedin"], ["image/jpeg", "image/png"]), null);
+  assert.equal(validateMediaSelection(["linkedin"], Array(20).fill("image/jpeg")), null);
+  assert.match(validateMediaSelection(["linkedin"], Array(21).fill("image/jpeg")) ?? "", /at most 20/);
+  assert.equal(validateMediaSelection(["linkedin"], ["application/pdf"]), null);
+  assert.equal(validateMediaSelection(["linkedin", "instagram"], ["application/pdf", "image/jpeg"]), null);
+});
