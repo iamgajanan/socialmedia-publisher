@@ -60,5 +60,6 @@ test("LinkedIn supports up to 20 images and PDF document publishing", () => {
   assert.equal(validateMediaSelection(["linkedin"], Array(20).fill("image/jpeg")), null);
   assert.match(validateMediaSelection(["linkedin"], Array(21).fill("image/jpeg")) ?? "", /at most 20/);
   assert.equal(validateMediaSelection(["linkedin"], ["application/pdf"]), null);
+  assert.ok(getUploadMediaCapability(["linkedin"]).imageTypes.includes("application/pdf"));
   assert.equal(validateMediaSelection(["linkedin", "instagram"], ["application/pdf", "image/jpeg"]), null);
 });
