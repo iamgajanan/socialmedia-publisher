@@ -27,11 +27,11 @@ export function isSupportedApiMediaType(value: string): value is ApiMediaMimeTyp
 
 /**
  * Determine the actual MIME type from the uploaded bytes instead of trusting
- * the multipart Content-Type header. Some URL downloaders (including storage
- * proxies) attach image/jpeg to PNG bytes, which then breaks provider uploads.
+ * the multipart Content-Type header. Some URL downloaders attach image/jpeg
+ * to PNG bytes, which then breaks provider uploads.
  *
- * For EBML containers (WebM/Matroska), the file signature is shared, so use
- * the filename extension or a supported declared MIME type to distinguish them.
+ * WebM and Matroska share an EBML signature, so their extension or declared
+ * multipart MIME type is used only to distinguish those two containers.
  */
 export function detectApiMediaType(
   bytes: Uint8Array,
@@ -61,21 +61,18 @@ export function detectApiMediaType(
     return "video/mp4";
   }
 
-  // WebM and Matroska share the EBML magic bytes; their extension and
-  // multipart MIME type are the available discriminator.
+  // WebM and Matroska share the EBML magic bytes.
   if (startsWith(0x1a, 0x45, 0xdf, 0xa3)) {
     if (lowerName.endsWith(".mkv") || declared === "video/x-matroska") return "video/x-matroska";
     if (lowerName.endsWith(".webm") || declared === "video/webm") return "video/webm";
   }
 
-  // A supported declaration is a fallback for formats whose signatures are
-  // container-specific or not uniquely identifiable (e.g. Matroska variants).
-  return isSupportedApiMediaType(declared) ? declared : null;
+  return null;
 }
 
 export function sanitizeMediaFilename(filename: string): string {
   const normalized = filename.trim().normalize("NFKC").replace(/[^A-Za-z0-9._(),+;@=&!$' -]/g, "_");
-  const collapsed = normalized.replace(/\\s+/g, " ").replace(/\\.\\.+/g, ".");
+  const collapsed = normalized.replace(/\s+/g, " ").replace(/\.\.+/g, ".");
   return (collapsed || "upload").slice(0, MAX_FILENAME_LENGTH);
 }
 
