@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { authenticateApiRequest } from "@/lib/api/api-auth";
 import {
   API_MEDIA_MAX_BYTES,
-  isSupportedApiMediaType,
+  detectApiMediaType,
   sanitizeMediaFilename,
 } from "@/lib/api/media-upload-core";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -35,13 +35,32 @@ async function POSTImpl(request: Request) {
   if (!fileValue.size) return apiJson({ error: "The uploaded file is empty.", code: "empty_media" }, 400, requestId);
   if (fileValue.size > API_MEDIA_MAX_BYTES) return apiJson({ error: "The upload exceeds the 100 MB size limit.", code: "media_too_large" }, 413, requestId);
 
-  const contentType = fileValue.type.trim().toLowerCase();
-  if (!isSupportedApiMediaType(contentType)) return apiJson({ error: "Unsupported media type.", code: "unsupported_media_type" }, 415, requestId);
+  const fileBytes = new Uint8Array(await fileValue.arrayBuffer());
+  const contentType = detectApiMediaType(fileBytes, fileValue.name, fileValue.type);
+  if (!contentType) {
+    console.warn("api_media_upload_unsupported_content", {
+      requestId,
+      declaredContentType: fileValue.type,
+      filename: fileValue.name,
+      size: fileValue.size,
+    });
+    return apiJson({ error: "The uploaded file type could not be identified or is not supported.", code: "unsupported_media_type" }, 415, requestId);
+  }
+
+  if (fileValue.type.trim().toLowerCase() !== contentType) {
+    console.info("api_media_upload_mime_corrected", {
+      requestId,
+      filename: fileValue.name,
+      declaredContentType: fileValue.type,
+      detectedContentType: contentType,
+      size: fileValue.size,
+    });
+  }
 
   const safeFilename = sanitizeMediaFilename(fileValue.name);
   const path = `${authentication.profileId}/${randomUUID()}-${safeFilename}`;
   const admin = createAdminClient();
-  const { error } = await admin.storage.from(BUCKET).upload(path, await fileValue.arrayBuffer(), { contentType, cacheControl: "3600", upsert: false });
+  const { error } = await admin.storage.from(BUCKET).upload(path, fileBytes, { contentType, cacheControl: "3600", upsert: false });
 
   if (error) {
     console.error("api_media_upload_failed", { requestId, profileId: authentication.profileId, contentType, size: fileValue.size, message: error.message });
