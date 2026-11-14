@@ -12,7 +12,7 @@ test("LinkedIn allows text-only posts and optional image/video media", () => {
   const capability = getMediaCapability(["linkedin"]);
 
   assert.equal(capability.minFiles, 0);
-  assert.equal(capability.maxFiles, 1);
+  assert.equal(capability.maxFiles, 20);
   assert.ok(capability.imageTypes.includes("image/jpeg"));
   assert.ok(capability.videoTypes.includes("video/mp4"));
   assert.equal(validateMediaSelection(["linkedin"], []), null);
