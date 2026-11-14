@@ -243,13 +243,6 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       try {
         const publisher = getPublisher(row.account.platform);
         const selectedMediaPaths = getMediaPathsForPlatform(row.account.platform, row.mediaPaths);
-        if (row.account.platform === "threads" && row.mediaPaths.length > selectedMediaPaths.length) {
-          console.info("[publishing] Threads media reduced to its first slide", {
-            postId: row.post_id,
-            requestedMediaCount: row.mediaPaths.length,
-            publishedMediaCount: selectedMediaPaths.length,
-          });
-        }
         const media = await resolveMedia(selectedMediaPaths);
         const platformMedia = row.account.platform === "linkedin"
           ? (media.some((asset) => asset.mimeType === "application/pdf") ? media.filter((asset) => asset.mimeType === "application/pdf") : media)
