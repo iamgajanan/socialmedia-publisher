@@ -67,12 +67,12 @@ test("LinkedIn supports up to 20 images and PDF document publishing", () => {
 });
 
 
-test("Threads uses only the first slide while other platforms retain the full carousel", () => {
+test("Threads and Facebook retain all selected carousel media", () => {
   const paths = ["profile/slide-01.png", "profile/slide-02.png", "profile/slide-03.png"];
   const types = ["image/png", "image/png", "image/png"];
 
-  assert.deepEqual(getMediaPathsForPlatform("threads", paths), ["profile/slide-01.png"]);
-  assert.deepEqual(getMediaTypesForPlatform("threads", types), ["image/png"]);
+  assert.deepEqual(getMediaPathsForPlatform("threads", paths), paths);
+  assert.deepEqual(getMediaTypesForPlatform("threads", types), types);
   assert.deepEqual(getMediaPathsForPlatform("instagram", paths), paths);
   assert.deepEqual(getMediaTypesForPlatform("facebook", types), types);
 });
