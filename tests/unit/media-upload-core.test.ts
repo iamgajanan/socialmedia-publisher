@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { detectApiMediaType } from "../../lib/api/media-upload-core.ts";
+import { alignMediaFilenameWithType, detectApiMediaType } from "../../lib/api/media-upload-core.ts";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -41,4 +41,14 @@ test("distinguishes WebM and Matroska using filename or supported declared MIME"
 
 test("rejects unknown bytes instead of trusting a misleading supported MIME header", () => {
   assert.equal(detectApiMediaType(bytes(0x00, 0x01, 0x02), "unknown.bin", "image/png"), null);
+});
+
+
+test("aligns a mismatched filename extension with the detected media MIME type", () => {
+
+  assert.equal(alignMediaFilenameWithType("slide-01.png", "image/jpeg"), "slide-01.jpg");
+  assert.equal(alignMediaFilenameWithType("photo.jpg", "image/png"), "photo.png");
+  assert.equal(alignMediaFilenameWithType("carousel-slide", "image/webp"), "carousel-slide.webp");
+  assert.equal(alignMediaFilenameWithType("clip.mp4", "video/quicktime"), "clip.mov");
+  assert.equal(alignMediaFilenameWithType("document.png", "application/pdf"), "document.pdf");
 });

@@ -70,6 +70,38 @@ export function detectApiMediaType(
   return null;
 }
 
+const EXTENSION_BY_MEDIA_TYPE: Record<ApiMediaMimeType, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+  "image/tiff": "tiff",
+  "image/bmp": "bmp",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+  "video/x-matroska": "mkv",
+  "application/pdf": "pdf",
+};
+
+/**
+ * Keep the stored object extension consistent with the MIME type detected
+ * from its bytes. Publishing resolves media by its storage path, so a JPEG
+ * saved as "slide.png" would otherwise be treated as PNG by downstream code.
+ */
+export function alignMediaFilenameWithType(
+  filename: string,
+  contentType: ApiMediaMimeType,
+): string {
+  const safeFilename = sanitizeMediaFilename(filename);
+  const extension = EXTENSION_BY_MEDIA_TYPE[contentType];
+  const lastDot = safeFilename.lastIndexOf(".");
+  const basename = lastDot > 0 ? safeFilename.slice(0, lastDot) : safeFilename;
+  const maxBasenameLength = MAX_FILENAME_LENGTH - extension.length - 1;
+  return `${basename.slice(0, maxBasenameLength)}.${extension}`;
+}
+
 export function sanitizeMediaFilename(filename: string): string {
   const normalized = filename.trim().normalize("NFKC").replace(/[^A-Za-z0-9._(),+;@=&!$' -]/g, "_");
   const collapsed = normalized.replace(/\s+/g, " ").replace(/\.\.+/g, ".");

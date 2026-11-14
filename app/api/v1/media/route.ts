@@ -4,7 +4,7 @@ import { authenticateApiRequest } from "@/lib/api/api-auth";
 import {
   API_MEDIA_MAX_BYTES,
   detectApiMediaType,
-  sanitizeMediaFilename,
+  alignMediaFilenameWithType,
 } from "@/lib/api/media-upload-core";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { apiJson, getRequestId, withRequestId } from "@/lib/api/api-response";
@@ -57,7 +57,15 @@ async function POSTImpl(request: Request) {
     });
   }
 
-  const safeFilename = sanitizeMediaFilename(fileValue.name);
+  const safeFilename = alignMediaFilenameWithType(fileValue.name, contentType);
+  if (safeFilename !== fileValue.name) {
+    console.info("api_media_upload_filename_corrected", {
+      requestId,
+      originalFilename: fileValue.name,
+      storedFilename: safeFilename,
+      detectedContentType: contentType,
+    });
+  }
   const path = `${authentication.profileId}/${randomUUID()}-${safeFilename}`;
   const admin = createAdminClient();
   const { error } = await admin.storage.from(BUCKET).upload(path, fileBytes, { contentType, cacheControl: "3600", upsert: false });
