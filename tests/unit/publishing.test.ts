@@ -25,10 +25,13 @@ test("idempotency keys are stable and destination-specific", () => {
   assert.notEqual(a, buildIdempotencyKey("post-1", "account-2"));
 });
 
-test("Threads validation accepts one image and rejects multiple media assets", async () => {
+test("Threads validation accepts carousel media and enforces its limits", async () => {
   const { validateThreadsPublishInput } = await import("../../lib/publishing/providers/threads-validation.ts");
   validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/png" }] });
-  assert.throws(() => validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/png" }, { mimeType: "image/png" }] }));
+  validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/png" }, { mimeType: "image/png" }] });
+  validateThreadsPublishInput({ content: "hello", media: Array(20).fill({ mimeType: "image/jpeg" }) });
+  assert.throws(() => validateThreadsPublishInput({ content: "hello", media: Array(21).fill({ mimeType: "image/png" }) }));
+  assert.throws(() => validateThreadsPublishInput({ content: "hello", media: [{ mimeType: "image/gif" }, { mimeType: "image/gif" }] }));
 });
 
 test("automatic retry keeps the post scheduled and suppresses premature failure notifications", async () => {
@@ -74,7 +77,7 @@ test("media capability matrix enforces selected destination requirements", async
   assert.equal(validateMediaSelection(["instagram"], ["image/jpeg"]), null);
   assert.equal(validateMediaSelection(["instagram"], ["image/tiff"]), null);
   const mixed = getMediaCapability(["facebook", "instagram"]);
-  assert.equal(mixed.maxFiles, 1);
+  assert.equal(mixed.maxFiles, 10);
   assert.deepEqual(mixed.imageTypes, ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/tiff", "image/bmp"]);
   assert.deepEqual(mixed.videoTypes, ["video/mp4", "video/quicktime"]);
 });
