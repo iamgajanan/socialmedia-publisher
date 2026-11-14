@@ -44,6 +44,6 @@ test("sanitizes unsafe filenames without allowing path traversal", () => {
 });
 
 test("accepts PDF documents for LinkedIn publishing", () => {
-  assert.equal(isSupportedApiMediaType("application/x-executable"), true);
-  assert.equal(parseMediaUploadMetadata({ contentType: "application/x-executable", size: 4096, filename: "carousel.pdf" }).success, true);
+  assert.equal(isSupportedApiMediaType("application/pdf"), true);
+  assert.equal(parseMediaUploadMetadata({ contentType: "application/pdf", size: 4096, filename: "carousel.pdf" }).success, true);
 });
