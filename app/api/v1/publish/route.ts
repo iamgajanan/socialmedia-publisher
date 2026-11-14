@@ -8,7 +8,7 @@ import { API_SOCIAL_PLATFORMS } from "@/lib/api/connected-accounts-core";
 import { hashRequestBody, isValidIdempotencyKey, normalizeIdempotencyKey, API_JSON_BODY_MAX_BYTES } from "@/lib/api/idempotency";
 import { getMissingPlatforms, parsePublishRequest } from "@/lib/api/publish-request";
 import { buildIdempotencyKey } from "@/lib/publishing/idempotency";
-import { mediaTypeFromPath, validateMediaSelection } from "@/lib/publishing/media-capabilities";
+import { getMediaTypesForPlatform, mediaTypeFromPath, validateMediaSelection } from "@/lib/publishing/media-capabilities";
 import { runPublishingWorker } from "@/lib/publishing/worker";
 
 export const maxDuration = 300;
@@ -122,7 +122,9 @@ export async function POST(request: Request) {
       return apiJson({ error: "One or more media files exceed the 100 MB size limit.", code: "media_too_large" }, 400, requestId);
     }
     const mediaTypes = selectedFiles.map((file, index) => String(file?.metadata?.mimetype ?? mediaTypeFromPath(mediaPaths[index] ?? "")));
-    const mediaValidationError = validateMediaSelection(connectedPlatforms, mediaTypes);
+    const mediaValidationError = connectedPlatforms
+      .map((platform) => validateMediaSelection([platform], getMediaTypesForPlatform(platform, mediaTypes)))
+      .find((message): message is string => Boolean(message)) ?? null;
     if (mediaValidationError) {
       if (idempotencyKey) await admin.from("socialmedia_api_idempotency_keys").delete().eq("api_key_id", authentication.apiKeyId).eq("idempotency_key", idempotencyKey);
       return apiJson({ error: mediaValidationError, code: "media_platform_incompatible" }, 400, requestId);
