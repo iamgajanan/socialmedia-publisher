@@ -14,6 +14,7 @@ const SIGNED_URL_TTL = 60 * 30;
 
 function mimeFromPath(path: string) {
   const lower = path.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
   if (lower.endsWith(".mp4")) return "video/mp4";
   if (lower.endsWith(".mov")) return "video/quicktime";
   if (lower.endsWith(".webm")) return "video/webm";
@@ -95,6 +96,16 @@ async function readRemoteMetadata(media: MediaAsset): Promise<MediaAsset> {
     });
     if (validationError) throw new Error(validationError);
     return { ...resolved, size };
+  }
+
+  if (remoteMimeType === "application/pdf") {
+    const response = await fetch(media.url, { headers: { Range: "bytes=0-4" }, cache: "no-store" });
+    if (!response.ok && response.status !== 206) throw new Error("Unable to inspect PDF media (" + response.status + ").");
+    const signature = new Uint8Array(await response.arrayBuffer());
+    if (new TextDecoder().decode(signature.slice(0, 5)) !== "%PDF-") throw new Error("Stored document is not a valid PDF file.");
+    const validationError = validateMediaMetadata(media, { size: parsedSize, mimeType: remoteMimeType });
+    if (validationError) throw new Error(validationError);
+    return resolved;
   }
 
   throw new Error(`Unsupported stored media MIME type: ${remoteMimeType}.`);

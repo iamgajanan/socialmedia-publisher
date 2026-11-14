@@ -12,7 +12,7 @@ test("LinkedIn allows text-only posts and optional image/video media", () => {
   const capability = getMediaCapability(["linkedin"]);
 
   assert.equal(capability.minFiles, 0);
-  assert.equal(capability.maxFiles, 1);
+  assert.equal(capability.maxFiles, 20);
   assert.ok(capability.imageTypes.includes("image/jpeg"));
   assert.ok(capability.videoTypes.includes("video/mp4"));
   assert.equal(validateMediaSelection(["linkedin"], []), null);
@@ -53,4 +53,13 @@ test("Instagram image carousels are allowed while mixed image/video carousels ar
     getPlatformMediaIssues(["instagram"], ["image/jpeg", "video/mp4"])[0]?.message ?? "",
     /cannot mix images and videos/i,
   );
+});
+
+test("LinkedIn supports up to 20 images and PDF document publishing", () => {
+  assert.equal(validateMediaSelection(["linkedin"], ["image/jpeg", "image/png"]), null);
+  assert.equal(validateMediaSelection(["linkedin"], Array(20).fill("image/jpeg")), null);
+  assert.match(validateMediaSelection(["linkedin"], Array(21).fill("image/jpeg")) ?? "", /at most 20/);
+  assert.equal(validateMediaSelection(["linkedin"], ["application/pdf"]), null);
+  assert.ok(getUploadMediaCapability(["linkedin"]).imageTypes.includes("application/pdf"));
+  assert.equal(validateMediaSelection(["linkedin", "instagram"], ["application/pdf", "image/jpeg"]), null);
 });

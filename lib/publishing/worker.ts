@@ -242,7 +242,10 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
       try {
         const publisher = getPublisher(row.account.platform);
         const media = await resolveMedia(row.mediaPaths);
-        const preparedMedia = await prepareMediaForPlatform(row.account.platform, media);
+        const platformMedia = row.account.platform === "linkedin"
+          ? (media.some((asset) => asset.mimeType === "application/pdf") ? media.filter((asset) => asset.mimeType === "application/pdf") : media)
+          : media.filter((asset) => asset.mimeType !== "application/pdf");
+        const preparedMedia = await prepareMediaForPlatform(row.account.platform, platformMedia);
         const input = {
           account: row.account,
           content: row.content,
