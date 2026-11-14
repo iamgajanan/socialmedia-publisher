@@ -22,6 +22,7 @@ const ACCEPTED_TYPES = [
   "video/webm",
   "video/quicktime",
   "video/x-matroska",
+  "application/pdf",
 ];
 
 export type UploadedMedia = {
