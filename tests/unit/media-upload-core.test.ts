@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { detectApiMediaType } from "../../lib/api/media-upload-core.ts";
+import { alignMediaFilenameWithType, detectApiMediaType } from "../../lib/api/media-upload-core.ts";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -44,8 +44,7 @@ test("rejects unknown bytes instead of trusting a misleading supported MIME head
 });
 
 
-test("aligns a mismatched filename extension with the detected media MIME type", async () => {
-  const { alignMediaFilenameWithType } = await import("../../lib/api/media-upload-core.ts");
+test("aligns a mismatched filename extension with the detected media MIME type", () => {
 
   assert.equal(alignMediaFilenameWithType("slide-01.png", "image/jpeg"), "slide-01.jpg");
   assert.equal(alignMediaFilenameWithType("photo.jpg", "image/png"), "photo.png");
