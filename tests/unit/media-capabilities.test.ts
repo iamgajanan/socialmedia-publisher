@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   getMediaCapability,
+  getMediaPathsForPlatform,
+  getMediaTypesForPlatform,
   getPlatformMediaIssues,
   getUploadMediaCapability,
   validateMediaSelection,
@@ -62,4 +64,15 @@ test("LinkedIn supports up to 20 images and PDF document publishing", () => {
   assert.equal(validateMediaSelection(["linkedin"], ["application/pdf"]), null);
   assert.ok(getUploadMediaCapability(["linkedin"]).imageTypes.includes("application/pdf"));
   assert.equal(validateMediaSelection(["linkedin", "instagram"], ["application/pdf", "image/jpeg"]), null);
+});
+
+
+test("Threads uses only the first slide while other platforms retain the full carousel", () => {
+  const paths = ["profile/slide-01.png", "profile/slide-02.png", "profile/slide-03.png"];
+  const types = ["image/png", "image/png", "image/png"];
+
+  assert.deepEqual(getMediaPathsForPlatform("threads", paths), ["profile/slide-01.png"]);
+  assert.deepEqual(getMediaTypesForPlatform("threads", types), ["image/png"]);
+  assert.deepEqual(getMediaPathsForPlatform("instagram", paths), paths);
+  assert.deepEqual(getMediaTypesForPlatform("facebook", types), types);
 });
