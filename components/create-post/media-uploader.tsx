@@ -69,7 +69,24 @@ export function MediaUploader({
             onProgress(100);
             resolve();
           } else {
-            reject(new Error(`Storage returned HTTP ${xhr.status}.`));
+            let detail = "";
+            try {
+              const payload = JSON.parse(xhr.responseText) as {
+                message?: string;
+                error?: string;
+                code?: string;
+              };
+              detail = payload.message ?? payload.error ?? payload.code ?? "";
+            } catch {
+              detail = xhr.responseText?.trim().slice(0, 240) ?? "";
+            }
+            reject(
+              new Error(
+                detail
+                  ? `Storage returned HTTP ${xhr.status}: ${detail}`
+                  : `Storage returned HTTP ${xhr.status}.`,
+              ),
+            );
           }
         };
         xhr.onerror = () => {
