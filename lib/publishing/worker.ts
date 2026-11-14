@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRetrySchedule } from "./retry";
+import { getMediaPathsForPlatform } from "./media-capabilities";
 import { buildIdempotencyKey } from "./idempotency";
 import { resolveMedia } from "./media";
 import { prepareMediaForPlatform } from "./media-preparation";
@@ -241,7 +242,15 @@ export async function runPublishingWorker(): Promise<PublishingWorkerResult> {
 
       try {
         const publisher = getPublisher(row.account.platform);
-        const media = await resolveMedia(row.mediaPaths);
+        const selectedMediaPaths = getMediaPathsForPlatform(row.account.platform, row.mediaPaths);
+        if (row.account.platform === "threads" && row.mediaPaths.length > selectedMediaPaths.length) {
+          console.info("[publishing] Threads media reduced to its first slide", {
+            postId: row.post_id,
+            requestedMediaCount: row.mediaPaths.length,
+            publishedMediaCount: selectedMediaPaths.length,
+          });
+        }
+        const media = await resolveMedia(selectedMediaPaths);
         const platformMedia = row.account.platform === "linkedin"
           ? (media.some((asset) => asset.mimeType === "application/pdf") ? media.filter((asset) => asset.mimeType === "application/pdf") : media)
           : media.filter((asset) => asset.mimeType !== "application/pdf");
