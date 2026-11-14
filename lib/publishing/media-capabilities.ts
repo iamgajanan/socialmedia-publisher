@@ -9,9 +9,9 @@ const PINTEREST_IMAGE_TYPES = ["image/jpeg","image/png","image/webp"];
 const BLUESKY_IMAGE_TYPES = ["image/jpeg","image/png","image/webp"];
 const GOOGLE_BUSINESS_IMAGE_TYPES = ["image/jpeg","image/png"];
 export const PLATFORM_MEDIA_CAPABILITIES: Record<string,MediaCapability> = {
- facebook:{minFiles:0,maxFiles:1,imageTypes:ALL_IMAGE_TYPES,videoTypes:ALL_VIDEO_TYPES},
+ facebook:{minFiles:0,maxFiles:10,imageTypes:ALL_IMAGE_TYPES,videoTypes:ALL_VIDEO_TYPES},
  instagram:{minFiles:1,maxFiles:10,imageTypes:ALL_IMAGE_TYPES,videoTypes:["video/mp4","video/quicktime"]},
- threads:{minFiles:0,maxFiles:1,imageTypes:["image/jpeg","image/png"],videoTypes:["video/mp4","video/quicktime"]},
+ threads:{minFiles:0,maxFiles:20,imageTypes:["image/jpeg","image/png"],videoTypes:["video/mp4","video/quicktime"]},
  youtube:{minFiles:1,maxFiles:1,imageTypes:[],videoTypes:ALL_VIDEO_TYPES},
  tiktok:{minFiles:1,maxFiles:1,imageTypes:[],videoTypes:["video/mp4","video/quicktime"]},
  linkedin:{minFiles:0,maxFiles:20,imageTypes:LINKEDIN_IMAGE_TYPES,videoTypes:LINKEDIN_VIDEO_TYPES},
@@ -38,9 +38,9 @@ export function validateMediaSelection(platforms:string[],mediaTypes:string[]):s
  * platforms that support multi-image posts.
  */
 export function getMediaPathsForPlatform(platform: string, mediaPaths: string[]): string[] {
-  return platform === "threads" ? mediaPaths.slice(0, 1) : mediaPaths;
+  return mediaPaths;
 }
 
 export function getMediaTypesForPlatform(platform: string, mediaTypes: string[]): string[] {
-  return platform === "threads" ? mediaTypes.slice(0, 1) : mediaTypes;
+  return mediaTypes;
 }
