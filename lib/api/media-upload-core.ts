@@ -98,7 +98,8 @@ export function alignMediaFilenameWithType(
   const extension = EXTENSION_BY_MEDIA_TYPE[contentType];
   const lastDot = safeFilename.lastIndexOf(".");
   const basename = lastDot > 0 ? safeFilename.slice(0, lastDot) : safeFilename;
-  return `${basename}.${extension}`.slice(0, MAX_FILENAME_LENGTH);
+  const maxBasenameLength = MAX_FILENAME_LENGTH - extension.length - 1;
+  return `${basename.slice(0, maxBasenameLength)}.${extension}`;
 }
 
 export function sanitizeMediaFilename(filename: string): string {
