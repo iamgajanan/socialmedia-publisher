@@ -76,6 +76,21 @@ async function uploadImage(media: MediaAsset, accessToken: string, owner: string
   return imageUrn;
 }
 
+
+async function uploadDocument(media: MediaAsset, accessToken: string, owner: string) {
+  const bytes = await downloadMedia(media);
+  const registration = await providerFetch("https://api.linkedin.com/rest/documents?action=initializeUpload", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + accessToken, "X-Restli-Protocol-Version": "2.0.0", "Linkedin-Version": LINKEDIN_VERSION, "Content-Type": "application/json" },
+    body: JSON.stringify({ initializeUploadRequest: { owner } }),
+  });
+  const body = await registration.json() as { value?: { uploadUrl?: string; document?: string } };
+  if (!body.value?.uploadUrl || !body.value.document) throw new PublisherError("LinkedIn did not return a document upload URL.", { code: "linkedin_document_upload_init_failed" });
+  const upload = await fetch(body.value.uploadUrl, { method: "PUT", headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/pdf" }, body: bytes });
+  if (!upload.ok) throw new PublisherError("LinkedIn document upload failed (" + upload.status + ").", { retryable: upload.status === 408 || upload.status === 429 || upload.status >= 500, code: "linkedin_document_upload_" + upload.status });
+  return body.value.document;
+}
+
 async function uploadVideo(media: MediaAsset, accessToken: string, owner: string) {
   const bytes = await downloadMedia(media);
   const registration = await providerFetch(
@@ -196,15 +211,14 @@ export const linkedinPublisher: Publisher = {
     if (!input.content.trim() && input.media.length === 0) {
       throw new PublisherError("LinkedIn posts need text or supported media.", { code: "empty_post" });
     }
-    if (input.media.length > 1) {
-      throw new PublisherError("LinkedIn supports one image or video per post in OmniSocial.", { code: "too_many_media" });
-    }
-    if (input.media.length === 1) {
-      const mimeType = input.media[0].mimeType.toLowerCase();
-      if (!LINKEDIN_IMAGE_TYPES.has(mimeType) && !LINKEDIN_VIDEO_TYPES.has(mimeType)) {
-        throw new PublisherError("LinkedIn supports JPEG/PNG images and MP4/MOV videos.", { code: "unsupported_media_type" });
-      }
-    }
+    const documents = input.media.filter((media) => media.mimeType.toLowerCase() === "application/pdf");
+    const nonDocuments = input.media.filter((media) => media.mimeType.toLowerCase() !== "application/pdf");
+    if (documents.length > 1 || (documents.length && nonDocuments.length)) throw new PublisherError("Publish one PDF document per LinkedIn post, or publish images/video instead.", { code: "invalid_linkedin_media_combination" });
+    if (nonDocuments.length > 20) throw new PublisherError("LinkedIn supports up to 20 images per multi-image post.", { code: "too_many_media" });
+    const types = nonDocuments.map((media) => media.mimeType.toLowerCase());
+    if (types.some((type) => LINKEDIN_VIDEO_TYPES.has(type)) && types.length > 1) throw new PublisherError("LinkedIn video posts support one video at a time.", { code: "invalid_linkedin_media_combination" });
+    if (types.some((type) => !LINKEDIN_IMAGE_TYPES.has(type) && !LINKEDIN_VIDEO_TYPES.has(type))) throw new PublisherError("LinkedIn supports JPEG/PNG images, PDF documents and MP4/MOV videos.", { code: "unsupported_media_type" });
+    if (types.some((type) => LINKEDIN_VIDEO_TYPES.has(type)) && types.some((type) => LINKEDIN_IMAGE_TYPES.has(type))) throw new PublisherError("LinkedIn posts cannot mix images and videos.", { code: "invalid_linkedin_media_combination" });
     if (input.content.length > 3000) {
       throw new PublisherError("LinkedIn content exceeds the 3,000 character limit.", { code: "content_too_long" });
     }
@@ -235,10 +249,20 @@ export const linkedinPublisher: Publisher = {
       return { platformPostId: id };
     }
 
-    const media = input.media[0];
-    const mediaId = media.mimeType.startsWith("image/")
-      ? await uploadImage(media, accessToken, author)
-      : await uploadVideo(media, accessToken, author);
+    const documents = input.media.filter((media) => media.mimeType.toLowerCase() === "application/pdf");
+    const images = input.media.filter((media) => media.mimeType.startsWith("image/"));
+    let content: Record<string, unknown>;
+    if (documents.length) {
+      const documentUrn = await uploadDocument(documents[0], accessToken, author);
+      content = { media: { id: documentUrn, title: documents[0].path.split("/").pop()?.replace(/\\.[^.]+$/, "") || "Document" } };
+    } else if (images.length > 1) {
+      const imageUrns = await Promise.all(images.map((media) => uploadImage(media, accessToken, author)));
+      content = { multiImage: { images: imageUrns.map((id) => ({ id })) } };
+    } else {
+      const media = input.media[0];
+      const mediaId = media.mimeType.startsWith("image/") ? await uploadImage(media, accessToken, author) : await uploadVideo(media, accessToken, author);
+      content = { media: { id: mediaId } };
+    }
 
     const response = await providerFetch("https://api.linkedin.com/rest/posts", {
       method: "POST",
@@ -253,7 +277,7 @@ export const linkedinPublisher: Publisher = {
         commentary: input.content,
         visibility: "PUBLIC",
         distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
-        content: { media: { id: mediaId } },
+        content,
         lifecycleState: "PUBLISHED",
         isReshareDisabledByAuthor: false,
       }),
