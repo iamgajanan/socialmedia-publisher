@@ -27,19 +27,41 @@ export const facebookPublisher: Publisher = {
   platform: "facebook",
   validate(input) {
     if (!input.content.trim() && input.media.length === 0) throw new PublisherError("Facebook posts need text or media.", { code: "empty_post" });
-    if (input.media.length > 1) throw new PublisherError("Facebook publishing currently supports one media asset per destination.", { code: "facebook_media_count" });
+    if (input.media.length > 10) throw new PublisherError("Facebook photo posts support at most 10 images in this integration.", { code: "facebook_media_count" });
+    if (input.media.length > 1 && input.media.some((media) => !media.mimeType.startsWith("image/"))) throw new PublisherError("Facebook multi-media posts currently support images only. Publish videos one at a time.", { code: "facebook_carousel_media_type" });
   },
   async publish(input, accessToken) {
     const version = graphVersion();
     const page = pageContext(accessToken, input.account.external_account_id);
+    if (input.media.length > 1) {
+      const photoIds: string[] = [];
+      for (const media of input.media) {
+        const uploadBody = new URLSearchParams({
+          url: media.url,
+          published: "false",
+          access_token: page.accessToken,
+        });
+        const uploadResponse = await providerFetch(
+          `https://graph.facebook.com/${version}/${encodeURIComponent(page.id)}/photos`,
+          { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: uploadBody },
+        );
+        const uploaded = await uploadResponse.json() as { id?: string };
+        if (!uploaded.id) throw new PublisherError("Facebook did not return an ID for an unpublished photo.", { code: "facebook_photo_upload_failed" });
+        photoIds.push(uploaded.id);
+      }
+      const postBody = new URLSearchParams({ message: input.content, access_token: page.accessToken });
+      photoIds.forEach((id, index) => postBody.set(`attached_media[${index}]`, JSON.stringify({ media_fbid: id })));
+      const postResponse = await providerFetch(
+        `https://graph.facebook.com/${version}/${encodeURIComponent(page.id)}/feed`,
+        { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: postBody },
+      );
+      const post = await postResponse.json() as { id?: string };
+      if (!post.id) throw new PublisherError("Facebook did not return a post ID for the multi-photo post.", { code: "missing_post_id" });
+      return { platformPostId: post.id };
+    }
+
     const media = input.media[0];
-    const request = buildFacebookPublishRequest(
-      version,
-      page.id,
-      page.accessToken,
-      input.content,
-      media ? { url: media.url, mimeType: media.mimeType } : undefined,
-    );
+    const request = buildFacebookPublishRequest(version, page.id, page.accessToken, input.content, media ? { url: media.url, mimeType: media.mimeType } : undefined);
     const response = await providerFetch(request.url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

@@ -6,10 +6,12 @@ test("Facebook accepts text-only posts", () => {
   assert.equal(validateMediaSelection(["facebook"], []), null);
 });
 
-test("Facebook accepts one image or one video", () => {
+test("Facebook accepts up to 10 images or one video", () => {
   assert.equal(validateMediaSelection(["facebook"], ["image/jpeg"]), null);
+  assert.equal(validateMediaSelection(["facebook"], Array(10).fill("image/jpeg")), null);
+  assert.match(validateMediaSelection(["facebook"], Array(11).fill("image/jpeg")) ?? "", /at most 10/);
   assert.equal(validateMediaSelection(["facebook"], ["video/mp4"]), null);
-  assert.notEqual(validateMediaSelection(["facebook"], ["image/jpeg", "image/png"]), null);
+  assert.notEqual(validateMediaSelection(["facebook"], ["image/jpeg", "video/mp4"]), null);
 });
 
 test("Facebook and Instagram accept one shared image or video", () => {

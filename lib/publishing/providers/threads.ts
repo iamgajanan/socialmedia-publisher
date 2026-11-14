@@ -65,64 +65,60 @@ export const threadsPublisher: Publisher = {
   },
   async publish(input, accessToken) {
     const userId = input.account.external_account_id;
-    const body = new URLSearchParams();
-
-    if (!input.media.length) {
-      body.set("media_type", "TEXT");
-      body.set("text", input.content);
-    } else {
-      const media = input.media[0];
-      const isVideo = media.mimeType.startsWith("video/");
-      body.set("media_type", isVideo ? "VIDEO" : "IMAGE");
-      if (input.content.trim()) body.set("text", input.content);
-      body.set(isVideo ? "video_url" : "image_url", media.url);
-    }
-
-    const containerResponse = await providerFetch(
-      `${THREADS_GRAPH_URL}/${encodeURIComponent(userId)}/threads`,
-      {
+    if (!userId) throw new PublisherError("The connected Threads user ID is missing.", { code: "threads_user_not_found" });
+    const createContainer = async (media?: { url: string; mimeType: string }, carouselItem = false) => {
+      const body = new URLSearchParams();
+      if (!media) {
+        body.set("media_type", "TEXT");
+        body.set("text", input.content);
+      } else {
+        const isVideo = media.mimeType.startsWith("video/");
+        body.set("media_type", isVideo ? "VIDEO" : "IMAGE");
+        body.set(isVideo ? "video_url" : "image_url", media.url);
+        if (carouselItem) body.set("is_carousel_item", "true");
+        if (!carouselItem && input.content.trim()) body.set("text", input.content);
+      }
+      const response = await providerFetch(`${THREADS_GRAPH_URL}/${encodeURIComponent(userId)}/threads`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/x-www-form-urlencoded" },
         body,
-      },
-    );
+      });
+      const result = await response.json() as { id?: string };
+      if (!result.id) throw new PublisherError("Threads did not return a media container ID.", { code: "missing_creation_id" });
+      return result.id;
+    };
 
-    const container = await containerResponse.json() as { id?: string };
-    if (!container.id) {
-      throw new PublisherError(
-        "Threads accepted the container request but did not return a creation ID.",
-        { code: "missing_creation_id" },
-      );
-    }
-
-    // Threads processes image/video containers asynchronously too. Publishing
-    // immediately after creation can return HTTP 400 "The requested resource
-    // does not exist" while the container is still IN_PROGRESS.
-    await waitForThreadsContainer(container.id, accessToken);
-
-    const publishResponse = await providerFetch(
-      `${THREADS_GRAPH_URL}/${encodeURIComponent(userId)}/threads_publish`,
-      {
+    let creationId: string;
+    if (input.media.length > 1) {
+      const childIds: string[] = [];
+      for (const media of input.media) {
+        childIds.push(await createContainer(media, true));
+      }
+      for (const childId of childIds) await waitForThreadsContainer(childId, accessToken);
+      const carouselResponse = await providerFetch(`${THREADS_GRAPH_URL}/${encodeURIComponent(userId)}/threads`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ creation_id: container.id }),
-      },
-    );
-
-    const published = await publishResponse.json() as { id?: string };
-    if (!published.id) {
-      throw new PublisherError(
-        "Threads published the post but did not return a post ID.",
-        { code: "missing_post_id" },
-      );
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          media_type: "CAROUSEL",
+          children: childIds.join(","),
+          ...(input.content.trim() ? { text: input.content } : {}),
+        }),
+      });
+      const carousel = await carouselResponse.json() as { id?: string };
+      if (!carousel.id) throw new PublisherError("Threads did not return a carousel container ID.", { code: "missing_creation_id" });
+      creationId = carousel.id;
+    } else {
+      creationId = await createContainer(input.media[0]);
     }
 
+    await waitForThreadsContainer(creationId, accessToken);
+    const publishResponse = await providerFetch(`${THREADS_GRAPH_URL}/${encodeURIComponent(userId)}/threads_publish`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ creation_id: creationId }),
+    });
+    const published = await publishResponse.json() as { id?: string };
+    if (!published.id) throw new PublisherError("Threads published the post but did not return a post ID.", { code: "missing_post_id" });
     return { platformPostId: published.id };
   },
   async refreshAccessToken(_account, accessToken) {
