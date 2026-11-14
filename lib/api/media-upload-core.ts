@@ -12,6 +12,7 @@ export const API_MEDIA_MIME_TYPES = [
   "video/webm",
   "video/quicktime",
   "video/x-matroska",
+  "application/pdf",
 ] as const;
 
 const MAX_FILENAME_LENGTH = 120;
