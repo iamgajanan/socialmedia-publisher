@@ -21,6 +21,7 @@ const SUPPORTED_MEDIA_TYPES = new Set([
   "video/webm",
   "video/quicktime",
   "video/x-matroska",
+  "application/pdf",
 ]);
 
 const VIDEO_SIGNATURES: Record<string, (bytes: Uint8Array) => boolean> = {
